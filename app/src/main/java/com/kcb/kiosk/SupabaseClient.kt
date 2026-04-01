@@ -5,6 +5,7 @@ import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 
 class SupabaseClient private constructor() {
     private val client by lazy {
@@ -18,16 +19,16 @@ class SupabaseClient private constructor() {
 
     suspend fun validatePin(pin: String): PinValidationResult = withContext(Dispatchers.IO) {
         try {
-            // Use a simpler approach: get the response as a list
-            val results = client.postgrest["credits"]
+            // Get raw JSON response
+            val response = client.postgrest["credits"]
                 .select {
                     filter { eq("pin", pin) }
                 }
-                .decodeList<Map<String, Any>>()
+                .decodeAs<JSONArray>()
             
-            if (results.isNotEmpty()) {
-                val row = results[0]
-                val seconds = (row["seconds_left"] as? Number)?.toInt() ?: 0
+            if (response.length() > 0) {
+                val row = response.getJSONObject(0)
+                val seconds = row.getInt("seconds_left")
                 PinValidationResult(true, seconds, null)
             } else {
                 PinValidationResult(false, 0, "PIN not found")
