@@ -70,6 +70,19 @@ class MainActivity : AppCompatActivity() {
         }
         layout.addView(statusText)
         
+        // Admin button
+        val adminBtn = Button(this).apply {
+            text = "🔐 ADMIN"
+            textSize = 14f
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            setTextColor(android.graphics.Color.GRAY)
+            setPadding(0, 30, 0, 0)
+            setOnClickListener {
+                startActivity(android.content.Intent(this@MainActivity, AdminActivity::class.java))
+            }
+        }
+        layout.addView(adminBtn)
+        
         setContentView(layout)
     }
     
@@ -94,7 +107,6 @@ class MainActivity : AppCompatActivity() {
                 if (result.isValid && result.secondsLeft > 0) {
                     startSession(result.secondsLeft)
                 } else {
-                    // Show the actual error message
                     val errorMsg = result.error ?: "Invalid PIN or expired"
                     Toast.makeText(this@MainActivity, errorMsg, Toast.LENGTH_LONG).show()
                 }
