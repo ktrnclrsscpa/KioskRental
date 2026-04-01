@@ -1,6 +1,5 @@
 package com.kcb.kiosk
 
-import android.widget.Toast
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
@@ -19,13 +18,20 @@ class SupabaseClient private constructor() {
 
     suspend fun validatePin(pin: String): PinValidationResult = withContext(Dispatchers.IO) {
         try {
-            val result = client.postgrest["credits"]
+            // Use a simpler approach: get the response as a list
+            val results = client.postgrest["credits"]
                 .select {
                     filter { eq("pin", pin) }
                 }
-                .decodeSingle<Map<String, Any>>()
-            val seconds = (result["seconds_left"] as Number).toInt()
-            PinValidationResult(true, seconds, null)
+                .decodeList<Map<String, Any>>()
+            
+            if (results.isNotEmpty()) {
+                val row = results[0]
+                val seconds = (row["seconds_left"] as? Number)?.toInt() ?: 0
+                PinValidationResult(true, seconds, null)
+            } else {
+                PinValidationResult(false, 0, "PIN not found")
+            }
         } catch (e: Exception) {
             PinValidationResult(false, 0, e.message ?: "Unknown error")
         }
