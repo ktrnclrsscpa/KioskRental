@@ -98,9 +98,56 @@ class SupabaseClient private constructor() {
         }
     }
 
+    suspend fun getWhitelistApps(): List<String> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("apikey", apiKey)
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            
+            if (connection.responseCode == 200) {
+                val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonArray = JSONArray(responseText)
+                if (jsonArray.length() > 0) {
+                    val value = jsonArray.getJSONObject(0).getString("setting_value")
+                    value.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                } else {
+                    defaultApps()
+                }
+            } else {
+                defaultApps()
+            }
+        } catch (e: Exception) {
+            defaultApps()
+        }
+    }
+
+    suspend fun updateWhitelistApps(apps: List<String>): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val appsString = apps.joinToString(",")
+            val url = URL("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "PATCH"
+            connection.setRequestProperty("apikey", apiKey)
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            
+            val jsonBody = JSONObject().apply {
+                put("setting_value", appsString)
+                put("updated_at", System.currentTimeMillis())
+            }.toString()
+            
+            connection.outputStream.write(jsonBody.toByteArray())
+            connection.responseCode in 200..299
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     suspend fun extendTime(pin: String, extraSeconds: Int): Boolean = withContext(Dispatchers.IO) {
         try {
-            // First get current seconds
             val getUrl = URL("$supabaseUrl/rest/v1/credits?pin=eq.$pin")
             val getConnection = getUrl.openConnection() as HttpURLConnection
             getConnection.requestMethod = "GET"
@@ -119,7 +166,6 @@ class SupabaseClient private constructor() {
                 return@withContext false
             }
             
-            // Update with new seconds
             val newSeconds = currentSeconds + extraSeconds
             val url = URL("$supabaseUrl/rest/v1/credits?pin=eq.$pin")
             val connection = url.openConnection() as HttpURLConnection
@@ -154,13 +200,11 @@ class SupabaseClient private constructor() {
         }
     }
 
-    suspend fun getWhitelistApps(): List<String> = withContext(Dispatchers.IO) {
-        listOf(
-            "com.google.android.youtube",
-            "com.roblox.client",
-            "com.gcash.gcash"
-        )
-    }
+    private fun defaultApps(): List<String> = listOf(
+        "com.google.android.youtube",
+        "com.roblox.client",
+        "com.gcash.gcash"
+    )
 
     companion object {
         private var instance: SupabaseClient? = null
