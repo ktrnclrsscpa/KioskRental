@@ -17,6 +17,8 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var refreshBtn: Button
     private lateinit var appListRecycler: RecyclerView
     private lateinit var saveAppsBtn: Button
+    private lateinit var pinsPanel: LinearLayout
+    private lateinit var appsPanel: LinearLayout
     private var currentTab = "pins"
     private var allApps = mutableListOf<AppInfo>()
     private var selectedPackages = mutableSetOf<String>()
@@ -62,9 +64,8 @@ class AdminActivity : AppCompatActivity() {
         layout.addView(tabsLayout)
         
         // PINS Panel
-        val pinsPanel = LinearLayout(this).apply {
+        pinsPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            id = android.R.id.content
         }
         
         val generateLabel = TextView(this).apply {
@@ -118,10 +119,9 @@ class AdminActivity : AppCompatActivity() {
         layout.addView(pinsPanel)
         
         // APPS Panel
-        val appsPanel = LinearLayout(this).apply {
+        appsPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = android.view.View.GONE
-            id = android.R.id.secondary
         }
         
         val appsLabel = TextView(this).apply {
@@ -161,16 +161,13 @@ class AdminActivity : AppCompatActivity() {
     
     private fun switchTab(tab: String) {
         currentTab = tab
-        val pinsPanel = findViewById<LinearLayout>(android.R.id.content)
-        val appsPanel = findViewById<LinearLayout>(android.R.id.secondary)
-        
         if (tab == "pins") {
-            pinsPanel?.visibility = android.view.View.VISIBLE
-            appsPanel?.visibility = android.view.View.GONE
+            pinsPanel.visibility = android.view.View.VISIBLE
+            appsPanel.visibility = android.view.View.GONE
             loadPins()
         } else {
-            pinsPanel?.visibility = android.view.View.GONE
-            appsPanel?.visibility = android.view.View.VISIBLE
+            pinsPanel.visibility = android.view.View.GONE
+            appsPanel.visibility = android.view.View.VISIBLE
         }
     }
     
@@ -276,5 +273,3 @@ class AdminActivity : AppCompatActivity() {
         }
     }
 }
-
-data class AppInfo(val name: String, val packageName: String)
