@@ -8,6 +8,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import kotlinx.coroutines.*
 
 class MainActivity : AppCompatActivity() {
     private lateinit var pinInput: EditText
@@ -15,9 +16,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var timerText: TextView
     private lateinit var statusText: TextView
     private var countDownTimer: CountDownTimer? = null
+    private lateinit var supabase: SupabaseClient
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        supabase = SupabaseClient.getInstance()
         
         // Create layout programmatically
         val layout = LinearLayout(this).apply {
@@ -82,11 +86,24 @@ class MainActivity : AppCompatActivity() {
             return
         }
         
-        // For now, accept only 123456
-        if (pin == "123456") {
-            startSession(600) // 10 minutes = 600 seconds
-        } else {
-            Toast.makeText(this, "Invalid PIN", Toast.LENGTH_SHORT).show()
+        // Disable input while checking
+        pinInput.isEnabled = false
+        activateBtn.isEnabled = false
+        statusText.text = "CHECKING..."
+        
+        CoroutineScope(Dispatchers.IO).launch {
+            val result = supabase.validatePin(pin)
+            withContext(Dispatchers.Main) {
+                pinInput.isEnabled = true
+                activateBtn.isEnabled = true
+                statusText.text = ""
+                
+                if (result.isValid && result.secondsLeft > 0) {
+                    startSession(result.secondsLeft)
+                } else {
+                    Toast.makeText(this@MainActivity, "Invalid PIN or expired", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
     
