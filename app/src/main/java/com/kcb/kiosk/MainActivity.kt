@@ -23,14 +23,12 @@ class MainActivity : AppCompatActivity() {
         
         supabase = SupabaseClient.getInstance()
         
-        // Create layout programmatically
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = android.view.Gravity.CENTER
             setPadding(50, 50, 50, 50)
         }
         
-        // Title
         val title = TextView(this).apply {
             text = "KCB RENTAL"
             textSize = 28f
@@ -39,7 +37,6 @@ class MainActivity : AppCompatActivity() {
         }
         layout.addView(title)
         
-        // PIN input
         pinInput = EditText(this).apply {
             hint = "Enter 6-digit PIN"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
@@ -49,7 +46,6 @@ class MainActivity : AppCompatActivity() {
         }
         layout.addView(pinInput)
         
-        // Activate button
         activateBtn = Button(this).apply {
             text = "ACTIVATE"
             textSize = 18f
@@ -58,7 +54,6 @@ class MainActivity : AppCompatActivity() {
         }
         layout.addView(activateBtn)
         
-        // Timer display
         timerText = TextView(this).apply {
             text = "--:--"
             textSize = 48f
@@ -67,7 +62,6 @@ class MainActivity : AppCompatActivity() {
         }
         layout.addView(timerText)
         
-        // Status display
         statusText = TextView(this).apply {
             text = ""
             textSize = 16f
@@ -86,7 +80,6 @@ class MainActivity : AppCompatActivity() {
             return
         }
         
-        // Disable input while checking
         pinInput.isEnabled = false
         activateBtn.isEnabled = false
         statusText.text = "CHECKING..."
@@ -101,7 +94,9 @@ class MainActivity : AppCompatActivity() {
                 if (result.isValid && result.secondsLeft > 0) {
                     startSession(result.secondsLeft)
                 } else {
-                    Toast.makeText(this@MainActivity, "Invalid PIN or expired", Toast.LENGTH_SHORT).show()
+                    // Show the actual error message
+                    val errorMsg = result.error ?: "Invalid PIN or expired"
+                    Toast.makeText(this@MainActivity, errorMsg, Toast.LENGTH_LONG).show()
                 }
             }
         }
