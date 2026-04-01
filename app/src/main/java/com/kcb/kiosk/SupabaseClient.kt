@@ -1,5 +1,6 @@
 package com.kcb.kiosk
 
+import android.widget.Toast
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
@@ -24,9 +25,9 @@ class SupabaseClient private constructor() {
                 }
                 .decodeSingle<Map<String, Any>>()
             val seconds = (result["seconds_left"] as Number).toInt()
-            PinValidationResult(true, seconds)
+            PinValidationResult(true, seconds, null)
         } catch (e: Exception) {
-            PinValidationResult(false, 0)
+            PinValidationResult(false, 0, e.message ?: "Unknown error")
         }
     }
 
@@ -47,4 +48,4 @@ class SupabaseClient private constructor() {
     }
 }
 
-data class PinValidationResult(val isValid: Boolean, val secondsLeft: Int)
+data class PinValidationResult(val isValid: Boolean, val secondsLeft: Int, val error: String?)
