@@ -1,12 +1,11 @@
 package com.kcb.kiosk
 
+import android.content.pm.PackageManager
 import android.os.Bundle
-import android.widget.Button
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
 
 class AdminActivity : AppCompatActivity() {
@@ -16,6 +15,11 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var generateMinutesInput: EditText
     private lateinit var generateBtn: Button
     private lateinit var refreshBtn: Button
+    private lateinit var appListRecycler: RecyclerView
+    private lateinit var saveAppsBtn: Button
+    private var currentTab = "pins"
+    private var allApps = mutableListOf<AppInfo>()
+    private var selectedPackages = mutableSetOf<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,17 +35,44 @@ class AdminActivity : AppCompatActivity() {
         val title = TextView(this).apply {
             text = "🔐 ADMIN PANEL"
             textSize = 24f
-            setPadding(0, 0, 0, 30)
+            setPadding(0, 0, 0, 20)
         }
         layout.addView(title)
         
-        // Generate PIN section
+        // Tabs
+        val tabsLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 0, 0, 20)
+        }
+        
+        val pinsTab = Button(this).apply {
+            text = "📋 PINS"
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setOnClickListener { switchTab("pins") }
+        }
+        tabsLayout.addView(pinsTab)
+        
+        val appsTab = Button(this).apply {
+            text = "📱 APPS"
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setOnClickListener { switchTab("apps") }
+        }
+        tabsLayout.addView(appsTab)
+        
+        layout.addView(tabsLayout)
+        
+        // PINS Panel
+        val pinsPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            id = android.R.id.content
+        }
+        
         val generateLabel = TextView(this).apply {
             text = "Generate New PIN"
             textSize = 18f
             setPadding(0, 20, 0, 10)
         }
-        layout.addView(generateLabel)
+        pinsPanel.addView(generateLabel)
         
         val pinRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -62,33 +93,138 @@ class AdminActivity : AppCompatActivity() {
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
         }
         pinRow.addView(generateMinutesInput)
-        layout.addView(pinRow)
+        pinsPanel.addView(pinRow)
         
         generateBtn = Button(this).apply {
             text = "GENERATE PIN"
             setOnClickListener { generatePin() }
         }
-        layout.addView(generateBtn)
+        pinsPanel.addView(generateBtn)
         
-        // Refresh button
         refreshBtn = Button(this).apply {
             text = "🔄 REFRESH LIST"
             setPadding(0, 20, 0, 20)
             setOnClickListener { loadPins() }
         }
-        layout.addView(refreshBtn)
+        pinsPanel.addView(refreshBtn)
         
-        // PIN list
         pinListText = TextView(this).apply {
             text = "Loading PINs..."
             textSize = 14f
             setPadding(0, 20, 0, 0)
         }
-        layout.addView(pinListText)
+        pinsPanel.addView(pinListText)
+        
+        layout.addView(pinsPanel)
+        
+        // APPS Panel
+        val appsPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = android.view.View.GONE
+            id = android.R.id.secondary
+        }
+        
+        val appsLabel = TextView(this).apply {
+            text = "Select Apps for Customers"
+            textSize = 18f
+            setPadding(0, 20, 0, 10)
+        }
+        appsPanel.addView(appsLabel)
+        
+        val infoText = TextView(this).apply {
+            text = "Tap checkbox to allow/disallow app"
+            textSize = 12f
+            setPadding(0, 0, 0, 10)
+        }
+        appsPanel.addView(infoText)
+        
+        appListRecycler = RecyclerView(this).apply {
+            layoutManager = LinearLayoutManager(this@AdminActivity)
+            setPadding(0, 0, 0, 20)
+        }
+        appsPanel.addView(appListRecycler)
+        
+        saveAppsBtn = Button(this).apply {
+            text = "💾 SAVE WHITELIST"
+            setOnClickListener { saveWhitelist() }
+        }
+        appsPanel.addView(saveAppsBtn)
+        
+        layout.addView(appsPanel)
         
         setContentView(layout)
         
         loadPins()
+        loadInstalledApps()
+        loadCurrentWhitelist()
+    }
+    
+    private fun switchTab(tab: String) {
+        currentTab = tab
+        val pinsPanel = findViewById<LinearLayout>(android.R.id.content)
+        val appsPanel = findViewById<LinearLayout>(android.R.id.secondary)
+        
+        if (tab == "pins") {
+            pinsPanel?.visibility = android.view.View.VISIBLE
+            appsPanel?.visibility = android.view.View.GONE
+            loadPins()
+        } else {
+            pinsPanel?.visibility = android.view.View.GONE
+            appsPanel?.visibility = android.view.View.VISIBLE
+        }
+    }
+    
+    private fun loadInstalledApps() {
+        val installedApps = mutableListOf<AppInfo>()
+        val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+        
+        for (app in packages) {
+            if (packageManager.getLaunchIntentForPackage(app.packageName) != null) {
+                installedApps.add(AppInfo(
+                    name = packageManager.getApplicationLabel(app).toString(),
+                    packageName = app.packageName
+                ))
+            }
+        }
+        
+        installedApps.sortBy { it.name }
+        allApps = installedApps
+        
+        runOnUiThread {
+            appListRecycler.adapter = AppSelectionAdapter(allApps, selectedPackages) { updatedSelection ->
+                selectedPackages.clear()
+                selectedPackages.addAll(updatedSelection)
+            }
+        }
+    }
+    
+    private fun loadCurrentWhitelist() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val whitelist = supabase.getWhitelistApps()
+            withContext(Dispatchers.Main) {
+                selectedPackages.clear()
+                selectedPackages.addAll(whitelist)
+                (appListRecycler.adapter as? AppSelectionAdapter)?.updateSelection(selectedPackages.toList())
+            }
+        }
+    }
+    
+    private fun saveWhitelist() {
+        saveAppsBtn.isEnabled = false
+        saveAppsBtn.text = "SAVING..."
+        
+        CoroutineScope(Dispatchers.IO).launch {
+            val success = supabase.updateWhitelistApps(selectedPackages.toList())
+            withContext(Dispatchers.Main) {
+                saveAppsBtn.isEnabled = true
+                saveAppsBtn.text = "💾 SAVE WHITELIST"
+                if (success) {
+                    Toast.makeText(this@AdminActivity, "Whitelist saved!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@AdminActivity, "Failed to save", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
     
     private fun generatePin() {
@@ -140,3 +276,5 @@ class AdminActivity : AppCompatActivity() {
         }
     }
 }
+
+data class AppInfo(val name: String, val packageName: String)
