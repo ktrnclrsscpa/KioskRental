@@ -5,16 +5,20 @@ import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
 import org.json.JSONArray
+import org.json.JSONObject
 
 class SupabaseClient private constructor() {
 
+    private val supabaseUrl = "https://qbricrnjchbdyseeuwif.supabase.co"
+    private val apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicmljcm5qY2hiZHlzZWV1d2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDU0NDUsImV4cCI6MjA4OTc4MTQ0NX0.5sJqi3fZc4VIFQAIw1QptHt7MlGdnkn5SVxYdRu4f7Q"
+
     suspend fun validatePin(pin: String): PinValidationResult = withContext(Dispatchers.IO) {
         try {
-            val url = URL("https://qbricrnjchbdyseeuwif.supabase.co/rest/v1/credits?pin=eq.$pin")
+            val url = URL("$supabaseUrl/rest/v1/credits?pin=eq.$pin")
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
-            connection.setRequestProperty("apikey", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicmljcm5qY2hiZHlzZWV1d2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDU0NDUsImV4cCI6MjA4OTc4MTQ0NX0.5sJqi3fZc4VIFQAIw1QptHt7MlGdnkn5SVxYdRu4f7Q")
-            connection.setRequestProperty("Authorization", "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicmljcm5qY2hiZHlzZWV1d2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDU0NDUsImV4cCI6MjA4OTc4MTQ0NX0.5sJqi3fZc4VIFQAIw1QptHt7MlGdnkn5SVxYdRu4f7Q")
+            connection.setRequestProperty("apikey", apiKey)
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
             
             val responseCode = connection.responseCode
             if (responseCode == 200) {
@@ -32,6 +36,121 @@ class SupabaseClient private constructor() {
             }
         } catch (e: Exception) {
             PinValidationResult(false, 0, e.message ?: "Network error")
+        }
+    }
+
+    suspend fun generatePin(customPin: String?, seconds: Int): String? = withContext(Dispatchers.IO) {
+        try {
+            val pin = customPin ?: (100000..999999).random().toString()
+            
+            val url = URL("$supabaseUrl/rest/v1/credits")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("apikey", apiKey)
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            
+            val jsonBody = JSONObject().apply {
+                put("pin", pin)
+                put("seconds_left", seconds)
+            }.toString()
+            
+            connection.outputStream.write(jsonBody.toByteArray())
+            
+            val responseCode = connection.responseCode
+            if (responseCode in 200..299) {
+                pin
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun getActivePins(): List<PinData> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL("$supabaseUrl/rest/v1/credits?seconds_left=gt.0&order=created_at.desc")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("apikey", apiKey)
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            
+            val responseCode = connection.responseCode
+            if (responseCode == 200) {
+                val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonArray = JSONArray(responseText)
+                val list = mutableListOf<PinData>()
+                for (i in 0 until jsonArray.length()) {
+                    val obj = jsonArray.getJSONObject(i)
+                    list.add(PinData(
+                        pin = obj.getString("pin"),
+                        secondsLeft = obj.getInt("seconds_left")
+                    ))
+                }
+                list
+            } else {
+                emptyList()
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun extendTime(pin: String, extraSeconds: Int): Boolean = withContext(Dispatchers.IO) {
+        try {
+            // First get current seconds
+            val getUrl = URL("$supabaseUrl/rest/v1/credits?pin=eq.$pin")
+            val getConnection = getUrl.openConnection() as HttpURLConnection
+            getConnection.requestMethod = "GET"
+            getConnection.setRequestProperty("apikey", apiKey)
+            getConnection.setRequestProperty("Authorization", "Bearer $apiKey")
+            
+            val currentSeconds = if (getConnection.responseCode == 200) {
+                val responseText = getConnection.inputStream.bufferedReader().use { it.readText() }
+                val jsonArray = JSONArray(responseText)
+                if (jsonArray.length() > 0) {
+                    jsonArray.getJSONObject(0).getInt("seconds_left")
+                } else {
+                    return@withContext false
+                }
+            } else {
+                return@withContext false
+            }
+            
+            // Update with new seconds
+            val newSeconds = currentSeconds + extraSeconds
+            val url = URL("$supabaseUrl/rest/v1/credits?pin=eq.$pin")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "PATCH"
+            connection.setRequestProperty("apikey", apiKey)
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            
+            val jsonBody = JSONObject().apply {
+                put("seconds_left", newSeconds)
+            }.toString()
+            
+            connection.outputStream.write(jsonBody.toByteArray())
+            connection.responseCode in 200..299
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun deletePin(pin: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val url = URL("$supabaseUrl/rest/v1/credits?pin=eq.$pin")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "DELETE"
+            connection.setRequestProperty("apikey", apiKey)
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            
+            connection.responseCode in 200..299
+        } catch (e: Exception) {
+            false
         }
     }
 
@@ -53,3 +172,4 @@ class SupabaseClient private constructor() {
 }
 
 data class PinValidationResult(val isValid: Boolean, val secondsLeft: Int, val error: String?)
+data class PinData(val pin: String, val secondsLeft: Int)
