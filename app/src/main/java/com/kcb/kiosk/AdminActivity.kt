@@ -49,7 +49,7 @@ class AdminActivity : AppCompatActivity() {
         }
         
         generatePinInput = EditText(this).apply {
-            hint = "PIN (leave blank for random)"
+            hint = "PIN (leave blank)"
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             setPadding(10, 10, 10, 10)
         }
