@@ -17,6 +17,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private var countDownTimer: CountDownTimer? = null
     private lateinit var supabase: SupabaseClient
+    private var currentPin: String? = null
+    private var syncJob: Job? = null
+    private var isActive = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,7 +73,6 @@ class MainActivity : AppCompatActivity() {
         }
         layout.addView(statusText)
         
-        // Admin button
         val adminBtn = Button(this).apply {
             text = "🔐 ADMIN"
             textSize = 14f
@@ -84,6 +86,9 @@ class MainActivity : AppCompatActivity() {
         layout.addView(adminBtn)
         
         setContentView(layout)
+        
+        // Check if there's an active session from previous run
+        checkExistingSession()
     }
     
     private fun validatePin() {
@@ -105,6 +110,7 @@ class MainActivity : AppCompatActivity() {
                 statusText.text = ""
                 
                 if (result.isValid && result.secondsLeft > 0) {
+                    currentPin = pin
                     startSession(result.secondsLeft)
                 } else {
                     val errorMsg = result.error ?: "Invalid PIN or expired"
@@ -115,10 +121,12 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun startSession(seconds: Int) {
+        isActive = true
         pinInput.isEnabled = false
         activateBtn.isEnabled = false
         statusText.text = "ACTIVE"
         
+        // Start the countdown timer
         countDownTimer?.cancel()
         countDownTimer = object : CountDownTimer(seconds * 1000L, 1000) {
             override fun onTick(millisUntilFinished: Long) {
@@ -132,10 +140,52 @@ class MainActivity : AppCompatActivity() {
                 endSession()
             }
         }.start()
+        
+        // Start periodic sync with Supabase
+        startSync()
+    }
+    
+    private fun startSync() {
+        syncJob?.cancel()
+        syncJob = CoroutineScope(Dispatchers.IO).launch {
+            while (isActive && currentPin != null) {
+                delay(5000) // Check every 5 seconds
+                val result = supabase.validatePin(currentPin!!)
+                withContext(Dispatchers.Main) {
+                    if (!result.isValid || result.secondsLeft <= 0) {
+                        // Session expired or invalid from database
+                        Toast.makeText(this@MainActivity, "Session expired (admin)", Toast.LENGTH_SHORT).show()
+                        endSession()
+                    } else if (result.secondsLeft != getCurrentRemainingSeconds()) {
+                        // Update timer if database has different time
+                        updateTimerFromDatabase(result.secondsLeft)
+                    }
+                }
+            }
+        }
+    }
+    
+    private fun getCurrentRemainingSeconds(): Int {
+        // Get current seconds from timer text
+        val timeStr = timerText.text.toString()
+        if (timeStr == "--:--") return 0
+        val parts = timeStr.split(":")
+        if (parts.size == 2) {
+            return parts[0].toInt() * 60 + parts[1].toInt()
+        }
+        return 0
+    }
+    
+    private fun updateTimerFromDatabase(seconds: Int) {
+        countDownTimer?.cancel()
+        startSession(seconds)
     }
     
     private fun endSession() {
+        isActive = false
+        syncJob?.cancel()
         countDownTimer?.cancel()
+        currentPin = null
         pinInput.isEnabled = true
         activateBtn.isEnabled = true
         statusText.text = ""
@@ -143,8 +193,13 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "Session expired", Toast.LENGTH_LONG).show()
     }
     
+    private fun checkExistingSession() {
+        // Check if there's a saved session (optional - can be implemented later)
+    }
+    
     override fun onDestroy() {
         super.onDestroy()
         countDownTimer?.cancel()
+        syncJob?.cancel()
     }
 }
