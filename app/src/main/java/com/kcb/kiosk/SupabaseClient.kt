@@ -1,40 +1,37 @@
 package com.kcb.kiosk
 
-import io.github.jan.supabase.createSupabaseClient
-import io.github.jan.supabase.postgrest.Postgrest
-import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
 import org.json.JSONArray
 
 class SupabaseClient private constructor() {
-    private val client by lazy {
-        createSupabaseClient(
-            supabaseUrl = "https://qbricrnjchbdyseeuwif.supabase.co",
-            supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicmljcm5qY2hiZHlzZWV1d2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDU0NDUsImV4cCI6MjA4OTc4MTQ0NX0.5sJqi3fZc4VIFQAIw1QptHt7MlGdnkn5SVxYdRu4f7Q"
-        ) {
-            install(Postgrest)
-        }
-    }
 
     suspend fun validatePin(pin: String): PinValidationResult = withContext(Dispatchers.IO) {
         try {
-            // Get raw JSON response
-            val response = client.postgrest["credits"]
-                .select {
-                    filter { eq("pin", pin) }
-                }
-                .decodeAs<JSONArray>()
+            val url = URL("https://qbricrnjchbdyseeuwif.supabase.co/rest/v1/credits?pin=eq.$pin")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("apikey", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicmljcm5qY2hiZHlzZWV1d2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDU0NDUsImV4cCI6MjA4OTc4MTQ0NX0.5sJqi3fZc4VIFQAIw1QptHt7MlGdnkn5SVxYdRu4f7Q")
+            connection.setRequestProperty("Authorization", "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicmljcm5qY2hiZHlzZWV1d2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDU0NDUsImV4cCI6MjA4OTc4MTQ0NX0.5sJqi3fZc4VIFQAIw1QptHt7MlGdnkn5SVxYdRu4f7Q")
             
-            if (response.length() > 0) {
-                val row = response.getJSONObject(0)
-                val seconds = row.getInt("seconds_left")
-                PinValidationResult(true, seconds, null)
+            val responseCode = connection.responseCode
+            if (responseCode == 200) {
+                val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonArray = JSONArray(responseText)
+                if (jsonArray.length() > 0) {
+                    val jsonObject = jsonArray.getJSONObject(0)
+                    val seconds = jsonObject.getInt("seconds_left")
+                    PinValidationResult(true, seconds, null)
+                } else {
+                    PinValidationResult(false, 0, "PIN not found")
+                }
             } else {
-                PinValidationResult(false, 0, "PIN not found")
+                PinValidationResult(false, 0, "HTTP error: $responseCode")
             }
         } catch (e: Exception) {
-            PinValidationResult(false, 0, e.message ?: "Unknown error")
+            PinValidationResult(false, 0, e.message ?: "Network error")
         }
     }
 
