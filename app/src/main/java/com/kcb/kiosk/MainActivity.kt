@@ -26,6 +26,7 @@ class MainActivity : AppCompatActivity() {
     private var isActive = false
     private var appList = mutableListOf<AppInfo>()
     private var gridReady = false
+    private val allInstalledApps = mutableListOf<AppInfo>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -295,8 +296,4 @@ class MainActivity : AppCompatActivity() {
             // Ignore
         }
     }
-    
-    companion object {
-        private val allInstalledApps = mutableListOf<AppInfo>()
-    }
-}￼Enter
+}
