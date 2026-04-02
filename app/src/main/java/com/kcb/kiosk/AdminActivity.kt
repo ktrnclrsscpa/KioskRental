@@ -29,7 +29,6 @@ class AdminActivity : AppCompatActivity() {
             setPadding(30, 50, 30, 30)
         }
         
-        // Title
         val title = TextView(this).apply {
             text = "🔐 SELECT APPS FOR CUSTOMERS"
             textSize = 22f
@@ -38,7 +37,6 @@ class AdminActivity : AppCompatActivity() {
         }
         layout.addView(title)
         
-        // Status text
         statusText = TextView(this).apply {
             text = "Loading apps..."
             textSize = 12f
@@ -46,7 +44,6 @@ class AdminActivity : AppCompatActivity() {
         }
         layout.addView(statusText)
         
-        // Recycler for apps
         appListRecycler = RecyclerView(this).apply {
             layoutManager = LinearLayoutManager(this@AdminActivity)
             setPadding(0, 0, 0, 20)
@@ -54,7 +51,6 @@ class AdminActivity : AppCompatActivity() {
         }
         layout.addView(appListRecycler)
         
-        // Save button
         saveAppsBtn = Button(this).apply {
             text = "💾 SAVE WHITELIST"
             setOnClickListener { saveWhitelist() }
