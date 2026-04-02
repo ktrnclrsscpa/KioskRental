@@ -156,53 +156,25 @@ class SupabaseClient private constructor() {
         try {
             val appsString = apps.joinToString(",")
             
-            // First try PATCH (update existing record)
-            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps"))
+            // Simple PATCH request - same as browser test
+            val url = URL("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps")
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "PATCH"
             connection.setRequestProperty("apikey", apiKey)
             connection.setRequestProperty("Authorization", "Bearer $apiKey")
             connection.setRequestProperty("Content-Type", "application/json")
             connection.doOutput = true
-            connection.connectTimeout = 5000
-            connection.readTimeout = 5000
+            connection.connectTimeout = 10000
+            connection.readTimeout = 10000
             
-            val jsonBody = JSONObject().apply {
-                put("setting_value", appsString)
-                put("updated_at", System.currentTimeMillis())
-            }.toString()
-            
+            val jsonBody = "{\"setting_value\":\"$appsString\"}"
             connection.outputStream.write(jsonBody.toByteArray())
             
             val responseCode = connection.responseCode
             connection.disconnect()
             
-            if (responseCode == 200) {
-                return@withContext true
-            }
-            
-            // If PATCH fails (no existing record), try POST to insert
-            val insertUrl = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings"))
-            val insertConnection = insertUrl.openConnection() as HttpURLConnection
-            insertConnection.requestMethod = "POST"
-            insertConnection.setRequestProperty("apikey", apiKey)
-            insertConnection.setRequestProperty("Authorization", "Bearer $apiKey")
-            insertConnection.setRequestProperty("Content-Type", "application/json")
-            insertConnection.doOutput = true
-            insertConnection.connectTimeout = 5000
-            insertConnection.readTimeout = 5000
-            
-            val insertBody = JSONObject().apply {
-                put("setting_key", "whitelist_apps")
-                put("setting_value", appsString)
-                put("updated_at", System.currentTimeMillis())
-            }.toString()
-            
-            insertConnection.outputStream.write(insertBody.toByteArray())
-            val insertResponseCode = insertConnection.responseCode
-            insertConnection.disconnect()
-            
-            insertResponseCode in 200..299
+            // 204 means success (no content returned)
+            responseCode == 204 || responseCode == 200
         } catch (e: Exception) {
             e.printStackTrace()
             false
