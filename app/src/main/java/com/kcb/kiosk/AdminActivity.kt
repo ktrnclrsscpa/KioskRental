@@ -3,62 +3,66 @@ package com.kcb.kiosk
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
 
 class AdminActivity : AppCompatActivity() {
     private lateinit var supabase: SupabaseClient
-    private lateinit var appListRecycler: RecyclerView
-    private lateinit var saveAppsBtn: Button
+    private lateinit var container: LinearLayout
+    private lateinit var saveBtn: Button
     private lateinit var statusText: TextView
-    private var allApps = mutableListOf<AppInfo>()
-    private var selectedPackages = mutableSetOf<String>()
+    private val checkBoxes = mutableListOf<Pair<CheckBox, String>>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
         supabase = SupabaseClient.getInstance()
         
-        val layout = LinearLayout(this).apply {
+        // Main layout
+        val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(30, 50, 30, 30)
         }
         
+        // Title
         val title = TextView(this).apply {
             text = "🔐 SELECT APPS FOR CUSTOMERS"
             textSize = 22f
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 20)
         }
-        layout.addView(title)
+        mainLayout.addView(title)
         
+        // Status text
         statusText = TextView(this).apply {
             text = "Loading apps..."
             textSize = 12f
             setPadding(0, 0, 0, 10)
         }
-        layout.addView(statusText)
+        mainLayout.addView(statusText)
         
-        appListRecycler = RecyclerView(this).apply {
-            layoutManager = LinearLayoutManager(this@AdminActivity)
-            setPadding(0, 0, 0, 20)
-            visibility = android.view.View.GONE
+        // Scroll view for checkboxes
+        val scrollView = ScrollView(this)
+        container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(10, 10, 10, 10)
         }
-        layout.addView(appListRecycler)
+        scrollView.addView(container)
+        mainLayout.addView(scrollView)
         
-        saveAppsBtn = Button(this).apply {
+        // Save button
+        saveBtn = Button(this).apply {
             text = "💾 SAVE WHITELIST"
             setOnClickListener { saveWhitelist() }
-            visibility = android.view.View.GONE
         }
-        layout.addView(saveAppsBtn)
+        mainLayout.addView(saveBtn)
         
-        setContentView(layout)
+        setContentView(mainLayout)
         
         loadInstalledApps()
         loadCurrentWhitelist()
@@ -66,60 +70,68 @@ class AdminActivity : AppCompatActivity() {
     
     private fun loadInstalledApps() {
         statusText.text = "Scanning apps..."
-        statusText.visibility = android.view.View.VISIBLE
-        appListRecycler.visibility = android.view.View.GONE
-        saveAppsBtn.visibility = android.view.View.GONE
+        saveBtn.isEnabled = false
         
-        val installedApps = mutableListOf<AppInfo>()
+        val installedApps = mutableListOf<Pair<String, String>>()
         val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
         
         for (app in packages) {
             if (packageManager.getLaunchIntentForPackage(app.packageName) != null) {
                 val appName = packageManager.getApplicationLabel(app).toString()
-                installedApps.add(AppInfo(appName, app.packageName))
+                installedApps.add(Pair(appName, app.packageName))
             }
         }
         
-        installedApps.sortBy { it.name }
-        allApps = installedApps
+        installedApps.sortBy { it.first }
         
-        runOnUiThread {
-            if (allApps.isEmpty()) {
-                statusText.text = "No apps found."
-            } else {
-                statusText.text = "Found ${allApps.size} apps. Select which ones to allow."
-                appListRecycler.visibility = android.view.View.VISIBLE
-                saveAppsBtn.visibility = android.view.View.VISIBLE
-                appListRecycler.adapter = AppSelectionAdapter(allApps, selectedPackages) { updatedSelection ->
-                    selectedPackages.clear()
-                    selectedPackages.addAll(updatedSelection)
-                }
+        // Clear existing checkboxes
+        container.removeAllViews()
+        checkBoxes.clear()
+        
+        // Add checkboxes for each app
+        for (app in installedApps) {
+            val checkBox = CheckBox(this).apply {
+                text = "${app.first}\n(${app.second})"
+                setPadding(10, 15, 10, 15)
+                textSize = 14f
             }
+            container.addView(checkBox)
+            checkBoxes.add(Pair(checkBox, app.second))
         }
+        
+        statusText.text = "Found ${installedApps.size} apps. Select which ones to allow."
+        saveBtn.isEnabled = true
     }
     
     private fun loadCurrentWhitelist() {
         CoroutineScope(Dispatchers.IO).launch {
             val whitelist = supabase.getWhitelistApps()
             withContext(Dispatchers.Main) {
-                selectedPackages.clear()
-                selectedPackages.addAll(whitelist)
-                (appListRecycler.adapter as? AppSelectionAdapter)?.updateSelection(selectedPackages.toList())
+                for ((checkBox, packageName) in checkBoxes) {
+                    checkBox.isChecked = whitelist.contains(packageName)
+                }
             }
         }
     }
     
     private fun saveWhitelist() {
-        saveAppsBtn.isEnabled = false
-        saveAppsBtn.text = "SAVING..."
+        saveBtn.isEnabled = false
+        saveBtn.text = "SAVING..."
+        
+        val selectedPackages = mutableListOf<String>()
+        for ((checkBox, packageName) in checkBoxes) {
+            if (checkBox.isChecked) {
+                selectedPackages.add(packageName)
+            }
+        }
         
         CoroutineScope(Dispatchers.IO).launch {
-            val success = supabase.updateWhitelistApps(selectedPackages.toList())
+            val success = supabase.updateWhitelistApps(selectedPackages)
             withContext(Dispatchers.Main) {
-                saveAppsBtn.isEnabled = true
-                saveAppsBtn.text = "💾 SAVE WHITELIST"
+                saveBtn.isEnabled = true
+                saveBtn.text = "💾 SAVE WHITELIST"
                 if (success) {
-                    Toast.makeText(this@AdminActivity, "Whitelist saved!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@AdminActivity, "Whitelist saved! ${selectedPackages.size} apps selected", Toast.LENGTH_LONG).show()
                 } else {
                     Toast.makeText(this@AdminActivity, "Failed to save", Toast.LENGTH_SHORT).show()
                 }
