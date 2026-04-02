@@ -25,7 +25,7 @@ class MainActivity : AppCompatActivity() {
     private var syncJob: Job? = null
     private var isActive = false
     private var appList = mutableListOf<AppInfo>()
-    private var allInstalledApps = mutableListOf<AppInfo>()
+    private var gridReady = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -88,7 +88,7 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(statusText)
         
-        // App grid (hidden initially)
+        // App grid
         appGrid = RecyclerView(this).apply {
             layoutManager = GridLayoutManager(this@MainActivity, 3)
             visibility = android.view.View.GONE
@@ -120,36 +120,40 @@ class MainActivity : AppCompatActivity() {
         
         setContentView(mainLayout)
         
-        // Auto-load apps when app starts
+        // Load apps when app starts
         loadAllInstalledApps()
     }
     
     private fun loadAllInstalledApps() {
-        allInstalledApps.clear()
-        val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
-        
-        for (app in packages) {
-            // Check if app can be launched (has an icon)
-            if (packageManager.getLaunchIntentForPackage(app.packageName) != null) {
-                val appName = packageManager.getApplicationLabel(app).toString()
-                allInstalledApps.add(AppInfo(appName, app.packageName))
+        try {
+            allInstalledApps.clear()
+            val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+            
+            for (app in packages) {
+                if (packageManager.getLaunchIntentForPackage(app.packageName) != null) {
+                    val appName = packageManager.getApplicationLabel(app).toString()
+                    allInstalledApps.add(AppInfo(appName, app.packageName))
+                }
             }
-        }
-        
-        allInstalledApps.sortBy { it.name }
-        
-        // Show the first 6 apps as demo (you can change this)
-        appList.clear()
-        val maxApps = minOf(6, allInstalledApps.size)
-        for (i in 0 until maxApps) {
-            appList.add(allInstalledApps[i])
-        }
-        
-        if (appList.isNotEmpty()) {
-            appGrid.adapter = AppAdapter(appList, packageManager)
-            Toast.makeText(this, "✅ Loaded ${appList.size} apps", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, "❌ No apps found", Toast.LENGTH_SHORT).show()
+            
+            allInstalledApps.sortBy { it.name }
+            
+            // Show the first 6 apps
+            appList.clear()
+            val maxApps = minOf(6, allInstalledApps.size)
+            for (i in 0 until maxApps) {
+                appList.add(allInstalledApps[i])
+            }
+            
+            if (appList.isNotEmpty()) {
+                appGrid.adapter = AppAdapter(appList, packageManager)
+                gridReady = true
+                Toast.makeText(this, "✅ Loaded ${appList.size} apps", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "❌ No apps found", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "Error loading apps: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
     
@@ -165,18 +169,27 @@ class MainActivity : AppCompatActivity() {
         statusText.text = "CHECKING..."
         
         CoroutineScope(Dispatchers.IO).launch {
-            val result = supabase.validatePin(pin)
-            withContext(Dispatchers.Main) {
-                pinInput.isEnabled = true
-                activateBtn.isEnabled = true
-                statusText.text = ""
-                
-                if (result.isValid && result.secondsLeft > 0) {
-                    currentPin = pin
-                    startSession(result.secondsLeft)
-                } else {
-                    val errorMsg = result.error ?: "Invalid PIN or expired"
-                    Toast.makeText(this@MainActivity, errorMsg, Toast.LENGTH_LONG).show()
+            try {
+                val result = supabase.validatePin(pin)
+                withContext(Dispatchers.Main) {
+                    pinInput.isEnabled = true
+                    activateBtn.isEnabled = true
+                    statusText.text = ""
+                    
+                    if (result.isValid && result.secondsLeft > 0) {
+                        currentPin = pin
+                        startSession(result.secondsLeft)
+                    } else {
+                        val errorMsg = result.error ?: "Invalid PIN or expired"
+                        Toast.makeText(this@MainActivity, errorMsg, Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    pinInput.isEnabled = true
+                    activateBtn.isEnabled = true
+                    statusText.text = ""
+                    Toast.makeText(this@MainActivity, "Connection error", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -189,18 +202,22 @@ class MainActivity : AppCompatActivity() {
             activateBtn.isEnabled = false
             statusText.text = "ACTIVE"
             
-            // Show app grid if there are apps
-            if (appList.isNotEmpty()) {
+            // Only show grid if apps are loaded
+            if (gridReady && appList.isNotEmpty()) {
                 appGrid.visibility = android.view.View.VISIBLE
             }
             
             countDownTimer?.cancel()
             countDownTimer = object : CountDownTimer(seconds * 1000L, 1000) {
                 override fun onTick(millisUntilFinished: Long) {
-                    val remainingSeconds = (millisUntilFinished / 1000).toInt()
-                    val minutes = remainingSeconds / 60
-                    val secs = remainingSeconds % 60
-                    timerText.text = String.format("%02d:%02d", minutes, secs)
+                    try {
+                        val remainingSeconds = (millisUntilFinished / 1000).toInt()
+                        val minutes = remainingSeconds / 60
+                        val secs = remainingSeconds % 60
+                        timerText.text = String.format("%02d:%02d", minutes, secs)
+                    } catch (e: Exception) {
+                        // Ignore
+                    }
                 }
                 
                 override fun onFinish() {
@@ -210,7 +227,7 @@ class MainActivity : AppCompatActivity() {
             
             startSync()
         } catch (e: Exception) {
-            Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Session error: ${e.message}", Toast.LENGTH_SHORT).show()
             endSession()
         }
     }
@@ -220,14 +237,18 @@ class MainActivity : AppCompatActivity() {
         syncJob = CoroutineScope(Dispatchers.IO).launch {
             while (isActive && currentPin != null) {
                 delay(5000)
-                val result = supabase.validatePin(currentPin!!)
-                withContext(Dispatchers.Main) {
-                    if (!result.isValid || result.secondsLeft <= 0) {
-                        Toast.makeText(this@MainActivity, "Session expired (admin)", Toast.LENGTH_SHORT).show()
-                        endSession()
-                    } else if (result.secondsLeft != getCurrentRemainingSeconds()) {
-                        updateTimerFromDatabase(result.secondsLeft)
+                try {
+                    val result = supabase.validatePin(currentPin!!)
+                    withContext(Dispatchers.Main) {
+                        if (!result.isValid || result.secondsLeft <= 0) {
+                            Toast.makeText(this@MainActivity, "Session expired (admin)", Toast.LENGTH_SHORT).show()
+                            endSession()
+                        } else if (result.secondsLeft != getCurrentRemainingSeconds()) {
+                            updateTimerFromDatabase(result.secondsLeft)
+                        }
                     }
+                } catch (e: Exception) {
+                    // Ignore network errors
                 }
             }
         }
@@ -249,21 +270,33 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun endSession() {
-        isActive = false
-        syncJob?.cancel()
-        countDownTimer?.cancel()
-        currentPin = null
-        pinInput.isEnabled = true
-        activateBtn.isEnabled = true
-        statusText.text = ""
-        timerText.text = "--:--"
-        appGrid.visibility = android.view.View.GONE
-        Toast.makeText(this, "Session expired", Toast.LENGTH_LONG).show()
+        try {
+            isActive = false
+            syncJob?.cancel()
+            countDownTimer?.cancel()
+            currentPin = null
+            pinInput.isEnabled = true
+            activateBtn.isEnabled = true
+            statusText.text = ""
+            timerText.text = "--:--"
+            appGrid.visibility = android.view.View.GONE
+            Toast.makeText(this, "Session expired", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            // Ignore
+        }
     }
     
     override fun onDestroy() {
         super.onDestroy()
-        countDownTimer?.cancel()
-        syncJob?.cancel()
+        try {
+            countDownTimer?.cancel()
+            syncJob?.cancel()
+        } catch (e: Exception) {
+            // Ignore
+        }
     }
-}
+    
+    companion object {
+        private val allInstalledApps = mutableListOf<AppInfo>()
+    }
+}￼Enter
