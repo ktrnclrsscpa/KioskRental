@@ -8,8 +8,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
 
 class MainActivity : AppCompatActivity() {
@@ -17,26 +15,21 @@ class MainActivity : AppCompatActivity() {
     private lateinit var activateBtn: Button
     private lateinit var timerText: TextView
     private lateinit var statusText: TextView
-    private lateinit var appGrid: RecyclerView
     private var countDownTimer: CountDownTimer? = null
     private lateinit var supabase: SupabaseClient
     private var currentPin: String? = null
     private var syncJob: Job? = null
     private var isActive = false
-    private var appList = mutableListOf<AppInfo>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        try {
-            supabase = SupabaseClient.getInstance()
-        } catch (e: Exception) {
-            Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-        }
+        supabase = SupabaseClient.getInstance()
         
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(30, 50, 30, 30)
+            gravity = android.view.Gravity.CENTER
+            setPadding(50, 50, 50, 50)
         }
         
         // Title
@@ -44,58 +37,46 @@ class MainActivity : AppCompatActivity() {
             text = "KCB RENTAL"
             textSize = 28f
             gravity = android.view.Gravity.CENTER
-            setPadding(0, 0, 0, 30)
+            setPadding(0, 0, 0, 50)
         }
         mainLayout.addView(title)
         
-        // PIN input row
-        val pinRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, 0, 0, 20)
-        }
-        
+        // PIN input
         pinInput = EditText(this).apply {
             hint = "Enter 6-digit PIN"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            textSize = 20f
+            textSize = 24f
             gravity = android.view.Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            setPadding(20, 15, 20, 15)
+            setPadding(20, 20, 20, 20)
         }
-        pinRow.addView(pinInput)
+        mainLayout.addView(pinInput)
         
+        // Activate button
         activateBtn = Button(this).apply {
             text = "ACTIVATE"
-            textSize = 16f
-            setPadding(20, 15, 20, 15)
+            textSize = 18f
+            setPadding(20, 20, 20, 20)
             setOnClickListener { validatePin() }
         }
-        pinRow.addView(activateBtn)
-        mainLayout.addView(pinRow)
+        mainLayout.addView(activateBtn)
         
-        // Timer and status
+        // Timer display
         timerText = TextView(this).apply {
             text = "--:--"
             textSize = 48f
             gravity = android.view.Gravity.CENTER
-            setPadding(0, 20, 0, 10)
+            setPadding(0, 50, 0, 0)
         }
         mainLayout.addView(timerText)
         
+        // Status display
         statusText = TextView(this).apply {
             text = ""
             textSize = 16f
             gravity = android.view.Gravity.CENTER
-            setPadding(0, 0, 0, 20)
+            setPadding(0, 20, 0, 0)
         }
         mainLayout.addView(statusText)
-        
-        // App grid (hidden initially)
-        appGrid = RecyclerView(this).apply {
-            layoutManager = GridLayoutManager(this@MainActivity, 3)
-            visibility = android.view.View.GONE
-        }
-        mainLayout.addView(appGrid)
         
         // Admin button
         val adminBtn = Button(this).apply {
@@ -111,41 +92,6 @@ class MainActivity : AppCompatActivity() {
         mainLayout.addView(adminBtn)
         
         setContentView(mainLayout)
-        
-        // Load apps for the grid (but keep hidden until session starts)
-        loadWhitelistApps()
-    }
-    
-    private fun loadWhitelistApps() {
-        try {
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    val packages = supabase.getWhitelistApps()
-                    val apps = mutableListOf<AppInfo>()
-                    for (pkg in packages) {
-                        try {
-                            val appName = packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
-                            apps.add(AppInfo(appName, pkg))
-                        } catch (e: Exception) {
-                            apps.add(AppInfo(pkg.substringAfterLast('.'), pkg))
-                        }
-                    }
-                    withContext(Dispatchers.Main) {
-                        appList.clear()
-                        appList.addAll(apps)
-                        if (appList.isNotEmpty()) {
-                            appGrid.adapter = AppAdapter(appList, packageManager)
-                        }
-                    }
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(this@MainActivity, "Error loading apps: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
     }
     
     private fun validatePin() {
@@ -160,67 +106,44 @@ class MainActivity : AppCompatActivity() {
         statusText.text = "CHECKING..."
         
         CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val result = supabase.validatePin(pin)
-                withContext(Dispatchers.Main) {
-                    pinInput.isEnabled = true
-                    activateBtn.isEnabled = true
-                    statusText.text = ""
-                    
-                    if (result.isValid && result.secondsLeft > 0) {
-                        currentPin = pin
-                        startSession(result.secondsLeft)
-                    } else {
-                        val errorMsg = result.error ?: "Invalid PIN or expired"
-                        Toast.makeText(this@MainActivity, errorMsg, Toast.LENGTH_LONG).show()
-                    }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    pinInput.isEnabled = true
-                    activateBtn.isEnabled = true
-                    statusText.text = ""
-                    Toast.makeText(this@MainActivity, "Connection error: ${e.message}", Toast.LENGTH_LONG).show()
+            val result = supabase.validatePin(pin)
+            withContext(Dispatchers.Main) {
+                pinInput.isEnabled = true
+                activateBtn.isEnabled = true
+                statusText.text = ""
+                
+                if (result.isValid && result.secondsLeft > 0) {
+                    currentPin = pin
+                    startSession(result.secondsLeft)
+                } else {
+                    val errorMsg = result.error ?: "Invalid PIN or expired"
+                    Toast.makeText(this@MainActivity, errorMsg, Toast.LENGTH_LONG).show()
                 }
             }
         }
     }
     
     private fun startSession(seconds: Int) {
-        try {
-            isActive = true
-            pinInput.isEnabled = false
-            activateBtn.isEnabled = false
-            statusText.text = "ACTIVE"
-            
-            // Show app grid if there are apps
-            if (appList.isNotEmpty()) {
-                appGrid.visibility = android.view.View.VISIBLE
+        isActive = true
+        pinInput.isEnabled = false
+        activateBtn.isEnabled = false
+        statusText.text = "ACTIVE"
+        
+        countDownTimer?.cancel()
+        countDownTimer = object : CountDownTimer(seconds * 1000L, 1000) {
+            override fun onTick(millisUntilFinished: Long) {
+                val remainingSeconds = (millisUntilFinished / 1000).toInt()
+                val minutes = remainingSeconds / 60
+                val secs = remainingSeconds % 60
+                timerText.text = String.format("%02d:%02d", minutes, secs)
             }
             
-            countDownTimer?.cancel()
-            countDownTimer = object : CountDownTimer(seconds * 1000L, 1000) {
-                override fun onTick(millisUntilFinished: Long) {
-                    try {
-                        val remainingSeconds = (millisUntilFinished / 1000).toInt()
-                        val minutes = remainingSeconds / 60
-                        val secs = remainingSeconds % 60
-                        timerText.text = String.format("%02d:%02d", minutes, secs)
-                    } catch (e: Exception) {
-                        // Ignore
-                    }
-                }
-                
-                override fun onFinish() {
-                    endSession()
-                }
-            }.start()
-            
-            startSync()
-        } catch (e: Exception) {
-            Toast.makeText(this, "Error starting session: ${e.message}", Toast.LENGTH_SHORT).show()
-            endSession()
-        }
+            override fun onFinish() {
+                endSession()
+            }
+        }.start()
+        
+        startSync()
     }
     
     private fun startSync() {
@@ -228,18 +151,14 @@ class MainActivity : AppCompatActivity() {
         syncJob = CoroutineScope(Dispatchers.IO).launch {
             while (isActive && currentPin != null) {
                 delay(5000)
-                try {
-                    val result = supabase.validatePin(currentPin!!)
-                    withContext(Dispatchers.Main) {
-                        if (!result.isValid || result.secondsLeft <= 0) {
-                            Toast.makeText(this@MainActivity, "Session expired (admin)", Toast.LENGTH_SHORT).show()
-                            endSession()
-                        } else if (result.secondsLeft != getCurrentRemainingSeconds()) {
-                            updateTimerFromDatabase(result.secondsLeft)
-                        }
+                val result = supabase.validatePin(currentPin!!)
+                withContext(Dispatchers.Main) {
+                    if (!result.isValid || result.secondsLeft <= 0) {
+                        Toast.makeText(this@MainActivity, "Session expired (admin)", Toast.LENGTH_SHORT).show()
+                        endSession()
+                    } else if (result.secondsLeft != getCurrentRemainingSeconds()) {
+                        updateTimerFromDatabase(result.secondsLeft)
                     }
-                } catch (e: Exception) {
-                    // Ignore network errors during sync
                 }
             }
         }
@@ -261,29 +180,20 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun endSession() {
-        try {
-            isActive = false
-            syncJob?.cancel()
-            countDownTimer?.cancel()
-            currentPin = null
-            pinInput.isEnabled = true
-            activateBtn.isEnabled = true
-            statusText.text = ""
-            timerText.text = "--:--"
-            appGrid.visibility = android.view.View.GONE
-            Toast.makeText(this, "Session expired", Toast.LENGTH_LONG).show()
-        } catch (e: Exception) {
-            // Ignore
-        }
+        isActive = false
+        syncJob?.cancel()
+        countDownTimer?.cancel()
+        currentPin = null
+        pinInput.isEnabled = true
+        activateBtn.isEnabled = true
+        statusText.text = ""
+        timerText.text = "--:--"
+        Toast.makeText(this, "Session expired", Toast.LENGTH_LONG).show()
     }
     
     override fun onDestroy() {
         super.onDestroy()
-        try {
-            countDownTimer?.cancel()
-            syncJob?.cancel()
-        } catch (e: Exception) {
-            // Ignore
-        }
+        countDownTimer?.cancel()
+        syncJob?.cancel()
     }
 }
