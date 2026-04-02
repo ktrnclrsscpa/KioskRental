@@ -29,16 +29,15 @@ class SupabaseClient private constructor() {
                 if (jsonArray.length() > 0) {
                     val jsonObject = jsonArray.getJSONObject(0)
                     val seconds = jsonObject.getInt("seconds_left")
-                    PinValidationResult(true, seconds, null)
+                    return@withContext PinValidationResult(true, seconds, null)
                 } else {
-                    PinValidationResult(false, 0, "PIN not found")
+                    return@withContext PinValidationResult(false, 0, "PIN not found")
                 }
             } else {
-                PinValidationResult(false, 0, "HTTP error: $responseCode")
+                return@withContext PinValidationResult(false, 0, "HTTP error: $responseCode")
             }
-            connection.disconnect()
         } catch (e: Exception) {
-            PinValidationResult(false, 0, e.message ?: "Network error")
+            return@withContext PinValidationResult(false, 0, e.message ?: "Network error")
         }
     }
 
@@ -64,13 +63,9 @@ class SupabaseClient private constructor() {
             val responseCode = connection.responseCode
             connection.disconnect()
             
-            if (responseCode in 200..299) {
-                pin
-            } else {
-                null
-            }
+            return@withContext if (responseCode in 200..299) pin else null
         } catch (e: Exception) {
-            null
+            return@withContext null
         }
     }
 
@@ -94,13 +89,14 @@ class SupabaseClient private constructor() {
                         secondsLeft = obj.getInt("seconds_left")
                     ))
                 }
-                list
+                connection.disconnect()
+                return@withContext list
             } else {
-                emptyList()
+                connection.disconnect()
+                return@withContext emptyList()
             }
-            connection.disconnect()
         } catch (e: Exception) {
-            emptyList()
+            return@withContext emptyList()
         }
     }
 
@@ -120,16 +116,19 @@ class SupabaseClient private constructor() {
                 val jsonArray = JSONArray(responseText)
                 if (jsonArray.length() > 0) {
                     val value = jsonArray.getJSONObject(0).getString("setting_value")
-                    value.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                    val result = value.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                    connection.disconnect()
+                    return@withContext result
                 } else {
-                    defaultApps()
+                    connection.disconnect()
+                    return@withContext defaultApps()
                 }
             } else {
-                defaultApps()
+                connection.disconnect()
+                return@withContext defaultApps()
             }
-            connection.disconnect()
         } catch (e: Exception) {
-            defaultApps()
+            return@withContext defaultApps()
         }
     }
 
@@ -137,58 +136,27 @@ class SupabaseClient private constructor() {
         try {
             val appsString = apps.joinToString(",")
             
-            // First, check if the record exists
-            val checkUrl = URL("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps")
-            val checkConnection = checkUrl.openConnection() as HttpURLConnection
-            checkConnection.requestMethod = "GET"
-            checkConnection.setRequestProperty("apikey", apiKey)
-            checkConnection.setRequestProperty("Authorization", "Bearer $apiKey")
-            
-            val exists = checkConnection.responseCode == 200
-            checkConnection.disconnect()
-            
-            val url = URL("$supabaseUrl/rest/v1/admin_settings")
+            val url = URL("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps")
             val connection = url.openConnection() as HttpURLConnection
-            
-            if (exists) {
-                // Update existing record
-                connection.requestMethod = "PATCH"
-                connection.setRequestProperty("Content-Type", "application/json")
-                // Add where clause via URL parameter
-                val whereUrl = URL("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps")
-                connection.setRequestProperty("Prefer", "return=representation")
-            } else {
-                // Insert new record
-                connection.requestMethod = "POST"
-                connection.setRequestProperty("Content-Type", "application/json")
-                connection.setRequestProperty("Prefer", "return=representation")
-            }
-            
+            connection.requestMethod = "PATCH"
             connection.setRequestProperty("apikey", apiKey)
             connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection.setRequestProperty("Content-Type", "application/json")
             connection.doOutput = true
             
-            val jsonBody = if (exists) {
-                JSONObject().apply {
-                    put("setting_value", appsString)
-                    put("updated_at", System.currentTimeMillis())
-                }.toString()
-            } else {
-                JSONObject().apply {
-                    put("setting_key", "whitelist_apps")
-                    put("setting_value", appsString)
-                }.toString()
-            }
+            val jsonBody = JSONObject().apply {
+                put("setting_value", appsString)
+                put("updated_at", System.currentTimeMillis())
+            }.toString()
             
             connection.outputStream.write(jsonBody.toByteArray())
             
             val responseCode = connection.responseCode
             connection.disconnect()
             
-            responseCode in 200..299
+            return@withContext responseCode in 200..299
         } catch (e: Exception) {
-            e.printStackTrace()
-            false
+            return@withContext false
         }
     }
 
