@@ -12,8 +12,6 @@ class SupabaseClient private constructor() {
     private val supabaseUrl = "https://qbricrnjchbdyseeuwif.supabase.co"
     private val apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicmljcm5qY2hiZHlzZWV1d2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDU0NDUsImV4cCI6MjA4OTc4MTQ0NX0.5sJqi3fZc4VIFQAIw1QptHt7MlGdnkn5SVxYdRu4f7Q"
 
-    // ==================== PIN FUNCTIONS ====================
-
     suspend fun validatePin(pin: String): PinValidationResult = withContext(Dispatchers.IO) {
         try {
             val url = URL("$supabaseUrl/rest/v1/credits?pin=eq.$pin")
@@ -100,8 +98,6 @@ class SupabaseClient private constructor() {
         }
     }
 
-    // ==================== WHITELIST FUNCTIONS ====================
-
     suspend fun getWhitelistApps(): List<String> = withContext(Dispatchers.IO) {
         try {
             val url = URL("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps")
@@ -116,19 +112,15 @@ class SupabaseClient private constructor() {
                 val jsonArray = JSONArray(responseText)
                 if (jsonArray.length() > 0) {
                     val value = jsonArray.getJSONObject(0).getString("setting_value")
-                    val result = value.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                    connection.disconnect()
-                    return@withContext result
+                    return@withContext value.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                 } else {
-                    connection.disconnect()
-                    return@withContext defaultApps()
+                    return@withContext emptyList()
                 }
             } else {
-                connection.disconnect()
-                return@withContext defaultApps()
+                return@withContext emptyList()
             }
         } catch (e: Exception) {
-            return@withContext defaultApps()
+            return@withContext emptyList()
         }
     }
 
@@ -136,15 +128,17 @@ class SupabaseClient private constructor() {
         try {
             val appsString = apps.joinToString(",")
             
-            val url = URL("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps")
+            val url = URL("$supabaseUrl/rest/v1/admin_settings")
             val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "PATCH"
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
             connection.setRequestProperty("apikey", apiKey)
             connection.setRequestProperty("Authorization", "Bearer $apiKey")
-            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Prefer", "resolution=merge-duplicates")
             connection.doOutput = true
             
             val jsonBody = JSONObject().apply {
+                put("setting_key", "whitelist_apps")
                 put("setting_value", appsString)
                 put("updated_at", System.currentTimeMillis())
             }.toString()
@@ -154,20 +148,12 @@ class SupabaseClient private constructor() {
             val responseCode = connection.responseCode
             connection.disconnect()
             
-            return@withContext responseCode in 200..299
+            responseCode in 200..299
         } catch (e: Exception) {
-            return@withContext false
+            e.printStackTrace()
+            false
         }
     }
-
-    private fun defaultApps(): List<String> = listOf(
-        "com.oppo.camera",
-        "com.caf.fmradio",
-        "com.android.vending",
-        "com.coloros.gallery3d",
-        "com.android.settings",
-        "ru.zdevs.zarchiver"
-    )
 
     companion object {
         private var instance: SupabaseClient? = null
