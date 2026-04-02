@@ -146,60 +146,6 @@ class SupabaseClient private constructor() {
         }
     }
 
-    suspend fun extendTime(pin: String, extraSeconds: Int): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val getUrl = URL("$supabaseUrl/rest/v1/credits?pin=eq.$pin")
-            val getConnection = getUrl.openConnection() as HttpURLConnection
-            getConnection.requestMethod = "GET"
-            getConnection.setRequestProperty("apikey", apiKey)
-            getConnection.setRequestProperty("Authorization", "Bearer $apiKey")
-            
-            val currentSeconds = if (getConnection.responseCode == 200) {
-                val responseText = getConnection.inputStream.bufferedReader().use { it.readText() }
-                val jsonArray = JSONArray(responseText)
-                if (jsonArray.length() > 0) {
-                    jsonArray.getJSONObject(0).getInt("seconds_left")
-                } else {
-                    return@withContext false
-                }
-            } else {
-                return@withContext false
-            }
-            
-            val newSeconds = currentSeconds + extraSeconds
-            val url = URL("$supabaseUrl/rest/v1/credits?pin=eq.$pin")
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "PATCH"
-            connection.setRequestProperty("apikey", apiKey)
-            connection.setRequestProperty("Authorization", "Bearer $apiKey")
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.doOutput = true
-            
-            val jsonBody = JSONObject().apply {
-                put("seconds_left", newSeconds)
-            }.toString()
-            
-            connection.outputStream.write(jsonBody.toByteArray())
-            connection.responseCode in 200..299
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    suspend fun deletePin(pin: String): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val url = URL("$supabaseUrl/rest/v1/credits?pin=eq.$pin")
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "DELETE"
-            connection.setRequestProperty("apikey", apiKey)
-            connection.setRequestProperty("Authorization", "Bearer $apiKey")
-            
-            connection.responseCode in 200..299
-        } catch (e: Exception) {
-            false
-        }
-    }
-
     private fun defaultApps(): List<String> = listOf(
         "com.google.android.youtube",
         "com.roblox.client",
