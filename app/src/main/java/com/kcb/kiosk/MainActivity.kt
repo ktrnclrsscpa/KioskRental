@@ -25,6 +25,7 @@ class MainActivity : AppCompatActivity() {
     private var currentPin: String? = null
     private var syncJob: Job? = null
     private var isActive = false
+    private var remainingSeconds = 0
     private var appList = mutableListOf<AppInfo>()
     private var gridReady = false
 
@@ -176,13 +177,11 @@ class MainActivity : AppCompatActivity() {
                         Toast.makeText(this@MainActivity, "✅ Loaded ${appList.size} apps", Toast.LENGTH_SHORT).show()
                     } else {
                         debugText.text = "$statusMsg\nNo matching apps. Go to Admin > APPS to select apps."
-                        Toast.makeText(this@MainActivity, "No whitelisted apps. Select apps in Admin panel.", Toast.LENGTH_LONG).show()
                     }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     debugText.text = "Error: ${e.message}"
-                    Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -209,7 +208,8 @@ class MainActivity : AppCompatActivity() {
                     
                     if (result.isValid && result.secondsLeft > 0) {
                         currentPin = pin
-                        startSession(result.secondsLeft)
+                        remainingSeconds = result.secondsLeft
+                        startSession()
                     } else {
                         val errorMsg = result.error ?: "Invalid PIN or expired"
                         Toast.makeText(this@MainActivity, errorMsg, Toast.LENGTH_LONG).show()
@@ -226,21 +226,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
-    private fun startSession(seconds: Int) {
+    private fun startSession() {
         try {
             isActive = true
             pinInput.isEnabled = false
             activateBtn.isEnabled = false
             statusText.text = "ACTIVE"
             
+            // Show app grid if there are apps
             if (gridReady && appList.isNotEmpty()) {
                 appGrid.visibility = android.view.View.VISIBLE
             }
             
+            // Start the countdown timer
             countDownTimer?.cancel()
-            countDownTimer = object : CountDownTimer(seconds * 1000L, 1000) {
+            countDownTimer = object : CountDownTimer(remainingSeconds * 1000L, 1000) {
                 override fun onTick(millisUntilFinished: Long) {
-                    val remainingSeconds = (millisUntilFinished / 1000).toInt()
+                    remainingSeconds = (millisUntilFinished / 1000).toInt()
                     val minutes = remainingSeconds / 60
                     val secs = remainingSeconds % 60
                     timerText.text = String.format("%02d:%02d", minutes, secs)
@@ -269,28 +271,18 @@ class MainActivity : AppCompatActivity() {
                         if (!result.isValid || result.secondsLeft <= 0) {
                             Toast.makeText(this@MainActivity, "Session expired (admin)", Toast.LENGTH_SHORT).show()
                             endSession()
-                        } else if (result.secondsLeft != getCurrentRemainingSeconds()) {
-                            updateTimerFromDatabase(result.secondsLeft)
+                        } else if (result.secondsLeft != remainingSeconds) {
+                            // Update remaining seconds from server
+                            remainingSeconds = result.secondsLeft
+                            countDownTimer?.cancel()
+                            startSession()
                         }
                     }
-                } catch (e: Exception) { }
+                } catch (e: Exception) {
+                    // Ignore network errors during sync
+                }
             }
         }
-    }
-    
-    private fun getCurrentRemainingSeconds(): Int {
-        val timeStr = timerText.text.toString()
-        if (timeStr == "--:--") return 0
-        val parts = timeStr.split(":")
-        if (parts.size == 2) {
-            return parts[0].toInt() * 60 + parts[1].toInt()
-        }
-        return 0
-    }
-    
-    private fun updateTimerFromDatabase(seconds: Int) {
-        countDownTimer?.cancel()
-        startSession(seconds)
     }
     
     private fun endSession() {
@@ -299,13 +291,16 @@ class MainActivity : AppCompatActivity() {
             syncJob?.cancel()
             countDownTimer?.cancel()
             currentPin = null
+            remainingSeconds = 0
             pinInput.isEnabled = true
             activateBtn.isEnabled = true
             statusText.text = ""
             timerText.text = "--:--"
             appGrid.visibility = android.view.View.GONE
             Toast.makeText(this, "Session expired", Toast.LENGTH_LONG).show()
-        } catch (e: Exception) { }
+        } catch (e: Exception) {
+            // Ignore cleanup errors
+        }
     }
     
     override fun onDestroy() {
@@ -313,6 +308,8 @@ class MainActivity : AppCompatActivity() {
         try {
             countDownTimer?.cancel()
             syncJob?.cancel()
-        } catch (e: Exception) { }
+        } catch (e: Exception) {
+            // Ignore
+        }
     }
 }
