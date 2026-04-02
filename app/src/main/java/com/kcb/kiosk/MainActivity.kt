@@ -17,6 +17,25 @@ class MainActivity : AppCompatActivity() {
     private lateinit var pinInput: EditText
     private lateinit var activateBtn: Button
     private lateinit var timerText: TextView
+package com.kcb.kiosk
+
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.os.CountDownTimer
+import android.widget.Button
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.*
+
+class MainActivity : AppCompatActivity() {
+    private lateinit var pinInput: EditText
+    private lateinit var activateBtn: Button
+    private lateinit var timerText: TextView
     private lateinit var statusText: TextView
     private lateinit var appGrid: RecyclerView
     private lateinit var debugText: TextView
@@ -145,29 +164,43 @@ class MainActivity : AppCompatActivity() {
             }
             
             detectedApps.sortBy { it.name }
-            appList.clear()
-            appList.addAll(detectedApps)
             
-            val debugInfo = "Detected ${appList.size} apps"
-            debugText.text = debugInfo
-            
-            if (appList.isNotEmpty()) {
-                appGrid.adapter = SimpleAppAdapter(appList) { packageName ->
-                    try {
-                        val intent = packageManager.getLaunchIntentForPackage(packageName)
-                        if (intent != null) {
-                            startActivity(intent)
-                        } else {
-                            Toast.makeText(this, "Cannot open app", Toast.LENGTH_SHORT).show()
+            // Load whitelist from Supabase
+            CoroutineScope(Dispatchers.IO).launch {
+                val whitelistPackages = supabase.getWhitelistApps()
+                
+                // Filter apps to only those in whitelist
+                val filteredApps = detectedApps.filter { app ->
+                    whitelistPackages.contains(app.packageName)
+                }
+                
+                withContext(Dispatchers.Main) {
+                    appList.clear()
+                    appList.addAll(filteredApps)
+                    
+                    val debugInfo = "Showing ${appList.size} of ${detectedApps.size} apps (whitelisted)"
+                    debugText.text = debugInfo
+                    
+                    if (appList.isNotEmpty()) {
+                        appGrid.adapter = SimpleAppAdapter(appList, packageManager) { packageName ->
+                            try {
+                                val intent = packageManager.getLaunchIntentForPackage(packageName)
+                                if (intent != null) {
+                                    startActivity(intent)
+                                } else {
+                                    Toast.makeText(this@MainActivity, "Cannot open app", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
                         }
-                    } catch (e: Exception) {
-                        Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                        gridReady = true
+                        Toast.makeText(this@MainActivity, "✅ Loaded ${appList.size} apps", Toast.LENGTH_LONG).show()
+                    } else {
+                        debugText.text = "No whitelisted apps. Go to Admin > APPS to select apps."
+                        Toast.makeText(this@MainActivity, "No whitelisted apps. Select apps in Admin panel.", Toast.LENGTH_LONG).show()
                     }
                 }
-                gridReady = true
-                Toast.makeText(this, "✅ Loaded ${appList.size} apps", Toast.LENGTH_LONG).show()
-            } else {
-                Toast.makeText(this, "❌ No apps found", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
             debugText.text = "Error: ${e.message}"
@@ -312,4 +345,209 @@ class MainActivity : AppCompatActivity() {
             // Ignore
         }
     }
-}
+}￼Enter    private lateinit var statusText: TextView
+    private lateinit var appGrid: RecyclerView
+    private lateinit var debugText: TextView
+    private var countDownTimer: CountDownTimer? = null
+    private lateinit var supabase: SupabaseClient
+    private var currentPin: String? = null
+    private var syncJob: Job? = null
+    private var isActive = false
+    private var appList = mutableListOf<AppInfo>()
+    private var gridReady = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        supabase = SupabaseClient.getInstance()
+        
+        val mainLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(30, 50, 30, 30)
+        }
+        
+        // Title
+        val title = TextView(this).apply {
+            text = "KCB RENTAL"
+            textSize = 28f
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 30)
+        }
+        mainLayout.addView(title)
+        
+        // PIN input row
+        val pinRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 0, 0, 20)
+        }
+        
+        pinInput = EditText(this).apply {
+            hint = "Enter 6-digit PIN"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            textSize = 20f
+            gravity = android.view.Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setPadding(20, 15, 20, 15)
+        }
+        pinRow.addView(pinInput)
+        
+        activateBtn = Button(this).apply {
+            text = "ACTIVATE"
+            textSize = 16f
+            setPadding(20, 15, 20, 15)
+            setOnClickListener { validatePin() }
+        }
+        pinRow.addView(activateBtn)
+        mainLayout.addView(pinRow)
+        
+        // Timer and status
+        timerText = TextView(this).apply {
+            text = "--:--"
+            textSize = 48f
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 20, 0, 10)
+        }
+        mainLayout.addView(timerText)
+        
+        statusText = TextView(this).apply {
+            text = ""
+            textSize = 16f
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 20)
+        }
+        mainLayout.addView(statusText)
+        
+        // Debug text
+        debugText = TextView(this).apply {
+            text = ""
+            textSize = 10f
+            setPadding(0, 0, 0, 10)
+        }
+        mainLayout.addView(debugText)
+        
+        // App grid
+        appGrid = RecyclerView(this).apply {
+            layoutManager = GridLayoutManager(this@MainActivity, 3)
+            visibility = android.view.View.GONE
+        }
+        mainLayout.addView(appGrid)
+        
+        // Load Apps button
+        val loadAppsBtn = Button(this).apply {
+            text = "📱 LOAD ALL APPS"
+            textSize = 12f
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            setTextColor(android.graphics.Color.GRAY)
+            setOnClickListener { loadAllInstalledApps() }
+        }
+        mainLayout.addView(loadAppsBtn)
+        
+        // Admin button
+        val adminBtn = Button(this).apply {
+            text = "🔐 ADMIN"
+            textSize = 14f
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            setTextColor(android.graphics.Color.GRAY)
+      setPadding(0, 10, 0, 0)
+            setOnClickListener {
+                startActivity(android.content.Intent(this@MainActivity, AdminActivity::class.java))
+            }
+        }
+        mainLayout.addView(adminBtn)
+        
+        setContentView(mainLayout)
+        
+        loadAllInstalledApps()
+    }
+    
+    private fun loadAllInstalledApps() {
+        try {
+            val detectedApps = mutableListOf<AppInfo>()
+            val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+            
+            for (app in packages) {
+                if (packageManager.getLaunchIntentForPackage(app.packageName) != null) {
+                    val appName = packageManager.getApplicationLabel(app).toString()
+                    detectedApps.add(AppInfo(appName, app.packageName))
+                }
+            }
+            
+            detectedApps.sortBy { it.name }
+            
+            // Load whitelist from Supabase
+            CoroutineScope(Dispatchers.IO).launch {
+                val whitelistPackages = supabase.getWhitelistApps()
+                
+                // Filter apps to only those in whitelist
+                val filteredApps = detectedApps.filter { app ->
+                    whitelistPackages.contains(app.packageName)
+                }
+                
+                withContext(Dispatchers.Main) {
+                    appList.clear()
+                    appList.addAll(filteredApps)
+                    
+                    val debugInfo = "Showing ${appList.size} of ${detectedApps.size} apps (whitelisted)"
+                    debugText.text = debugInfo
+                    
+                    if (appList.isNotEmpty()) {
+                        appGrid.adapter = SimpleAppAdapter(appList, packageManager) { packageName ->
+                            try {
+                                val intent = packageManager.getLaunchIntentForPackage(packageName)
+                                if (intent != null) {
+                                    startActivity(intent)
+                                } else {
+                                    Toast.makeText(this@MainActivity, "Cannot open app", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        gridReady = true
+                        Toast.makeText(this@MainActivity, "✅ Loaded ${appList.size} apps", Toast.LENGTH_LONG).show()
+                    } else {
+                        debugText.text = "No whitelisted apps. Go to Admin > APPS to select apps."
+                        Toast.makeText(this@MainActivity, "No whitelisted apps. Select apps in Admin panel.", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            debugText.text = "Error: ${e.message}"
+            Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    private fun validatePin() {
+        val pin = pinInput.text.toString().trim()
+        if (pin.length != 6) {
+            Toast.makeText(this, "Enter 6-digit PIN", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        pinInput.isEnabled = false
+        activateBtn.isEnabled = false
+        statusText.text = "CHECKING..."
+        
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val result = supabase.validatePin(pin)
+                withContext(Dispatchers.Main) {
+                    pinInput.isEnabled = true
+                    activateBtn.isEnabled = true
+                    statusText.text = ""
+                    
+                    if (result.isValid && result.secondsLeft > 0) {
+                        currentPin = pin
+                        startSession(result.secondsLeft)
+                    } else {
+                        val errorMsg = result.error ?: "Invalid PIN or expired"
+                        Toast.makeText(this@MainActivity, errorMsg, Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    pinInput.isEnabled = true
+                    activateBtn.isEnabled = true
+                    statusText.text = ""
+                    Toast.makeText(this@MainActivity, "Connection error", Toast.LENGTH_SHORT).show()
+                }
