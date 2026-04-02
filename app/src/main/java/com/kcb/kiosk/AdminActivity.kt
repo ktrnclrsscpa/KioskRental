@@ -33,7 +33,6 @@ class AdminActivity : AppCompatActivity() {
             setPadding(30, 50, 30, 30)
         }
         
-        // Title
         val title = TextView(this).apply {
             text = "🔐 ADMIN PANEL"
             textSize = 24f
@@ -64,7 +63,7 @@ class AdminActivity : AppCompatActivity() {
         
         mainLayout.addView(tabLayout)
         
-        // ========== PIN PANEL ==========
+        // PIN PANEL
         pinPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
@@ -118,7 +117,7 @@ class AdminActivity : AppCompatActivity() {
         
         mainLayout.addView(pinPanel)
         
-        // ========== APP PANEL ==========
+        // APP PANEL
         appPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = android.view.View.GONE
