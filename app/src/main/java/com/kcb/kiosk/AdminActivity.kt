@@ -4,6 +4,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.Button
 import android.widget.CheckBox
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -13,10 +14,20 @@ import kotlinx.coroutines.*
 
 class AdminActivity : AppCompatActivity() {
     private lateinit var supabase: SupabaseClient
-    private lateinit var container: LinearLayout
-    private lateinit var saveBtn: Button
-    private lateinit var statusText: TextView
-    private lateinit var errorText: TextView
+    
+    // PINS panel
+    private lateinit var pinPanel: LinearLayout
+    private lateinit var pinListText: TextView
+    private lateinit var generatePinInput: EditText
+    private lateinit var generateMinutesInput: EditText
+    private lateinit var generateBtn: Button
+    private lateinit var refreshPinsBtn: Button
+    
+    // APPS panel
+    private lateinit var appPanel: LinearLayout
+    private lateinit var appContainer: LinearLayout
+    private lateinit var saveAppsBtn: Button
+    private lateinit var appStatusText: TextView
     private val checkBoxes = mutableListOf<Pair<CheckBox, String>>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,75 +40,174 @@ class AdminActivity : AppCompatActivity() {
             setPadding(30, 50, 30, 30)
         }
         
+        // Title
         val title = TextView(this).apply {
-            text = "🔐 SELECT APPS FOR CUSTOMERS"
-            textSize = 22f
+            text = "🔐 ADMIN PANEL"
+            textSize = 24f
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 20)
         }
         mainLayout.addView(title)
         
-        statusText = TextView(this).apply {
+        // Tab buttons
+        val tabLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 0, 0, 20)
+        }
+        
+        val pinsTab = Button(this).apply {
+            text = "📋 PINS"
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setOnClickListener { showPinPanel() }
+        }
+        tabLayout.addView(pinsTab)
+        
+        val appsTab = Button(this).apply {
+            text = "📱 APPS"
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setOnClickListener { showAppPanel() }
+        }
+        tabLayout.addView(appsTab)
+        
+        mainLayout.addView(tabLayout)
+        
+        // ========== PINS PANEL ==========
+        pinPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        
+        val genLabel = TextView(this).apply {
+            text = "Generate New PIN"
+            textSize = 18f
+            setPadding(0, 20, 0, 10)
+        }
+        pinPanel.addView(genLabel)
+        
+        val pinRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        
+        generatePinInput = EditText(this).apply {
+            hint = "PIN (leave blank)"
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setPadding(10, 10, 10, 10)
+        }
+        pinRow.addView(generatePinInput)
+        
+        generateMinutesInput = EditText(this).apply {
+            hint = "Minutes"
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.5f)
+            setPadding(10, 10, 10, 10)
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        }
+        pinRow.addView(generateMinutesInput)
+        pinPanel.addView(pinRow)
+        
+        generateBtn = Button(this).apply {
+            text = "GENERATE PIN"
+            setOnClickListener { generatePin() }
+        }
+        pinPanel.addView(generateBtn)
+        
+        refreshPinsBtn = Button(this).apply {
+            text = "🔄 REFRESH PIN LIST"
+            setPadding(0, 20, 0, 20)
+            setOnClickListener { loadPins() }
+        }
+        pinPanel.addView(refreshPinsBtn)
+        
+        pinListText = TextView(this).apply {
+            text = "Loading PINs..."
+            textSize = 14f
+            setPadding(0, 20, 0, 0)
+        }
+        pinPanel.addView(pinListText)
+        
+        mainLayout.addView(pinPanel)
+        
+        // ========== APPS PANEL ==========
+        appPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = android.view.View.GONE
+        }
+        
+        val appLabel = TextView(this).apply {
+            text = "Select Apps for Customers"
+            textSize = 18f
+            setPadding(0, 20, 0, 10)
+        }
+        appPanel.addView(appLabel)
+        
+        appStatusText = TextView(this).apply {
             text = "Loading apps..."
             textSize = 12f
             setPadding(0, 0, 0, 10)
         }
-        mainLayout.addView(statusText)
-        
-        errorText = TextView(this).apply {
-            text = ""
-            textSize = 12f
-            setTextColor(android.graphics.Color.RED)
-            setPadding(0, 0, 0, 10)
-        }
-        mainLayout.addView(errorText)
+        appPanel.addView(appStatusText)
         
         val testBtn = Button(this).apply {
             text = "🔌 TEST CONNECTION"
             textSize = 12f
             setOnClickListener { testConnection() }
         }
-        mainLayout.addView(testBtn)
+        appPanel.addView(testBtn)
         
         val scrollView = ScrollView(this)
-        container = LinearLayout(this).apply {
+        appContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(10, 10, 10, 10)
         }
-        scrollView.addView(container)
-        mainLayout.addView(scrollView)
+        scrollView.addView(appContainer)
+        appPanel.addView(scrollView)
         
-        saveBtn = Button(this).apply {
+        saveAppsBtn = Button(this).apply {
             text = "💾 SAVE WHITELIST"
             setOnClickListener { saveWhitelist() }
         }
-        mainLayout.addView(saveBtn)
+        appPanel.addView(saveAppsBtn)
+        
+        mainLayout.addView(appPanel)
         
         setContentView(mainLayout)
         
+        // Load initial data
+        loadPins()
+        loadInstalledApps()
+        loadCurrentWhitelist()
+    }
+    
+    private fun showPinPanel() {
+        pinPanel.visibility = android.view.View.VISIBLE
+        appPanel.visibility = android.view.View.GONE
+        loadPins()
+    }
+    
+    private fun showAppPanel() {
+        pinPanel.visibility = android.view.View.GONE
+        appPanel.visibility = android.view.View.VISIBLE
         loadInstalledApps()
         loadCurrentWhitelist()
     }
     
     private fun testConnection() {
-        errorText.text = "Testing connection..."
+        appStatusText.text = "Testing connection..."
         CoroutineScope(Dispatchers.IO).launch {
             val result = supabase.testConnection()
             withContext(Dispatchers.Main) {
                 if (result) {
-                    errorText.text = "✓ Connection successful! Supabase is reachable."
-                    errorText.setTextColor(android.graphics.Color.GREEN)
+                    appStatusText.text = "✓ Connection successful!"
+                    appStatusText.setTextColor(android.graphics.Color.GREEN)
                 } else {
-                    errorText.text = "✗ Connection failed! Cannot reach Supabase."
-                    errorText.setTextColor(android.graphics.Color.RED)
+                    appStatusText.text = "✗ Connection failed!"
+                    appStatusText.setTextColor(android.graphics.Color.RED)
                 }
             }
         }
     }
     
     private fun loadInstalledApps() {
-        statusText.text = "Scanning apps..."
-        saveBtn.isEnabled = false
+        appStatusText.text = "Scanning apps..."
+        saveAppsBtn.isEnabled = false
         
         val installedApps = mutableListOf<Pair<String, String>>()
         val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
@@ -111,7 +221,7 @@ class AdminActivity : AppCompatActivity() {
         
         installedApps.sortBy { it.first }
         
-        container.removeAllViews()
+        appContainer.removeAllViews()
         checkBoxes.clear()
         
         for (app in installedApps) {
@@ -120,12 +230,12 @@ class AdminActivity : AppCompatActivity() {
                 setPadding(10, 15, 10, 15)
                 textSize = 14f
             }
-            container.addView(checkBox)
+            appContainer.addView(checkBox)
             checkBoxes.add(Pair(checkBox, app.second))
         }
         
-        statusText.text = "Found ${installedApps.size} apps. Select which ones to allow."
-        saveBtn.isEnabled = true
+        appStatusText.text = "Found ${installedApps.size} apps. Select which ones to allow."
+        saveAppsBtn.isEnabled = true
     }
     
     private fun loadCurrentWhitelist() {
@@ -139,16 +249,15 @@ class AdminActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    errorText.text = "Error loading: ${e.message}"
+                    appStatusText.text = "Error loading: ${e.message}"
                 }
             }
         }
     }
     
     private fun saveWhitelist() {
-        saveBtn.isEnabled = false
-        saveBtn.text = "SAVING..."
-        errorText.text = ""
+        saveAppsBtn.isEnabled = false
+        saveAppsBtn.text = "SAVING..."
         
         val selectedPackages = mutableListOf<String>()
         for ((checkBox, packageName) in checkBoxes) {
@@ -161,25 +270,74 @@ class AdminActivity : AppCompatActivity() {
             try {
                 val success = supabase.updateWhitelistApps(selectedPackages)
                 withContext(Dispatchers.Main) {
-                    saveBtn.isEnabled = true
-                    saveBtn.text = "💾 SAVE WHITELIST"
+                    saveAppsBtn.isEnabled = true
+                    saveAppsBtn.text = "💾 SAVE WHITELIST"
                     if (success) {
-                        errorText.text = "✓ Success! Saved ${selectedPackages.size} apps"
-                        errorText.setTextColor(android.graphics.Color.GREEN)
+                        appStatusText.text = "✓ Success! Saved ${selectedPackages.size} apps"
+                        appStatusText.setTextColor(android.graphics.Color.GREEN)
                         Toast.makeText(this@AdminActivity, "Whitelist saved! ${selectedPackages.size} apps", Toast.LENGTH_LONG).show()
                     } else {
-                        errorText.text = "✗ Failed to save. Check internet connection."
-                        errorText.setTextColor(android.graphics.Color.RED)
+                        appStatusText.text = "✗ Failed to save. Check internet connection."
+                        appStatusText.setTextColor(android.graphics.Color.RED)
                         Toast.makeText(this@AdminActivity, "Failed to save", Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    saveBtn.isEnabled = true
-                    saveBtn.text = "💾 SAVE WHITELIST"
-                    errorText.text = "✗ Error: ${e.message}"
-                    errorText.setTextColor(android.graphics.Color.RED)
+                    saveAppsBtn.isEnabled = true
+                    saveAppsBtn.text = "💾 SAVE WHITELIST"
+                    appStatusText.text = "✗ Error: ${e.message}"
+                    appStatusText.setTextColor(android.graphics.Color.RED)
                     Toast.makeText(this@AdminActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+    
+    private fun generatePin() {
+        val minutes = generateMinutesInput.text.toString().toIntOrNull()
+        if (minutes == null || minutes <= 0) {
+            Toast.makeText(this, "Enter valid minutes (1-1440)", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        val customPin = generatePinInput.text.toString().trim()
+        val pin = if (customPin.length == 6) customPin else null
+        
+        generateBtn.isEnabled = false
+        generateBtn.text = "GENERATING..."
+        
+        CoroutineScope(Dispatchers.IO).launch {
+            val result = supabase.generatePin(pin, minutes * 60)
+            withContext(Dispatchers.Main) {
+                generateBtn.isEnabled = true
+                generateBtn.text = "GENERATE PIN"
+                if (result != null) {
+                    Toast.makeText(this@AdminActivity, "PIN: $result ($minutes min)", Toast.LENGTH_LONG).show()
+                    generatePinInput.text.clear()
+                    generateMinutesInput.text.clear()
+                    loadPins()
+                } else {
+                    Toast.makeText(this@AdminActivity, "Failed to generate PIN", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+    
+    private fun loadPins() {
+        pinListText.text = "Loading..."
+        CoroutineScope(Dispatchers.IO).launch {
+            val pins = supabase.getActivePins()
+            withContext(Dispatchers.Main) {
+                if (pins.isEmpty()) {
+                    pinListText.text = "No active PINs"
+                } else {
+                    val sb = StringBuilder()
+                    for (p in pins) {
+                        val minutes = p.secondsLeft / 60
+                        sb.append("🔑 ${p.pin} - ${minutes} min left\n")
+                    }
+                    pinListText.text = sb.toString()
                 }
             }
         }
