@@ -1,7 +1,6 @@
 package com.kcb.kiosk
 
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
@@ -11,19 +10,20 @@ class SimpleAppAdapter(
     private val onClick: (String) -> Unit
 ) : RecyclerView.Adapter<SimpleAppAdapter.ViewHolder>() {
 
-    class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val name: TextView = itemView.findViewById(android.R.id.text1)
+    class ViewHolder(itemView: TextView) : RecyclerView.ViewHolder(itemView) {
+        val textView: TextView = itemView
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(android.R.layout.simple_list_item_1, parent, false)
-        return ViewHolder(view)
+        val textView = TextView(parent.context)
+        textView.setPadding(50, 30, 50, 30)
+        textView.textSize = 16f
+        return ViewHolder(textView)
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val app = apps[position]
-        holder.name.text = app.name
+        holder.textView.text = app.name
         holder.itemView.setOnClickListener {
             onClick(app.packageName)
         }
