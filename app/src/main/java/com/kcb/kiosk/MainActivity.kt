@@ -148,16 +148,10 @@ class MainActivity : AppCompatActivity() {
             appList.clear()
             appList.addAll(detectedApps)
             
-            // Show debug info
-            val debugInfo = StringBuilder()
-            debugInfo.append("Detected ${appList.size} apps\n")
-            for (i in 0 until minOf(5, appList.size)) {
-                debugInfo.append("• ${appList[i].name}\n")
-            }
-            debugText.text = debugInfo.toString()
+            val debugInfo = "Detected ${appList.size} apps"
+            debugText.text = debugInfo
             
             if (appList.isNotEmpty()) {
-                // Use SimpleAppAdapter instead (no icons)
                 appGrid.adapter = SimpleAppAdapter(appList) { packageName ->
                     try {
                         val intent = packageManager.getLaunchIntentForPackage(packageName)
@@ -173,7 +167,6 @@ class MainActivity : AppCompatActivity() {
                 gridReady = true
                 Toast.makeText(this, "✅ Loaded ${appList.size} apps", Toast.LENGTH_LONG).show()
             } else {
-                debugText.text = "No apps detected!"
                 Toast.makeText(this, "❌ No apps found", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
@@ -239,7 +232,9 @@ class MainActivity : AppCompatActivity() {
                         val minutes = remainingSeconds / 60
                         val secs = remainingSeconds % 60
                         timerText.text = String.format("%02d:%02d", minutes, secs)
-                    } catch (e: Exception) { }
+                    } catch (e: Exception) {
+                        // Ignore
+                    }
                 }
                 
                 override fun onFinish() {
@@ -269,7 +264,9 @@ class MainActivity : AppCompatActivity() {
                             updateTimerFromDatabase(result.secondsLeft)
                         }
                     }
-                } catch (e: Exception) { }
+                } catch (e: Exception) {
+                    // Ignore
+                }
             }
         }
     }
@@ -301,7 +298,9 @@ class MainActivity : AppCompatActivity() {
             timerText.text = "--:--"
             appGrid.visibility = android.view.View.GONE
             Toast.makeText(this, "Session expired", Toast.LENGTH_LONG).show()
-        } catch (e: Exception) { }
+        } catch (e: Exception) {
+            // Ignore
+        }
     }
     
     override fun onDestroy() {
@@ -309,6 +308,8 @@ class MainActivity : AppCompatActivity() {
         try {
             countDownTimer?.cancel()
             syncJob?.cancel()
-        } catch (e: Exception) { }
+        } catch (e: Exception) {
+            // Ignore
+        }
     }
 }
