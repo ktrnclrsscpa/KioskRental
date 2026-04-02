@@ -29,7 +29,6 @@ class AdminActivity : AppCompatActivity() {
             setPadding(30, 50, 30, 30)
         }
         
-        // Title
         val title = TextView(this).apply {
             text = "🔐 SELECT APPS FOR CUSTOMERS"
             textSize = 22f
@@ -38,7 +37,6 @@ class AdminActivity : AppCompatActivity() {
         }
         mainLayout.addView(title)
         
-        // Status text
         statusText = TextView(this).apply {
             text = "Loading apps..."
             textSize = 12f
@@ -46,7 +44,6 @@ class AdminActivity : AppCompatActivity() {
         }
         mainLayout.addView(statusText)
         
-        // Error text
         errorText = TextView(this).apply {
             text = ""
             textSize = 12f
@@ -55,7 +52,6 @@ class AdminActivity : AppCompatActivity() {
         }
         mainLayout.addView(errorText)
         
-        // Test Connection Button
         val testBtn = Button(this).apply {
             text = "🔌 TEST CONNECTION"
             textSize = 12f
@@ -63,7 +59,6 @@ class AdminActivity : AppCompatActivity() {
         }
         mainLayout.addView(testBtn)
         
-        // Scroll view for checkboxes
         val scrollView = ScrollView(this)
         container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -72,7 +67,6 @@ class AdminActivity : AppCompatActivity() {
         scrollView.addView(container)
         mainLayout.addView(scrollView)
         
-        // Save button
         saveBtn = Button(this).apply {
             text = "💾 SAVE WHITELIST"
             setOnClickListener { saveWhitelist() }
@@ -87,7 +81,6 @@ class AdminActivity : AppCompatActivity() {
     
     private fun testConnection() {
         errorText.text = "Testing connection..."
-        errorText.setTextColor(android.graphics.Color.BLACK)
         CoroutineScope(Dispatchers.IO).launch {
             val result = supabase.testConnection()
             withContext(Dispatchers.Main) {
@@ -143,13 +136,10 @@ class AdminActivity : AppCompatActivity() {
                     for ((checkBox, packageName) in checkBoxes) {
                         checkBox.isChecked = whitelist.contains(packageName)
                     }
-                    errorText.text = "✓ Loaded whitelist from server"
-                    errorText.setTextColor(android.graphics.Color.GREEN)
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     errorText.text = "Error loading: ${e.message}"
-                    errorText.setTextColor(android.graphics.Color.RED)
                 }
             }
         }
