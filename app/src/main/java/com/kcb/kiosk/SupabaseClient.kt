@@ -156,21 +156,19 @@ class SupabaseClient private constructor() {
         try {
             val appsString = apps.joinToString(",")
             
-            // Use POST with upsert - simpler approach
-            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings"))
+            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps"))
             val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "POST"
+            connection.requestMethod = "PATCH"
             connection.setRequestProperty("apikey", apiKey)
             connection.setRequestProperty("Authorization", "Bearer $apiKey")
             connection.setRequestProperty("Content-Type", "application/json")
-            connection.setRequestProperty("Prefer", "resolution=merge-duplicates")
             connection.doOutput = true
             connection.connectTimeout = 5000
             connection.readTimeout = 5000
             
             val jsonBody = JSONObject().apply {
-                put("setting_key", "whitelist_apps")
                 put("setting_value", appsString)
+                put("updated_at", System.currentTimeMillis())
             }.toString()
             
             connection.outputStream.write(jsonBody.toByteArray())
@@ -180,7 +178,6 @@ class SupabaseClient private constructor() {
             
             responseCode in 200..299
         } catch (e: Exception) {
-            e.printStackTrace()
             false
         }
     }
