@@ -38,6 +38,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(30, 50, 30, 30)
         }
         
+        // Title
         val title = TextView(this).apply {
             text = "KCB RENTAL"
             textSize = 28f
@@ -46,6 +47,7 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(title)
         
+        // PIN input row
         val pinRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, 0, 0, 20)
@@ -70,6 +72,7 @@ class MainActivity : AppCompatActivity() {
         pinRow.addView(activateBtn)
         mainLayout.addView(pinRow)
         
+        // Timer and status
         timerText = TextView(this).apply {
             text = "--:--"
             textSize = 48f
@@ -86,28 +89,32 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(statusText)
         
+        // Debug/Status text
         debugText = TextView(this).apply {
             text = ""
-            textSize = 10f
+            textSize = 11f
             setPadding(0, 0, 0, 10)
         }
         mainLayout.addView(debugText)
         
+        // App grid (hidden initially)
         appGrid = RecyclerView(this).apply {
             layoutManager = GridLayoutManager(this@MainActivity, 2)
             visibility = android.view.View.GONE
         }
         mainLayout.addView(appGrid)
         
+        // Load Apps button
         val loadAppsBtn = Button(this).apply {
-            text = "📱 SHOW ALL APPS"
+            text = "📱 LOAD APPS"
             textSize = 12f
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
             setTextColor(android.graphics.Color.GRAY)
-            setOnClickListener { showAllInstalledApps() }
+            setOnClickListener { loadWhitelistedApps() }
         }
         mainLayout.addView(loadAppsBtn)
         
+        // Admin button
         val adminBtn = Button(this).apply {
             text = "🔐 ADMIN"
             textSize = 14f
@@ -122,32 +129,19 @@ class MainActivity : AppCompatActivity() {
         
         setContentView(mainLayout)
         
+        // Load whitelisted apps when app starts
         loadWhitelistedApps()
     }
     
-    private fun showAllInstalledApps() {
-        val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
-        val sb = StringBuilder()
-        sb.append("=== ALL INSTALLED APPS ===\n")
-        
-        for (app in packages) {
-            if (packageManager.getLaunchIntentForPackage(app.packageName) != null) {
-                val appName = packageManager.getApplicationLabel(app).toString()
-                sb.append("📱 $appName\n")
-                sb.append("   Package: ${app.packageName}\n")
-            }
-        }
-        
-        debugText.text = sb.toString()
-    }
-    
     private fun loadWhitelistedApps() {
-        debugText.text = "Loading..."
+        debugText.text = "Loading whitelisted apps..."
         
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                // Get whitelist from Supabase
                 val whitelistPackages = supabase.getWhitelistApps()
                 
+                // Get all installed apps that can be launched
                 val allInstalledApps = mutableListOf<AppInfo>()
                 val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
                 
@@ -158,6 +152,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 
+                // Find which whitelisted apps are actually installed
                 val matchedApps = mutableListOf<AppInfo>()
                 for (whitelistPkg in whitelistPackages) {
                     val found = allInstalledApps.find { it.packageName == whitelistPkg }
@@ -172,18 +167,8 @@ class MainActivity : AppCompatActivity() {
                     appList.clear()
                     appList.addAll(matchedApps)
                     
-                    val debugInfo = """
-                        Whitelist from server: ${whitelistPackages.size} apps
-                        Installed apps: ${allInstalledApps.size}
-                        Matched: ${matchedApps.size} apps
-                        
-                        --- WHITELIST PACKAGES FROM SERVER ---
-                        ${whitelistPackages.joinToString("\n")}
-                        
-                        --- MATCHED APPS ---
-                        ${matchedApps.joinToString("\n") { "${it.name} (${it.packageName})" }}
-                    """.trimIndent()
-                    debugText.text = debugInfo
+                    val statusMsg = "Whitelist: ${whitelistPackages.size} apps | Installed: ${allInstalledApps.size} | Matched: ${matchedApps.size}"
+                    debugText.text = statusMsg
                     
                     if (appList.isNotEmpty()) {
                         appGrid.adapter = SimpleAppAdapter(appList) { packageName ->
@@ -199,9 +184,10 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                         gridReady = true
-                        Toast.makeText(this@MainActivity, "✅ Loaded ${appList.size} apps", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@MainActivity, "✅ Loaded ${appList.size} apps", Toast.LENGTH_SHORT).show()
                     } else {
-                        Toast.makeText(this@MainActivity, "No matching apps found.", Toast.LENGTH_LONG).show()
+                        debugText.text = "$statusMsg\nNo matching apps. Go to Admin > APPS to select apps."
+                        Toast.makeText(this@MainActivity, "No whitelisted apps. Select apps in Admin panel.", Toast.LENGTH_LONG).show()
                     }
                 }
             } catch (e: Exception) {
@@ -245,7 +231,7 @@ class MainActivity : AppCompatActivity() {
                     pinInput.isEnabled = true
                     activateBtn.isEnabled = true
                     statusText.text = ""
-                    Toast.makeText(this@MainActivity, "Connection error", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "Connection error: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -258,6 +244,7 @@ class MainActivity : AppCompatActivity() {
             activateBtn.isEnabled = false
             statusText.text = "ACTIVE"
             
+            // Show app grid if there are apps
             if (gridReady && appList.isNotEmpty()) {
                 appGrid.visibility = android.view.View.VISIBLE
             }
@@ -298,7 +285,9 @@ class MainActivity : AppCompatActivity() {
                             updateTimerFromDatabase(result.secondsLeft)
                         }
                     }
-                } catch (e: Exception) { }
+                } catch (e: Exception) {
+                    // Ignore network errors during sync
+                }
             }
         }
     }
@@ -319,21 +308,29 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun endSession() {
-        isActive = false
-        syncJob?.cancel()
-        countDownTimer?.cancel()
-        currentPin = null
-        pinInput.isEnabled = true
-        activateBtn.isEnabled = true
-        statusText.text = ""
-        timerText.text = "--:--"
-        appGrid.visibility = android.view.View.GONE
-        Toast.makeText(this, "Session expired", Toast.LENGTH_LONG).show()
+        try {
+            isActive = false
+            syncJob?.cancel()
+            countDownTimer?.cancel()
+            currentPin = null
+            pinInput.isEnabled = true
+            activateBtn.isEnabled = true
+            statusText.text = ""
+            timerText.text = "--:--"
+            appGrid.visibility = android.view.View.GONE
+            Toast.makeText(this, "Session expired", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            // Ignore cleanup errors
+        }
     }
     
     override fun onDestroy() {
         super.onDestroy()
-        countDownTimer?.cancel()
-        syncJob?.cancel()
+        try {
+            countDownTimer?.cancel()
+            syncJob?.cancel()
+        } catch (e: Exception) {
+            // Ignore
+        }
     }
 }
