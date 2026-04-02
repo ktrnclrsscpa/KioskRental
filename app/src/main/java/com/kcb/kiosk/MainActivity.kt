@@ -18,6 +18,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var timerText: TextView
     private lateinit var statusText: TextView
     private lateinit var appGrid: RecyclerView
+    private lateinit var loadAppsBtn: Button
     private var countDownTimer: CountDownTimer? = null
     private lateinit var supabase: SupabaseClient
     private var currentPin: String? = null
@@ -93,13 +94,26 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(appGrid)
         
+        // Load Apps button (for testing)
+        loadAppsBtn = Button(this).apply {
+            text = "📱 LOAD APPS"
+            textSize = 12f
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            setTextColor(android.graphics.Color.GRAY)
+            setOnClickListener { 
+                Toast.makeText(this@MainActivity, "Loading apps...", Toast.LENGTH_SHORT).show()
+                loadWhitelistApps() 
+            }
+        }
+        mainLayout.addView(loadAppsBtn)
+        
         // Admin button
         val adminBtn = Button(this).apply {
             text = "🔐 ADMIN"
             textSize = 14f
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
             setTextColor(android.graphics.Color.GRAY)
-            setPadding(0, 30, 0, 0)
+            setPadding(0, 10, 0, 0)
             setOnClickListener {
                 startActivity(android.content.Intent(this@MainActivity, AdminActivity::class.java))
             }
@@ -108,7 +122,7 @@ class MainActivity : AppCompatActivity() {
         
         setContentView(mainLayout)
         
-        // Load apps for the grid
+        // Auto-load apps when app starts
         loadWhitelistApps()
     }
     
@@ -121,8 +135,13 @@ class MainActivity : AppCompatActivity() {
                     try {
                         val appName = packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
                         apps.add(AppInfo(appName, pkg))
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(this@MainActivity, "Found: $appName", Toast.LENGTH_SHORT).show()
+                        }
                     } catch (e: Exception) {
-                        apps.add(AppInfo(pkg.substringAfterLast('.'), pkg))
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(this@MainActivity, "Not installed: $pkg", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
                 withContext(Dispatchers.Main) {
@@ -130,10 +149,16 @@ class MainActivity : AppCompatActivity() {
                     appList.addAll(apps)
                     if (appList.isNotEmpty()) {
                         appGrid.adapter = AppAdapter(appList, packageManager)
+                        appGrid.visibility = android.view.View.VISIBLE
+                        Toast.makeText(this@MainActivity, "✅ ${appList.size} apps loaded!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this@MainActivity, "❌ No apps found", Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) {
-                // Silent fail
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
