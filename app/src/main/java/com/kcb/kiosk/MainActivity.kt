@@ -108,6 +108,7 @@ class MainActivity : AppCompatActivity() {
         
         setContentView(mainLayout)
         
+        // Load apps for the grid (but keep hidden until session starts)
         loadWhitelistApps()
     }
     
@@ -166,8 +167,10 @@ class MainActivity : AppCompatActivity() {
         activateBtn.isEnabled = false
         statusText.text = "ACTIVE"
         
-        // Show app grid
-        appGrid.visibility = android.view.View.VISIBLE
+        // Show app grid if there are apps
+        if (appList.isNotEmpty()) {
+            appGrid.visibility = android.view.View.VISIBLE
+        }
         
         countDownTimer?.cancel()
         countDownTimer = object : CountDownTimer(seconds * 1000L, 1000) {
