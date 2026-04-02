@@ -12,10 +12,25 @@ class SupabaseClient private constructor() {
     private val supabaseUrl = "https://qbricrnjchbdyseeuwif.supabase.co"
     private val apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicmljcm5qY2hiZHlzZWV1d2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDU0NDUsImV4cCI6MjA4OTc4MTQ0NX0.5sJqi3fZc4VIFQAIw1QptHt7MlGdnkn5SVxYdRu4f7Q"
 
-    // Helper to add apikey to URL as query parameter (for safety)
     private fun addApiKeyToUrl(urlString: String): String {
         val separator = if (urlString.contains("?")) "&" else "?"
         return "$urlString${separator}apikey=$apiKey"
+    }
+
+    // Test connection function
+    suspend fun testConnection(): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val url = URL("$supabaseUrl/rest/v1/admin_settings?limit=1")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("apikey", apiKey)
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            val responseCode = connection.responseCode
+            connection.disconnect()
+            responseCode == 200
+        } catch (e: Exception) {
+            false
+        }
     }
 
     suspend fun validatePin(pin: String): PinValidationResult = withContext(Dispatchers.IO) {
@@ -132,7 +147,6 @@ class SupabaseClient private constructor() {
         try {
             val appsString = apps.joinToString(",")
             
-            // Use POST with upsert (merge-duplicates)
             val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings"))
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "POST"
@@ -171,18 +185,3 @@ class SupabaseClient private constructor() {
 
 data class PinValidationResult(val isValid: Boolean, val secondsLeft: Int, val error: String?)
 data class PinData(val pin: String, val secondsLeft: Int)
-
-suspend fun testConnection(): Boolean = withContext(Dispatchers.IO) {
-    try {
-        val url = URL("$supabaseUrl/rest/v1/admin_settings?limit=1")
-        val connection = url.openConnection() as HttpURLConnection
-        connection.requestMethod = "GET"
-        connection.setRequestProperty("apikey", apiKey)
-        connection.setRequestProperty("Authorization", "Bearer $apiKey")
-        val responseCode = connection.responseCode
-        connection.disconnect()
-        responseCode == 200
-    } catch (e: Exception) {
-        false
-    }
-}
