@@ -1,5 +1,6 @@
 package com.kcb.kiosk
 
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.widget.Button
@@ -18,13 +19,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var timerText: TextView
     private lateinit var statusText: TextView
     private lateinit var appGrid: RecyclerView
-    private lateinit var loadAppsBtn: Button
     private var countDownTimer: CountDownTimer? = null
     private lateinit var supabase: SupabaseClient
     private var currentPin: String? = null
     private var syncJob: Job? = null
     private var isActive = false
     private var appList = mutableListOf<AppInfo>()
+    private var allInstalledApps = mutableListOf<AppInfo>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -94,16 +95,13 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(appGrid)
         
-        // Load Apps button (for testing)
-        loadAppsBtn = Button(this).apply {
-            text = "📱 LOAD APPS"
+        // Load Apps button
+        val loadAppsBtn = Button(this).apply {
+            text = "📱 LOAD ALL APPS"
             textSize = 12f
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
             setTextColor(android.graphics.Color.GRAY)
-            setOnClickListener { 
-                Toast.makeText(this@MainActivity, "Loading apps...", Toast.LENGTH_SHORT).show()
-                loadWhitelistApps() 
-            }
+            setOnClickListener { loadAllInstalledApps() }
         }
         mainLayout.addView(loadAppsBtn)
         
@@ -123,43 +121,35 @@ class MainActivity : AppCompatActivity() {
         setContentView(mainLayout)
         
         // Auto-load apps when app starts
-        loadWhitelistApps()
+        loadAllInstalledApps()
     }
     
-    private fun loadWhitelistApps() {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val packages = supabase.getWhitelistApps()
-                val apps = mutableListOf<AppInfo>()
-                for (pkg in packages) {
-                    try {
-                        val appName = packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
-                        apps.add(AppInfo(appName, pkg))
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(this@MainActivity, "Found: $appName", Toast.LENGTH_SHORT).show()
-                        }
-                    } catch (e: Exception) {
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(this@MainActivity, "Not installed: $pkg", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
-                withContext(Dispatchers.Main) {
-                    appList.clear()
-                    appList.addAll(apps)
-                    if (appList.isNotEmpty()) {
-                        appGrid.adapter = AppAdapter(appList, packageManager)
-                        appGrid.visibility = android.view.View.VISIBLE
-                        Toast.makeText(this@MainActivity, "✅ ${appList.size} apps loaded!", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(this@MainActivity, "❌ No apps found", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+    private fun loadAllInstalledApps() {
+        allInstalledApps.clear()
+        val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+        
+        for (app in packages) {
+            // Check if app can be launched (has an icon)
+            if (packageManager.getLaunchIntentForPackage(app.packageName) != null) {
+                val appName = packageManager.getApplicationLabel(app).toString()
+                allInstalledApps.add(AppInfo(appName, app.packageName))
             }
+        }
+        
+        allInstalledApps.sortBy { it.name }
+        
+        // Show the first 6 apps as demo (you can change this)
+        appList.clear()
+        val maxApps = minOf(6, allInstalledApps.size)
+        for (i in 0 until maxApps) {
+            appList.add(allInstalledApps[i])
+        }
+        
+        if (appList.isNotEmpty()) {
+            appGrid.adapter = AppAdapter(appList, packageManager)
+            Toast.makeText(this, "✅ Loaded ${appList.size} apps", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "❌ No apps found", Toast.LENGTH_SHORT).show()
         }
     }
     
