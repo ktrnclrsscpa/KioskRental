@@ -12,6 +12,8 @@ class SupabaseClient private constructor() {
     private val supabaseUrl = "https://qbricrnjchbdyseeuwif.supabase.co"
     private val apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicmljcm5qY2hiZHlzZWV1d2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDU0NDUsImV4cCI6MjA4OTc4MTQ0NX0.5sJqi3fZc4VIFQAIw1QptHt7MlGdnkn5SVxYdRu4f7Q"
 
+    // ==================== PIN FUNCTIONS ====================
+
     suspend fun validatePin(pin: String): PinValidationResult = withContext(Dispatchers.IO) {
         try {
             val url = URL("$supabaseUrl/rest/v1/credits?pin=eq.$pin")
@@ -34,6 +36,7 @@ class SupabaseClient private constructor() {
             } else {
                 PinValidationResult(false, 0, "HTTP error: $responseCode")
             }
+            connection.disconnect()
         } catch (e: Exception) {
             PinValidationResult(false, 0, e.message ?: "Network error")
         }
@@ -59,6 +62,8 @@ class SupabaseClient private constructor() {
             connection.outputStream.write(jsonBody.toByteArray())
             
             val responseCode = connection.responseCode
+            connection.disconnect()
+            
             if (responseCode in 200..299) {
                 pin
             } else {
@@ -93,10 +98,13 @@ class SupabaseClient private constructor() {
             } else {
                 emptyList()
             }
+            connection.disconnect()
         } catch (e: Exception) {
             emptyList()
         }
     }
+
+    // ==================== WHITELIST FUNCTIONS ====================
 
     suspend fun getWhitelistApps(): List<String> = withContext(Dispatchers.IO) {
         try {
@@ -106,7 +114,8 @@ class SupabaseClient private constructor() {
             connection.setRequestProperty("apikey", apiKey)
             connection.setRequestProperty("Authorization", "Bearer $apiKey")
             
-            if (connection.responseCode == 200) {
+            val responseCode = connection.responseCode
+            if (responseCode == 200) {
                 val responseText = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonArray = JSONArray(responseText)
                 if (jsonArray.length() > 0) {
@@ -118,6 +127,7 @@ class SupabaseClient private constructor() {
             } else {
                 defaultApps()
             }
+            connection.disconnect()
         } catch (e: Exception) {
             defaultApps()
         }
@@ -126,30 +136,69 @@ class SupabaseClient private constructor() {
     suspend fun updateWhitelistApps(apps: List<String>): Boolean = withContext(Dispatchers.IO) {
         try {
             val appsString = apps.joinToString(",")
-            val url = URL("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps")
+            
+            // First, check if the record exists
+            val checkUrl = URL("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps")
+            val checkConnection = checkUrl.openConnection() as HttpURLConnection
+            checkConnection.requestMethod = "GET"
+            checkConnection.setRequestProperty("apikey", apiKey)
+            checkConnection.setRequestProperty("Authorization", "Bearer $apiKey")
+            
+            val exists = checkConnection.responseCode == 200
+            checkConnection.disconnect()
+            
+            val url = URL("$supabaseUrl/rest/v1/admin_settings")
             val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "PATCH"
+            
+            if (exists) {
+                // Update existing record
+                connection.requestMethod = "PATCH"
+                connection.setRequestProperty("Content-Type", "application/json")
+                // Add where clause via URL parameter
+                val whereUrl = URL("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps")
+                connection.setRequestProperty("Prefer", "return=representation")
+            } else {
+                // Insert new record
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.setRequestProperty("Prefer", "return=representation")
+            }
+            
             connection.setRequestProperty("apikey", apiKey)
             connection.setRequestProperty("Authorization", "Bearer $apiKey")
-            connection.setRequestProperty("Content-Type", "application/json")
             connection.doOutput = true
             
-            val jsonBody = JSONObject().apply {
-                put("setting_value", appsString)
-                put("updated_at", System.currentTimeMillis())
-            }.toString()
+            val jsonBody = if (exists) {
+                JSONObject().apply {
+                    put("setting_value", appsString)
+                    put("updated_at", System.currentTimeMillis())
+                }.toString()
+            } else {
+                JSONObject().apply {
+                    put("setting_key", "whitelist_apps")
+                    put("setting_value", appsString)
+                }.toString()
+            }
             
             connection.outputStream.write(jsonBody.toByteArray())
-            connection.responseCode in 200..299
+            
+            val responseCode = connection.responseCode
+            connection.disconnect()
+            
+            responseCode in 200..299
         } catch (e: Exception) {
+            e.printStackTrace()
             false
         }
     }
 
     private fun defaultApps(): List<String> = listOf(
-        "com.google.android.youtube",
-        "com.roblox.client",
-        "com.gcash.gcash"
+        "com.oppo.camera",
+        "com.caf.fmradio",
+        "com.android.vending",
+        "com.coloros.gallery3d",
+        "com.android.settings",
+        "ru.zdevs.zarchiver"
     )
 
     companion object {
