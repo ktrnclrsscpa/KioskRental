@@ -152,7 +152,6 @@ class AdminActivity : AppCompatActivity() {
         }
         appPanel.addView(testBtn)
         
-        // Scroll view for checkboxes (takes remaining space)
         val scrollView = ScrollView(this)
         appContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -160,7 +159,6 @@ class AdminActivity : AppCompatActivity() {
         }
         scrollView.addView(appContainer)
         
-        // Use a layout that pushes button to bottom
         val scrollContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
@@ -172,7 +170,6 @@ class AdminActivity : AppCompatActivity() {
         }
         appPanel.addView(scrollContainer)
         
-        // SAVE WHITELIST BUTTON - now at the bottom
         saveAppsBtn = Button(this).apply {
             text = "💾 SAVE WHITELIST"
             setPadding(0, 20, 0, 20)
@@ -184,7 +181,6 @@ class AdminActivity : AppCompatActivity() {
         
         setContentView(mainLayout)
         
-        // Load initial data
         loadPins()
         loadInstalledApps()
         loadCurrentWhitelist()
@@ -226,11 +222,10 @@ class AdminActivity : AppCompatActivity() {
         val installedApps = mutableListOf<Pair<String, String>>()
         val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
         
+        // Show ALL installed apps (no filter)
         for (app in packages) {
-            if (packageManager.getLaunchIntentForPackage(app.packageName) != null) {
-                val appName = packageManager.getApplicationLabel(app).toString()
-                installedApps.add(Pair(appName, app.packageName))
-            }
+            val appName = packageManager.getApplicationLabel(app).toString()
+            installedApps.add(Pair(appName, app.packageName))
         }
         
         installedApps.sortBy { it.first }
