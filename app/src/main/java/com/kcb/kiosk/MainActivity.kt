@@ -38,7 +38,6 @@ class MainActivity : AppCompatActivity() {
             setPadding(30, 50, 30, 30)
         }
         
-        // Title
         val title = TextView(this).apply {
             text = "KCB RENTAL"
             textSize = 28f
@@ -72,7 +71,6 @@ class MainActivity : AppCompatActivity() {
         pinRow.addView(activateBtn)
         mainLayout.addView(pinRow)
         
-        // Timer and status
         timerText = TextView(this).apply {
             text = "--:--"
             textSize = 48f
@@ -89,7 +87,6 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(statusText)
         
-        // Debug text
         debugText = TextView(this).apply {
             text = ""
             textSize = 10f
@@ -97,14 +94,12 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(debugText)
         
-        // App grid
         appGrid = RecyclerView(this).apply {
             layoutManager = GridLayoutManager(this@MainActivity, 3)
             visibility = android.view.View.GONE
         }
         mainLayout.addView(appGrid)
         
-        // Load Apps button
         val loadAppsBtn = Button(this).apply {
             text = "📱 LOAD ALL APPS"
             textSize = 12f
@@ -114,7 +109,6 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(loadAppsBtn)
         
-        // Admin button
         val adminBtn = Button(this).apply {
             text = "🔐 ADMIN"
             textSize = 14f
@@ -146,11 +140,9 @@ class MainActivity : AppCompatActivity() {
             
             detectedApps.sortBy { it.name }
             
-            // Load whitelist from Supabase
             CoroutineScope(Dispatchers.IO).launch {
                 val whitelistPackages = supabase.getWhitelistApps()
                 
-                // Filter apps to only those in whitelist
                 val filteredApps = detectedApps.filter { app ->
                     whitelistPackages.contains(app.packageName)
                 }
@@ -159,11 +151,10 @@ class MainActivity : AppCompatActivity() {
                     appList.clear()
                     appList.addAll(filteredApps)
                     
-                    val debugInfo = "Showing ${appList.size} of ${detectedApps.size} apps (whitelisted)"
-                    debugText.text = debugInfo
+                    debugText.text = "Showing ${appList.size} of ${detectedApps.size} apps (whitelisted)"
                     
                     if (appList.isNotEmpty()) {
-                        appGrid.adapter = SimpleAppAdapter(appList, packageManager) { packageName ->
+                        appGrid.adapter = SimpleAppAdapter(appList) { packageName ->
                             try {
                                 val intent = packageManager.getLaunchIntentForPackage(packageName)
                                 if (intent != null) {
@@ -246,9 +237,7 @@ class MainActivity : AppCompatActivity() {
                         val minutes = remainingSeconds / 60
                         val secs = remainingSeconds % 60
                         timerText.text = String.format("%02d:%02d", minutes, secs)
-                    } catch (e: Exception) {
-                        // Ignore
-                    }
+                    } catch (e: Exception) { }
                 }
                 
                 override fun onFinish() {
@@ -278,9 +267,7 @@ class MainActivity : AppCompatActivity() {
                             updateTimerFromDatabase(result.secondsLeft)
                         }
                     }
-                } catch (e: Exception) {
-                    // Ignore
-                }
+                } catch (e: Exception) { }
             }
         }
     }
@@ -312,9 +299,7 @@ class MainActivity : AppCompatActivity() {
             timerText.text = "--:--"
             appGrid.visibility = android.view.View.GONE
             Toast.makeText(this, "Session expired", Toast.LENGTH_LONG).show()
-        } catch (e: Exception) {
-            // Ignore
-        }
+        } catch (e: Exception) { }
     }
     
     override fun onDestroy() {
@@ -322,8 +307,6 @@ class MainActivity : AppCompatActivity() {
         try {
             countDownTimer?.cancel()
             syncJob?.cancel()
-        } catch (e: Exception) {
-            // Ignore
-        }
+        } catch (e: Exception) { }
     }
 }
