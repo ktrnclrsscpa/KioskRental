@@ -39,36 +39,6 @@ class SupabaseClient private constructor() {
         }
     }
 
-    suspend fun generatePin(customPin: String?, seconds: Int): String? = withContext(Dispatchers.IO) {
-        try {
-            val pin = customPin ?: (100000..999999).random().toString()
-            
-            val url = URL("$supabaseUrl/rest/v1/credits")
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "POST"
-            connection.setRequestProperty("apikey", apiKey)
-            connection.setRequestProperty("Authorization", "Bearer $apiKey")
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.doOutput = true
-            
-            val jsonBody = JSONObject().apply {
-                put("pin", pin)
-                put("seconds_left", seconds)
-            }.toString()
-            
-            connection.outputStream.write(jsonBody.toByteArray())
-            
-            val responseCode = connection.responseCode
-            if (responseCode in 200..299) {
-                pin
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            null
-        }
-    }
-
     suspend fun getActivePins(): List<PinData> = withContext(Dispatchers.IO) {
         try {
             val url = URL("$supabaseUrl/rest/v1/credits?seconds_left=gt.0&order=created_at.desc")
@@ -120,29 +90,6 @@ class SupabaseClient private constructor() {
             }
         } catch (e: Exception) {
             defaultApps()
-        }
-    }
-
-    suspend fun updateWhitelistApps(apps: List<String>): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val appsString = apps.joinToString(",")
-            val url = URL("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps")
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "PATCH"
-            connection.setRequestProperty("apikey", apiKey)
-            connection.setRequestProperty("Authorization", "Bearer $apiKey")
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.doOutput = true
-            
-            val jsonBody = JSONObject().apply {
-                put("setting_value", appsString)
-                put("updated_at", System.currentTimeMillis())
-            }.toString()
-            
-            connection.outputStream.write(jsonBody.toByteArray())
-            connection.responseCode in 200..299
-        } catch (e: Exception) {
-            false
         }
     }
 
