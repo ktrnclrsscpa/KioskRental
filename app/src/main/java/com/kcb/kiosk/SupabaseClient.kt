@@ -18,6 +18,8 @@ class SupabaseClient private constructor() {
         return "$urlString${separator}apikey=$apiKey"
     }
 
+    // ==================== TEST CONNECTION ====================
+    
     suspend fun testConnection(): Boolean = withContext(Dispatchers.IO) {
         try {
             val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?limit=1"))
@@ -35,6 +37,8 @@ class SupabaseClient private constructor() {
         }
     }
 
+    // ==================== PIN FUNCTIONS ====================
+
     suspend fun validatePin(pin: String): PinValidationResult = withContext(Dispatchers.IO) {
         try {
             val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits?pin=eq.$pin"))
@@ -42,6 +46,8 @@ class SupabaseClient private constructor() {
             connection.requestMethod = "GET"
             connection.setRequestProperty("apikey", apiKey)
             connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
             
             val responseCode = connection.responseCode
             if (responseCode == 200) {
@@ -73,6 +79,8 @@ class SupabaseClient private constructor() {
             connection.setRequestProperty("Authorization", "Bearer $apiKey")
             connection.setRequestProperty("Content-Type", "application/json")
             connection.doOutput = true
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
             
             val jsonBody = JSONObject().apply {
                 put("pin", pin)
@@ -97,6 +105,8 @@ class SupabaseClient private constructor() {
             connection.requestMethod = "GET"
             connection.setRequestProperty("apikey", apiKey)
             connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
             
             val responseCode = connection.responseCode
             if (responseCode == 200) {
@@ -119,6 +129,8 @@ class SupabaseClient private constructor() {
         }
     }
 
+    // ==================== WHITELIST FUNCTIONS ====================
+
     suspend fun getWhitelistApps(): List<String> = withContext(Dispatchers.IO) {
         try {
             val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps"))
@@ -126,6 +138,8 @@ class SupabaseClient private constructor() {
             connection.requestMethod = "GET"
             connection.setRequestProperty("apikey", apiKey)
             connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
             
             val responseCode = connection.responseCode
             if (responseCode == 200) {
@@ -149,14 +163,26 @@ class SupabaseClient private constructor() {
         try {
             val appsString = apps.joinToString(",")
             
-            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings"))
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "POST"
-            connection.setRequestProperty("apikey", apiKey)
-            connection.setRequestProperty("Authorization", "Bearer $apiKey")
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.setRequestProperty("Prefer", "resolution=merge-duplicates")
-            connection.doOutput = true
+            // First, delete any existing entry
+            val deleteUrl = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps"))
+            val deleteConnection = deleteUrl.openConnection() as HttpURLConnection
+            deleteConnection.requestMethod = "DELETE"
+            deleteConnection.setRequestProperty("apikey", apiKey)
+            deleteConnection.setRequestProperty("Authorization", "Bearer $apiKey")
+            deleteConnection.connectTimeout = 5000
+            deleteConnection.readTimeout = 5000
+            deleteConnection.disconnect()
+            
+            // Then insert the new entry
+            val insertUrl = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings"))
+            val insertConnection = insertUrl.openConnection() as HttpURLConnection
+            insertConnection.requestMethod = "POST"
+            insertConnection.setRequestProperty("apikey", apiKey)
+            insertConnection.setRequestProperty("Authorization", "Bearer $apiKey")
+            insertConnection.setRequestProperty("Content-Type", "application/json")
+            insertConnection.doOutput = true
+            insertConnection.connectTimeout = 5000
+            insertConnection.readTimeout = 5000
             
             val jsonBody = JSONObject().apply {
                 put("setting_key", "whitelist_apps")
@@ -164,13 +190,14 @@ class SupabaseClient private constructor() {
                 put("updated_at", System.currentTimeMillis())
             }.toString()
             
-            connection.outputStream.write(jsonBody.toByteArray())
+            insertConnection.outputStream.write(jsonBody.toByteArray())
             
-            val responseCode = connection.responseCode
-            connection.disconnect()
+            val responseCode = insertConnection.responseCode
+            insertConnection.disconnect()
             
             responseCode in 200..299
         } catch (e: Exception) {
+            e.printStackTrace()
             false
         }
     }
