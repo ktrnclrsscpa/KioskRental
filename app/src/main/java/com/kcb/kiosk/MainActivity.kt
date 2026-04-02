@@ -19,6 +19,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var timerText: TextView
     private lateinit var statusText: TextView
     private lateinit var appGrid: RecyclerView
+    private lateinit var debugText: TextView
     private var countDownTimer: CountDownTimer? = null
     private lateinit var supabase: SupabaseClient
     private var currentPin: String? = null
@@ -26,7 +27,6 @@ class MainActivity : AppCompatActivity() {
     private var isActive = false
     private var appList = mutableListOf<AppInfo>()
     private var gridReady = false
-    private val allInstalledApps = mutableListOf<AppInfo>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -89,6 +89,14 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(statusText)
         
+        // Debug text to show detected apps
+        debugText = TextView(this).apply {
+            text = ""
+            textSize = 10f
+            setPadding(0, 0, 0, 10)
+        }
+        mainLayout.addView(debugText)
+        
         // App grid
         appGrid = RecyclerView(this).apply {
             layoutManager = GridLayoutManager(this@MainActivity, 3)
@@ -127,30 +135,44 @@ class MainActivity : AppCompatActivity() {
     
     private fun loadAllInstalledApps() {
         try {
-            allInstalledApps.clear()
+            val detectedApps = mutableListOf<AppInfo>()
             val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
             
             for (app in packages) {
+                // Check if app can be launched (has an icon)
                 if (packageManager.getLaunchIntentForPackage(app.packageName) != null) {
                     val appName = packageManager.getApplicationLabel(app).toString()
-                    allInstalledApps.add(AppInfo(appName, app.packageName))
+                    detectedApps.add(AppInfo(appName, app.packageName))
                 }
             }
             
-            allInstalledApps.sortBy { it.name }
+            detectedApps.sortBy { it.name }
             
-            // Show ALL apps (no limit)
+            // Show ALL detected apps
             appList.clear()
-            appList.addAll(allInstalledApps)
+            appList.addAll(detectedApps)
+            
+            // Show debug info
+            val debugInfo = StringBuilder()
+            debugInfo.append("Detected ${appList.size} apps:\n")
+            for (i in 0 until minOf(10, appList.size)) {
+                debugInfo.append("• ${appList[i].name}\n")
+            }
+            if (appList.size > 10) {
+                debugInfo.append("... and ${appList.size - 10} more")
+            }
+            debugText.text = debugInfo.toString()
             
             if (appList.isNotEmpty()) {
                 appGrid.adapter = AppAdapter(appList, packageManager)
                 gridReady = true
-                Toast.makeText(this, "✅ Loaded ${appList.size} apps", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "✅ Loaded ${appList.size} apps", Toast.LENGTH_LONG).show()
             } else {
+                debugText.text = "No apps detected! Check if apps have launcher icons."
                 Toast.makeText(this, "❌ No apps found", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
+            debugText.text = "Error: ${e.message}"
             Toast.makeText(this, "Error loading apps: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
