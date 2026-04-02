@@ -32,7 +32,6 @@ class MainActivity : AppCompatActivity() {
             setPadding(50, 50, 50, 50)
         }
         
-        // Title
         val title = TextView(this).apply {
             text = "KCB RENTAL"
             textSize = 28f
@@ -41,7 +40,6 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(title)
         
-        // PIN input
         pinInput = EditText(this).apply {
             hint = "Enter 6-digit PIN"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
@@ -51,7 +49,6 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(pinInput)
         
-        // Activate button
         activateBtn = Button(this).apply {
             text = "ACTIVATE"
             textSize = 18f
@@ -60,7 +57,6 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(activateBtn)
         
-        // Timer display
         timerText = TextView(this).apply {
             text = "--:--"
             textSize = 48f
@@ -69,7 +65,6 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(timerText)
         
-        // Status display
         statusText = TextView(this).apply {
             text = ""
             textSize = 16f
@@ -78,7 +73,6 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(statusText)
         
-        // Admin button
         val adminBtn = Button(this).apply {
             text = "🔐 ADMIN"
             textSize = 14f
