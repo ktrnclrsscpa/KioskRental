@@ -160,8 +160,10 @@ class AdminActivity : AppCompatActivity() {
         scrollView.addView(appContainer)
         appPanel.addView(scrollView)
         
+        // SAVE WHITELIST BUTTON - make sure it's added
         saveAppsBtn = Button(this).apply {
             text = "💾 SAVE WHITELIST"
+            setPadding(0, 20, 0, 20)
             setOnClickListener { saveWhitelist() }
         }
         appPanel.addView(saveAppsBtn)
