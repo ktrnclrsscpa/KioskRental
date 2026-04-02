@@ -17,10 +17,9 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var refreshBtn: Button
     private lateinit var appListRecycler: RecyclerView
     private lateinit var saveAppsBtn: Button
-    private lateinit var pinsPanel: LinearLayout
-    private lateinit var appsPanel: LinearLayout
-    private lateinit var appsStatusText: TextView
-    private var currentTab = "pins"
+    private lateinit var pinPanel: LinearLayout
+    private lateinit var appPanel: LinearLayout
+    private lateinit var appStatusText: TextView
     private var allApps = mutableListOf<AppInfo>()
     private var selectedPackages = mutableSetOf<String>()
 
@@ -29,7 +28,8 @@ class AdminActivity : AppCompatActivity() {
         
         supabase = SupabaseClient.getInstance()
         
-        val layout = LinearLayout(this).apply {
+        // Main layout
+        val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(30, 50, 30, 30)
         }
@@ -38,47 +38,47 @@ class AdminActivity : AppCompatActivity() {
         val title = TextView(this).apply {
             text = "🔐 ADMIN PANEL"
             textSize = 24f
+            gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 20)
         }
-        layout.addView(title)
+        mainLayout.addView(title)
         
-        // Tabs
-        val tabsLayout = LinearLayout(this).apply {
+        // Tab buttons
+        val tabLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, 0, 0, 20)
         }
         
-        val pinsTab = Button(this).apply {
+        val pinTab = Button(this).apply {
             text = "📋 PINS"
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            setOnClickListener { switchTab("pins") }
+            setOnClickListener { showPinPanel() }
         }
-        tabsLayout.addView(pinsTab)
+        tabLayout.addView(pinTab)
         
-        val appsTab = Button(this).apply {
+        val appTab = Button(this).apply {
             text = "📱 APPS"
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            setOnClickListener { switchTab("apps") }
+            setOnClickListener { showAppPanel() }
         }
-        tabsLayout.addView(appsTab)
+        tabLayout.addView(appTab)
         
-        layout.addView(tabsLayout)
+        mainLayout.addView(tabLayout)
         
-        // PINS Panel
-        pinsPanel = LinearLayout(this).apply {
+        // PIN Panel
+        pinPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
         
-        val generateLabel = TextView(this).apply {
+        val genLabel = TextView(this).apply {
             text = "Generate New PIN"
             textSize = 18f
             setPadding(0, 20, 0, 10)
         }
-        pinsPanel.addView(generateLabel)
+        pinPanel.addView(genLabel)
         
         val pinRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(0, 0, 0, 10)
         }
         
         generatePinInput = EditText(this).apply {
@@ -95,96 +95,98 @@ class AdminActivity : AppCompatActivity() {
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
         }
         pinRow.addView(generateMinutesInput)
-        pinsPanel.addView(pinRow)
+        pinPanel.addView(pinRow)
         
         generateBtn = Button(this).apply {
             text = "GENERATE PIN"
             setOnClickListener { generatePin() }
         }
-        pinsPanel.addView(generateBtn)
+        pinPanel.addView(generateBtn)
         
         refreshBtn = Button(this).apply {
             text = "🔄 REFRESH LIST"
             setPadding(0, 20, 0, 20)
             setOnClickListener { loadPins() }
         }
-        pinsPanel.addView(refreshBtn)
+        pinPanel.addView(refreshBtn)
         
         pinListText = TextView(this).apply {
             text = "Loading PINs..."
             textSize = 14f
             setPadding(0, 20, 0, 0)
         }
-        pinsPanel.addView(pinListText)
+        pinPanel.addView(pinListText)
         
-        layout.addView(pinsPanel)
+        mainLayout.addView(pinPanel)
         
-        // APPS Panel
-        appsPanel = LinearLayout(this).apply {
+        // APP Panel
+        appPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = android.view.View.GONE
         }
         
-        val appsLabel = TextView(this).apply {
+        val appLabel = TextView(this).apply {
             text = "Select Apps for Customers"
             textSize = 18f
             setPadding(0, 20, 0, 10)
         }
-        appsPanel.addView(appsLabel)
+        appPanel.addView(appLabel)
         
         val infoText = TextView(this).apply {
-            text = "Tap checkbox to allow/disallow app"
+            text = "Check the apps you want customers to access"
             textSize = 12f
             setPadding(0, 0, 0, 10)
         }
-        appsPanel.addView(infoText)
+        appPanel.addView(infoText)
         
-        appsStatusText = TextView(this).apply {
+        appStatusText = TextView(this).apply {
             text = "Loading apps..."
             textSize = 12f
             setPadding(0, 0, 0, 10)
         }
-        appsPanel.addView(appsStatusText)
+        appPanel.addView(appStatusText)
         
         appListRecycler = RecyclerView(this).apply {
             layoutManager = LinearLayoutManager(this@AdminActivity)
             setPadding(0, 0, 0, 20)
             visibility = android.view.View.GONE
         }
-        appsPanel.addView(appListRecycler)
+        appPanel.addView(appListRecycler)
         
         saveAppsBtn = Button(this).apply {
             text = "💾 SAVE WHITELIST"
             setOnClickListener { saveWhitelist() }
             visibility = android.view.View.GONE
         }
-        appsPanel.addView(saveAppsBtn)
+        appPanel.addView(saveAppsBtn)
         
-        layout.addView(appsPanel)
+        mainLayout.addView(appPanel)
         
-        setContentView(layout)
+        setContentView(mainLayout)
         
+        // Load initial data
         loadPins()
         loadInstalledApps()
         loadCurrentWhitelist()
     }
     
-    private fun switchTab(tab: String) {
-        currentTab = tab
-        if (tab == "pins") {
-            pinsPanel.visibility = android.view.View.VISIBLE
-            appsPanel.visibility = android.view.View.GONE
-            loadPins()
-        } else {
-            pinsPanel.visibility = android.view.View.GONE
-            appsPanel.visibility = android.view.View.VISIBLE
-            loadInstalledApps()
-        }
+    private fun showPinPanel() {
+        pinPanel.visibility = android.view.View.VISIBLE
+        appPanel.visibility = android.view.View.GONE
+        loadPins()
+    }
+    
+    private fun showAppPanel() {
+        pinPanel.visibility = android.view.View.GONE
+        appPanel.visibility = android.view.View.VISIBLE
+        // Refresh app list when showing
+        loadInstalledApps()
+        loadCurrentWhitelist()
     }
     
     private fun loadInstalledApps() {
-        appsStatusText.text = "Scanning apps..."
-        appsStatusText.visibility = android.view.View.VISIBLE
+        appStatusText.text = "Scanning apps..."
+        appStatusText.visibility = android.view.View.VISIBLE
         appListRecycler.visibility = android.view.View.GONE
         saveAppsBtn.visibility = android.view.View.GONE
         
@@ -205,9 +207,9 @@ class AdminActivity : AppCompatActivity() {
         
         runOnUiThread {
             if (allApps.isEmpty()) {
-                appsStatusText.text = "No apps found. Make sure you have apps installed."
+                appStatusText.text = "No apps found. Make sure you have apps installed."
             } else {
-                appsStatusText.text = "Found ${allApps.size} apps. Select which ones to allow."
+                appStatusText.text = "Found ${allApps.size} apps. Select which ones to allow."
                 appListRecycler.visibility = android.view.View.VISIBLE
                 saveAppsBtn.visibility = android.view.View.VISIBLE
                 appListRecycler.adapter = AppSelectionAdapter(allApps, selectedPackages) { updatedSelection ->
