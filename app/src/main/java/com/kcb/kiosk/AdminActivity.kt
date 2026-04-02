@@ -52,6 +52,14 @@ class AdminActivity : AppCompatActivity() {
         }
         mainLayout.addView(errorText)
         
+        // Test connection button
+        val testBtn = Button(this).apply {
+            text = "🔌 TEST CONNECTION"
+            textSize = 12f
+            setOnClickListener { testConnection() }
+        }
+        mainLayout.addView(testBtn)
+        
         val scrollView = ScrollView(this)
         container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -70,6 +78,22 @@ class AdminActivity : AppCompatActivity() {
         
         loadInstalledApps()
         loadCurrentWhitelist()
+    }
+    
+    private fun testConnection() {
+        errorText.text = "Testing connection..."
+        CoroutineScope(Dispatchers.IO).launch {
+            val result = supabase.testConnection()
+            withContext(Dispatchers.Main) {
+                if (result) {
+                    errorText.text = "✓ Connection successful! Supabase is reachable."
+                    errorText.setTextColor(android.graphics.Color.GREEN)
+                } else {
+                    errorText.text = "✗ Connection failed! Cannot reach Supabase."
+                    errorText.setTextColor(android.graphics.Color.RED)
+                }
+            }
+        }
     }
     
     private fun loadInstalledApps() {
@@ -113,7 +137,6 @@ class AdminActivity : AppCompatActivity() {
                     for ((checkBox, packageName) in checkBoxes) {
                         checkBox.isChecked = whitelist.contains(packageName)
                     }
-                    errorText.text = "✓ Loaded whitelist from server"
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
@@ -143,9 +166,11 @@ class AdminActivity : AppCompatActivity() {
                     saveBtn.text = "💾 SAVE WHITELIST"
                     if (success) {
                         errorText.text = "✓ Success! Saved ${selectedPackages.size} apps"
+                        errorText.setTextColor(android.graphics.Color.GREEN)
                         Toast.makeText(this@AdminActivity, "Whitelist saved! ${selectedPackages.size} apps", Toast.LENGTH_LONG).show()
                     } else {
                         errorText.text = "✗ Failed to save. Check internet connection."
+                        errorText.setTextColor(android.graphics.Color.RED)
                         Toast.makeText(this@AdminActivity, "Failed to save", Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -154,6 +179,7 @@ class AdminActivity : AppCompatActivity() {
                     saveBtn.isEnabled = true
                     saveBtn.text = "💾 SAVE WHITELIST"
                     errorText.text = "✗ Error: ${e.message}"
+                    errorText.setTextColor(android.graphics.Color.RED)
                     Toast.makeText(this@AdminActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
