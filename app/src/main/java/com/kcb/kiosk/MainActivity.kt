@@ -139,12 +139,9 @@ class MainActivity : AppCompatActivity() {
             
             allInstalledApps.sortBy { it.name }
             
-            // Show the first 6 apps
+            // Show ALL apps (no limit)
             appList.clear()
-            val maxApps = minOf(6, allInstalledApps.size)
-            for (i in 0 until maxApps) {
-                appList.add(allInstalledApps[i])
-            }
+            appList.addAll(allInstalledApps)
             
             if (appList.isNotEmpty()) {
                 appGrid.adapter = AppAdapter(appList, packageManager)
@@ -203,7 +200,7 @@ class MainActivity : AppCompatActivity() {
             activateBtn.isEnabled = false
             statusText.text = "ACTIVE"
             
-            // Only show grid if apps are loaded
+            // Show grid if apps are loaded
             if (gridReady && appList.isNotEmpty()) {
                 appGrid.visibility = android.view.View.VISIBLE
             }
