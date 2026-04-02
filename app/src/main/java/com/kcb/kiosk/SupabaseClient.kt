@@ -12,9 +12,15 @@ class SupabaseClient private constructor() {
     private val supabaseUrl = "https://qbricrnjchbdyseeuwif.supabase.co"
     private val apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicmljcm5qY2hiZHlzZWV1d2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDU0NDUsImV4cCI6MjA4OTc4MTQ0NX0.5sJqi3fZc4VIFQAIw1QptHt7MlGdnkn5SVxYdRu4f7Q"
 
+    // Helper to add apikey to URL as query parameter (for safety)
+    private fun addApiKeyToUrl(urlString: String): String {
+        val separator = if (urlString.contains("?")) "&" else "?"
+        return "$urlString${separator}apikey=$apiKey"
+    }
+
     suspend fun validatePin(pin: String): PinValidationResult = withContext(Dispatchers.IO) {
         try {
-            val url = URL("$supabaseUrl/rest/v1/credits?pin=eq.$pin")
+            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits?pin=eq.$pin"))
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.setRequestProperty("apikey", apiKey)
@@ -43,7 +49,7 @@ class SupabaseClient private constructor() {
         try {
             val pin = customPin ?: (100000..999999).random().toString()
             
-            val url = URL("$supabaseUrl/rest/v1/credits")
+            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits"))
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "POST"
             connection.setRequestProperty("apikey", apiKey)
@@ -69,7 +75,7 @@ class SupabaseClient private constructor() {
 
     suspend fun getActivePins(): List<PinData> = withContext(Dispatchers.IO) {
         try {
-            val url = URL("$supabaseUrl/rest/v1/credits?seconds_left=gt.0&order=created_at.desc")
+            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits?seconds_left=gt.0&order=created_at.desc"))
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.setRequestProperty("apikey", apiKey)
@@ -87,10 +93,8 @@ class SupabaseClient private constructor() {
                         secondsLeft = obj.getInt("seconds_left")
                     ))
                 }
-                connection.disconnect()
                 return@withContext list
             } else {
-                connection.disconnect()
                 return@withContext emptyList()
             }
         } catch (e: Exception) {
@@ -100,7 +104,7 @@ class SupabaseClient private constructor() {
 
     suspend fun getWhitelistApps(): List<String> = withContext(Dispatchers.IO) {
         try {
-            val url = URL("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps")
+            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps"))
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.setRequestProperty("apikey", apiKey)
@@ -128,12 +132,13 @@ class SupabaseClient private constructor() {
         try {
             val appsString = apps.joinToString(",")
             
-            val url = URL("$supabaseUrl/rest/v1/admin_settings")
+            // Use POST with upsert (merge-duplicates)
+            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings"))
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "POST"
-            connection.setRequestProperty("Content-Type", "application/json")
             connection.setRequestProperty("apikey", apiKey)
             connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection.setRequestProperty("Content-Type", "application/json")
             connection.setRequestProperty("Prefer", "resolution=merge-duplicates")
             connection.doOutput = true
             
