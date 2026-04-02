@@ -152,15 +152,27 @@ class AdminActivity : AppCompatActivity() {
         }
         appPanel.addView(testBtn)
         
+        // Scroll view for checkboxes (takes remaining space)
         val scrollView = ScrollView(this)
         appContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(10, 10, 10, 10)
         }
         scrollView.addView(appContainer)
-        appPanel.addView(scrollView)
         
-        // SAVE WHITELIST BUTTON - make sure it's added
+        // Use a layout that pushes button to bottom
+        val scrollContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+            addView(scrollView)
+        }
+        appPanel.addView(scrollContainer)
+        
+        // SAVE WHITELIST BUTTON - now at the bottom
         saveAppsBtn = Button(this).apply {
             text = "💾 SAVE WHITELIST"
             setPadding(0, 20, 0, 20)
