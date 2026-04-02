@@ -89,7 +89,7 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(statusText)
         
-        // Debug text to show detected apps
+        // Debug text
         debugText = TextView(this).apply {
             text = ""
             textSize = 10f
@@ -129,7 +129,6 @@ class MainActivity : AppCompatActivity() {
         
         setContentView(mainLayout)
         
-        // Load apps when app starts
         loadAllInstalledApps()
     }
     
@@ -139,7 +138,6 @@ class MainActivity : AppCompatActivity() {
             val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
             
             for (app in packages) {
-                // Check if app can be launched (has an icon)
                 if (packageManager.getLaunchIntentForPackage(app.packageName) != null) {
                     val appName = packageManager.getApplicationLabel(app).toString()
                     detectedApps.add(AppInfo(appName, app.packageName))
@@ -147,33 +145,40 @@ class MainActivity : AppCompatActivity() {
             }
             
             detectedApps.sortBy { it.name }
-            
-            // Show ALL detected apps
             appList.clear()
             appList.addAll(detectedApps)
             
             // Show debug info
             val debugInfo = StringBuilder()
-            debugInfo.append("Detected ${appList.size} apps:\n")
-            for (i in 0 until minOf(10, appList.size)) {
+            debugInfo.append("Detected ${appList.size} apps\n")
+            for (i in 0 until minOf(5, appList.size)) {
                 debugInfo.append("• ${appList[i].name}\n")
-            }
-            if (appList.size > 10) {
-                debugInfo.append("... and ${appList.size - 10} more")
             }
             debugText.text = debugInfo.toString()
             
             if (appList.isNotEmpty()) {
-                appGrid.adapter = AppAdapter(appList, packageManager)
+                // Use SimpleAppAdapter instead (no icons)
+                appGrid.adapter = SimpleAppAdapter(appList) { packageName ->
+                    try {
+                        val intent = packageManager.getLaunchIntentForPackage(packageName)
+                        if (intent != null) {
+                            startActivity(intent)
+                        } else {
+                            Toast.makeText(this, "Cannot open app", Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
                 gridReady = true
                 Toast.makeText(this, "✅ Loaded ${appList.size} apps", Toast.LENGTH_LONG).show()
             } else {
-                debugText.text = "No apps detected! Check if apps have launcher icons."
+                debugText.text = "No apps detected!"
                 Toast.makeText(this, "❌ No apps found", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
             debugText.text = "Error: ${e.message}"
-            Toast.makeText(this, "Error loading apps: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
     
@@ -222,7 +227,6 @@ class MainActivity : AppCompatActivity() {
             activateBtn.isEnabled = false
             statusText.text = "ACTIVE"
             
-            // Show grid if apps are loaded
             if (gridReady && appList.isNotEmpty()) {
                 appGrid.visibility = android.view.View.VISIBLE
             }
@@ -235,9 +239,7 @@ class MainActivity : AppCompatActivity() {
                         val minutes = remainingSeconds / 60
                         val secs = remainingSeconds % 60
                         timerText.text = String.format("%02d:%02d", minutes, secs)
-                    } catch (e: Exception) {
-                        // Ignore
-                    }
+                    } catch (e: Exception) { }
                 }
                 
                 override fun onFinish() {
@@ -267,9 +269,7 @@ class MainActivity : AppCompatActivity() {
                             updateTimerFromDatabase(result.secondsLeft)
                         }
                     }
-                } catch (e: Exception) {
-                    // Ignore network errors
-                }
+                } catch (e: Exception) { }
             }
         }
     }
@@ -301,9 +301,7 @@ class MainActivity : AppCompatActivity() {
             timerText.text = "--:--"
             appGrid.visibility = android.view.View.GONE
             Toast.makeText(this, "Session expired", Toast.LENGTH_LONG).show()
-        } catch (e: Exception) {
-            // Ignore
-        }
+        } catch (e: Exception) { }
     }
     
     override fun onDestroy() {
@@ -311,8 +309,6 @@ class MainActivity : AppCompatActivity() {
         try {
             countDownTimer?.cancel()
             syncJob?.cancel()
-        } catch (e: Exception) {
-            // Ignore
-        }
+        } catch (e: Exception) { }
     }
 }
