@@ -88,7 +88,7 @@ class MainActivity : AppCompatActivity() {
         
         debugText = TextView(this).apply {
             text = ""
-            textSize = 12f
+            textSize = 11f
             setPadding(0, 0, 0, 10)
         }
         mainLayout.addView(debugText)
@@ -126,31 +126,45 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun loadWhitelistedApps() {
-        debugText.text = "Loading whitelisted apps..."
+        debugText.text = "Loading..."
         
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                // Get whitelist from Supabase
                 val whitelistPackages = supabase.getWhitelistApps()
                 
-                val allApps = mutableListOf<AppInfo>()
+                // Get all installed apps
+                val allInstalledApps = mutableListOf<AppInfo>()
                 val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
                 
                 for (app in packages) {
                     if (packageManager.getLaunchIntentForPackage(app.packageName) != null) {
-                        if (whitelistPackages.contains(app.packageName)) {
-                            val appName = packageManager.getApplicationLabel(app).toString()
-                            allApps.add(AppInfo(appName, app.packageName))
-                        }
+                        val appName = packageManager.getApplicationLabel(app).toString()
+                        allInstalledApps.add(AppInfo(appName, app.packageName))
                     }
                 }
                 
-                allApps.sortBy { it.name }
+                // Find which whitelisted apps are actually installed
+                val matchedApps = mutableListOf<AppInfo>()
+                for (whitelistPkg in whitelistPackages) {
+                    val found = allInstalledApps.find { it.packageName == whitelistPkg }
+                    if (found != null) {
+                        matchedApps.add(found)
+                    }
+                }
+                
+                matchedApps.sortBy { it.name }
                 
                 withContext(Dispatchers.Main) {
                     appList.clear()
-                    appList.addAll(allApps)
+                    appList.addAll(matchedApps)
                     
-                    debugText.text = "✅ ${appList.size} whitelisted apps found"
+                    val debugInfo = """
+                        Whitelist from server: ${whitelistPackages.size} apps
+                        Installed apps: ${allInstalledApps.size}
+                        Matched: ${matchedApps.size} apps
+                    """.trimIndent()
+                    debugText.text = debugInfo
                     
                     if (appList.isNotEmpty()) {
                         appGrid.adapter = SimpleAppAdapter(appList) { packageName ->
@@ -166,13 +180,15 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                         gridReady = true
+                        Toast.makeText(this@MainActivity, "✅ Loaded ${appList.size} apps", Toast.LENGTH_LONG).show()
                     } else {
-                        debugText.text = "No whitelisted apps. Go to Admin > APPS to select apps."
+                        Toast.makeText(this@MainActivity, "No matching apps found. Check whitelist in Supabase.", Toast.LENGTH_LONG).show()
                     }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     debugText.text = "Error: ${e.message}"
+                    Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
         }
