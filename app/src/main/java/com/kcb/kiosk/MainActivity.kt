@@ -1,8 +1,10 @@
 package com.kcb.kiosk
 
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.CountDownTimer
+import android.provider.Settings
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -25,12 +27,24 @@ class MainActivity : AppCompatActivity() {
     private var currentPin: String? = null
     private var syncJob: Job? = null
     private var isActive = false
-    private var remainingSeconds = 0
     private var appList = mutableListOf<AppInfo>()
     private var gridReady = false
+    
+    // Floating timer
+    private lateinit var floatingTimer: TextView
+    private var windowManager: android.view.WindowManager? = null
+    private var isOverlayVisible = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Request overlay permission for floating timer
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!Settings.canDrawOverlays(this)) {
+                val intent = android.content.Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                startActivity(intent)
+            }
+        }
         
         supabase = SupabaseClient.getInstance()
         
@@ -137,10 +151,8 @@ class MainActivity : AppCompatActivity() {
                 val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
                 
                 for (app in packages) {
-                    if (packageManager.getLaunchIntentForPackage(app.packageName) != null) {
-                        val appName = packageManager.getApplicationLabel(app).toString()
-                        allInstalledApps.add(AppInfo(appName, app.packageName))
-                    }
+                    val appName = packageManager.getApplicationLabel(app).toString()
+                    allInstalledApps.add(AppInfo(appName, app.packageName))
                 }
                 
                 val matchedApps = mutableListOf<AppInfo>()
@@ -208,8 +220,7 @@ class MainActivity : AppCompatActivity() {
                     
                     if (result.isValid && result.secondsLeft > 0) {
                         currentPin = pin
-                        remainingSeconds = result.secondsLeft
-                        startSession()
+                        startSession(result.secondsLeft)
                     } else {
                         val errorMsg = result.error ?: "Invalid PIN or expired"
                         Toast.makeText(this@MainActivity, errorMsg, Toast.LENGTH_LONG).show()
@@ -226,26 +237,34 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
-    private fun startSession() {
+    private fun startSession(seconds: Int) {
         try {
             isActive = true
             pinInput.isEnabled = false
             activateBtn.isEnabled = false
             statusText.text = "ACTIVE"
             
-            // Show app grid if there are apps
             if (gridReady && appList.isNotEmpty()) {
                 appGrid.visibility = android.view.View.VISIBLE
             }
             
-            // Start the countdown timer
+            // Show floating timer
+            showFloatingTimer()
+            
+            var timeLeft = seconds
+            
             countDownTimer?.cancel()
-            countDownTimer = object : CountDownTimer(remainingSeconds * 1000L, 1000) {
+            countDownTimer = object : CountDownTimer(seconds * 1000L, 1000) {
                 override fun onTick(millisUntilFinished: Long) {
-                    remainingSeconds = (millisUntilFinished / 1000).toInt()
-                    val minutes = remainingSeconds / 60
-                    val secs = remainingSeconds % 60
-                    timerText.text = String.format("%02d:%02d", minutes, secs)
+                    timeLeft = (millisUntilFinished / 1000).toInt()
+                    val minutes = timeLeft / 60
+                    val secs = timeLeft % 60
+                    val timeString = String.format("%02d:%02d", minutes, secs)
+                    timerText.text = timeString
+                    // Update floating timer
+                    if (::floatingTimer.isInitialized) {
+                        floatingTimer.text = timeString
+                    }
                 }
                 
                 override fun onFinish() {
@@ -260,6 +279,57 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
+    private fun showFloatingTimer() {
+        if (isOverlayVisible) return
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            return
+        }
+        
+        try {
+            windowManager = getSystemService(WINDOW_SERVICE) as android.view.WindowManager
+            
+            floatingTimer = TextView(this).apply {
+                text = timerText.text
+                textSize = 20f
+                setTextColor(android.graphics.Color.WHITE)
+                setBackgroundColor(android.graphics.Color.parseColor("#80000000"))
+                setPadding(25, 15, 25, 15)
+                gravity = android.view.Gravity.CENTER
+            }
+            
+            val params = android.view.WindowManager.LayoutParams(
+                android.view.WindowManager.LayoutParams.WRAP_CONTENT,
+                android.view.WindowManager.LayoutParams.WRAP_CONTENT,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                    android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                else
+                    android.view.WindowManager.LayoutParams.TYPE_PHONE,
+                android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                android.graphics.PixelFormat.TRANSLUCENT
+            )
+            
+            params.gravity = android.view.Gravity.TOP or android.view.Gravity.END
+            params.x = 20
+            params.y = 100
+            
+            windowManager?.addView(floatingTimer, params)
+            isOverlayVisible = true
+        } catch (e: Exception) {
+            // Overlay not allowed
+        }
+    }
+    
+    private fun hideFloatingTimer() {
+        if (!isOverlayVisible) return
+        try {
+            windowManager?.removeView(floatingTimer)
+            isOverlayVisible = false
+        } catch (e: Exception) {
+            // Ignore
+        }
+    }
+    
     private fun startSync() {
         syncJob?.cancel()
         syncJob = CoroutineScope(Dispatchers.IO).launch {
@@ -271,15 +341,10 @@ class MainActivity : AppCompatActivity() {
                         if (!result.isValid || result.secondsLeft <= 0) {
                             Toast.makeText(this@MainActivity, "Session expired (admin)", Toast.LENGTH_SHORT).show()
                             endSession()
-                        } else if (result.secondsLeft != remainingSeconds) {
-                            // Update remaining seconds from server
-                            remainingSeconds = result.secondsLeft
-                            countDownTimer?.cancel()
-                            startSession()
                         }
                     }
                 } catch (e: Exception) {
-                    // Ignore network errors during sync
+                    // Ignore network errors
                 }
             }
         }
@@ -291,15 +356,15 @@ class MainActivity : AppCompatActivity() {
             syncJob?.cancel()
             countDownTimer?.cancel()
             currentPin = null
-            remainingSeconds = 0
             pinInput.isEnabled = true
             activateBtn.isEnabled = true
             statusText.text = ""
             timerText.text = "--:--"
             appGrid.visibility = android.view.View.GONE
+            hideFloatingTimer()
             Toast.makeText(this, "Session expired", Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
-            // Ignore cleanup errors
+            // Ignore
         }
     }
     
@@ -308,6 +373,7 @@ class MainActivity : AppCompatActivity() {
         try {
             countDownTimer?.cancel()
             syncJob?.cancel()
+            hideFloatingTimer()
         } catch (e: Exception) {
             // Ignore
         }
