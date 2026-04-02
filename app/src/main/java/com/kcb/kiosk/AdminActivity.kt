@@ -19,6 +19,7 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var saveAppsBtn: Button
     private lateinit var pinsPanel: LinearLayout
     private lateinit var appsPanel: LinearLayout
+    private lateinit var appsStatusText: TextView
     private var currentTab = "pins"
     private var allApps = mutableListOf<AppInfo>()
     private var selectedPackages = mutableSetOf<String>()
@@ -138,15 +139,25 @@ class AdminActivity : AppCompatActivity() {
         }
         appsPanel.addView(infoText)
         
+        // Status text for debugging
+        appsStatusText = TextView(this).apply {
+            text = "Loading apps..."
+            textSize = 12f
+            setPadding(0, 0, 0, 10)
+        }
+        appsPanel.addView(appsStatusText)
+        
         appListRecycler = RecyclerView(this).apply {
             layoutManager = LinearLayoutManager(this@AdminActivity)
             setPadding(0, 0, 0, 20)
+            visibility = android.view.View.GONE
         }
         appsPanel.addView(appListRecycler)
         
         saveAppsBtn = Button(this).apply {
             text = "💾 SAVE WHITELIST"
             setOnClickListener { saveWhitelist() }
+            visibility = android.view.View.GONE
         }
         appsPanel.addView(saveAppsBtn)
         
@@ -168,14 +179,22 @@ class AdminActivity : AppCompatActivity() {
         } else {
             pinsPanel.visibility = android.view.View.GONE
             appsPanel.visibility = android.view.View.VISIBLE
+            // Refresh apps list when switching to apps tab
+            loadInstalledApps()
         }
     }
     
     private fun loadInstalledApps() {
+        appsStatusText.text = "Scanning apps..."
+        appsStatusText.visibility = android.view.View.VISIBLE
+        appListRecycler.visibility = android.view.View.GONE
+        saveAppsBtn.visibility = android.view.View.GONE
+        
         val installedApps = mutableListOf<AppInfo>()
         val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
         
         for (app in packages) {
+            // Check if app can be launched (has an icon/launcher)
             if (packageManager.getLaunchIntentForPackage(app.packageName) != null) {
                 installedApps.add(AppInfo(
                     name = packageManager.getApplicationLabel(app).toString(),
@@ -188,9 +207,16 @@ class AdminActivity : AppCompatActivity() {
         allApps = installedApps
         
         runOnUiThread {
-            appListRecycler.adapter = AppSelectionAdapter(allApps, selectedPackages) { updatedSelection ->
-                selectedPackages.clear()
-                selectedPackages.addAll(updatedSelection)
+            if (allApps.isEmpty()) {
+                appsStatusText.text = "No apps found. Make sure you have apps installed."
+            } else {
+                appsStatusText.text = "Found ${allApps.size} apps. Select which ones to allow."
+                appListRecycler.visibility = android.view.View.VISIBLE
+                saveAppsBtn.visibility = android.view.View.VISIBLE
+                appListRecycler.adapter = AppSelectionAdapter(allApps, selectedPackages) { updatedSelection ->
+                    selectedPackages.clear()
+                    selectedPackages.addAll(updatedSelection)
+                }
             }
         }
     }
