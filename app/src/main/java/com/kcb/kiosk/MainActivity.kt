@@ -8,6 +8,8 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
 
 class MainActivity : AppCompatActivity() {
@@ -15,11 +17,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var activateBtn: Button
     private lateinit var timerText: TextView
     private lateinit var statusText: TextView
+    private lateinit var appGrid: RecyclerView
     private var countDownTimer: CountDownTimer? = null
     private lateinit var supabase: SupabaseClient
     private var currentPin: String? = null
     private var syncJob: Job? = null
     private var isActive = false
+    private var appList = mutableListOf<AppInfo>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,8 +32,7 @@ class MainActivity : AppCompatActivity() {
         
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = android.view.Gravity.CENTER
-            setPadding(50, 50, 50, 50)
+            setPadding(30, 50, 30, 30)
         }
         
         // Title
@@ -37,46 +40,58 @@ class MainActivity : AppCompatActivity() {
             text = "KCB RENTAL"
             textSize = 28f
             gravity = android.view.Gravity.CENTER
-            setPadding(0, 0, 0, 50)
+            setPadding(0, 0, 0, 30)
         }
         mainLayout.addView(title)
         
-        // PIN input
+        // PIN input row
+        val pinRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 0, 0, 20)
+        }
+        
         pinInput = EditText(this).apply {
             hint = "Enter 6-digit PIN"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            textSize = 24f
+            textSize = 20f
             gravity = android.view.Gravity.CENTER
-            setPadding(20, 20, 20, 20)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setPadding(20, 15, 20, 15)
         }
-        mainLayout.addView(pinInput)
+        pinRow.addView(pinInput)
         
-        // Activate button
         activateBtn = Button(this).apply {
             text = "ACTIVATE"
-            textSize = 18f
-            setPadding(20, 20, 20, 20)
+            textSize = 16f
+            setPadding(20, 15, 20, 15)
             setOnClickListener { validatePin() }
         }
-        mainLayout.addView(activateBtn)
+        pinRow.addView(activateBtn)
+        mainLayout.addView(pinRow)
         
-        // Timer display
+        // Timer and status
         timerText = TextView(this).apply {
             text = "--:--"
             textSize = 48f
             gravity = android.view.Gravity.CENTER
-            setPadding(0, 50, 0, 0)
+            setPadding(0, 20, 0, 10)
         }
         mainLayout.addView(timerText)
         
-        // Status display
         statusText = TextView(this).apply {
             text = ""
             textSize = 16f
             gravity = android.view.Gravity.CENTER
-            setPadding(0, 20, 0, 0)
+            setPadding(0, 0, 0, 20)
         }
         mainLayout.addView(statusText)
+        
+        // App grid (hidden initially)
+        appGrid = RecyclerView(this).apply {
+            layoutManager = GridLayoutManager(this@MainActivity, 3)
+            visibility = android.view.View.GONE
+        }
+        mainLayout.addView(appGrid)
         
         // Admin button
         val adminBtn = Button(this).apply {
@@ -92,6 +107,35 @@ class MainActivity : AppCompatActivity() {
         mainLayout.addView(adminBtn)
         
         setContentView(mainLayout)
+        
+        // Load apps for the grid
+        loadWhitelistApps()
+    }
+    
+    private fun loadWhitelistApps() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val packages = supabase.getWhitelistApps()
+                val apps = mutableListOf<AppInfo>()
+                for (pkg in packages) {
+                    try {
+                        val appName = packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+                        apps.add(AppInfo(appName, pkg))
+                    } catch (e: Exception) {
+                        // App not installed, skip it
+                    }
+                }
+                withContext(Dispatchers.Main) {
+                    appList.clear()
+                    appList.addAll(apps)
+                    if (appList.isNotEmpty()) {
+                        appGrid.adapter = AppAdapter(appList, packageManager)
+                    }
+                }
+            } catch (e: Exception) {
+                // Silent fail - no apps to show
+            }
+        }
     }
     
     private fun validatePin() {
@@ -124,26 +168,36 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun startSession(seconds: Int) {
-        isActive = true
-        pinInput.isEnabled = false
-        activateBtn.isEnabled = false
-        statusText.text = "ACTIVE"
-        
-        countDownTimer?.cancel()
-        countDownTimer = object : CountDownTimer(seconds * 1000L, 1000) {
-            override fun onTick(millisUntilFinished: Long) {
-                val remainingSeconds = (millisUntilFinished / 1000).toInt()
-                val minutes = remainingSeconds / 60
-                val secs = remainingSeconds % 60
-                timerText.text = String.format("%02d:%02d", minutes, secs)
+        try {
+            isActive = true
+            pinInput.isEnabled = false
+            activateBtn.isEnabled = false
+            statusText.text = "ACTIVE"
+            
+            // Show app grid if there are apps
+            if (appList.isNotEmpty()) {
+                appGrid.visibility = android.view.View.VISIBLE
             }
             
-            override fun onFinish() {
-                endSession()
-            }
-        }.start()
-        
-        startSync()
+            countDownTimer?.cancel()
+            countDownTimer = object : CountDownTimer(seconds * 1000L, 1000) {
+                override fun onTick(millisUntilFinished: Long) {
+                    val remainingSeconds = (millisUntilFinished / 1000).toInt()
+                    val minutes = remainingSeconds / 60
+                    val secs = remainingSeconds % 60
+                    timerText.text = String.format("%02d:%02d", minutes, secs)
+                }
+                
+                override fun onFinish() {
+                    endSession()
+                }
+            }.start()
+            
+            startSync()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+            endSession()
+        }
     }
     
     private fun startSync() {
@@ -188,6 +242,7 @@ class MainActivity : AppCompatActivity() {
         activateBtn.isEnabled = true
         statusText.text = ""
         timerText.text = "--:--"
+        appGrid.visibility = android.view.View.GONE
         Toast.makeText(this, "Session expired", Toast.LENGTH_LONG).show()
     }
     
