@@ -16,6 +16,7 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var container: LinearLayout
     private lateinit var saveBtn: Button
     private lateinit var statusText: TextView
+    private lateinit var errorText: TextView
     private val checkBoxes = mutableListOf<Pair<CheckBox, String>>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -23,13 +24,11 @@ class AdminActivity : AppCompatActivity() {
         
         supabase = SupabaseClient.getInstance()
         
-        // Main layout
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(30, 50, 30, 30)
         }
         
-        // Title
         val title = TextView(this).apply {
             text = "🔐 SELECT APPS FOR CUSTOMERS"
             textSize = 22f
@@ -38,7 +37,6 @@ class AdminActivity : AppCompatActivity() {
         }
         mainLayout.addView(title)
         
-        // Status text
         statusText = TextView(this).apply {
             text = "Loading apps..."
             textSize = 12f
@@ -46,7 +44,14 @@ class AdminActivity : AppCompatActivity() {
         }
         mainLayout.addView(statusText)
         
-        // Scroll view for checkboxes
+        errorText = TextView(this).apply {
+            text = ""
+            textSize = 12f
+            setTextColor(android.graphics.Color.RED)
+            setPadding(0, 0, 0, 10)
+        }
+        mainLayout.addView(errorText)
+        
         val scrollView = ScrollView(this)
         container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -55,7 +60,6 @@ class AdminActivity : AppCompatActivity() {
         scrollView.addView(container)
         mainLayout.addView(scrollView)
         
-        // Save button
         saveBtn = Button(this).apply {
             text = "💾 SAVE WHITELIST"
             setOnClickListener { saveWhitelist() }
@@ -84,11 +88,9 @@ class AdminActivity : AppCompatActivity() {
         
         installedApps.sortBy { it.first }
         
-        // Clear existing checkboxes
         container.removeAllViews()
         checkBoxes.clear()
         
-        // Add checkboxes for each app
         for (app in installedApps) {
             val checkBox = CheckBox(this).apply {
                 text = "${app.first}\n(${app.second})"
@@ -105,10 +107,17 @@ class AdminActivity : AppCompatActivity() {
     
     private fun loadCurrentWhitelist() {
         CoroutineScope(Dispatchers.IO).launch {
-            val whitelist = supabase.getWhitelistApps()
-            withContext(Dispatchers.Main) {
-                for ((checkBox, packageName) in checkBoxes) {
-                    checkBox.isChecked = whitelist.contains(packageName)
+            try {
+                val whitelist = supabase.getWhitelistApps()
+                withContext(Dispatchers.Main) {
+                    for ((checkBox, packageName) in checkBoxes) {
+                        checkBox.isChecked = whitelist.contains(packageName)
+                    }
+                    errorText.text = "✓ Loaded whitelist from server"
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    errorText.text = "Error loading: ${e.message}"
                 }
             }
         }
@@ -117,6 +126,7 @@ class AdminActivity : AppCompatActivity() {
     private fun saveWhitelist() {
         saveBtn.isEnabled = false
         saveBtn.text = "SAVING..."
+        errorText.text = ""
         
         val selectedPackages = mutableListOf<String>()
         for ((checkBox, packageName) in checkBoxes) {
@@ -126,14 +136,25 @@ class AdminActivity : AppCompatActivity() {
         }
         
         CoroutineScope(Dispatchers.IO).launch {
-            val success = supabase.updateWhitelistApps(selectedPackages)
-            withContext(Dispatchers.Main) {
-                saveBtn.isEnabled = true
-                saveBtn.text = "💾 SAVE WHITELIST"
-                if (success) {
-                    Toast.makeText(this@AdminActivity, "Whitelist saved! ${selectedPackages.size} apps selected", Toast.LENGTH_LONG).show()
-                } else {
-                    Toast.makeText(this@AdminActivity, "Failed to save", Toast.LENGTH_SHORT).show()
+            try {
+                val success = supabase.updateWhitelistApps(selectedPackages)
+                withContext(Dispatchers.Main) {
+                    saveBtn.isEnabled = true
+                    saveBtn.text = "💾 SAVE WHITELIST"
+                    if (success) {
+                        errorText.text = "✓ Success! Saved ${selectedPackages.size} apps"
+                        Toast.makeText(this@AdminActivity, "Whitelist saved! ${selectedPackages.size} apps", Toast.LENGTH_LONG).show()
+                    } else {
+                        errorText.text = "✗ Failed to save. Check internet connection."
+                        Toast.makeText(this@AdminActivity, "Failed to save", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    saveBtn.isEnabled = true
+                    saveBtn.text = "💾 SAVE WHITELIST"
+                    errorText.text = "✗ Error: ${e.message}"
+                    Toast.makeText(this@AdminActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }
