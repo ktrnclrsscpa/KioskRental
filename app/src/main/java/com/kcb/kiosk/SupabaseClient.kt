@@ -185,3 +185,21 @@ class SupabaseClient private constructor() {
 
 data class PinValidationResult(val isValid: Boolean, val secondsLeft: Int, val error: String?)
 data class PinData(val pin: String, val secondsLeft: Int)
+
+suspend fun testConnection(): Boolean = withContext(Dispatchers.IO) {
+    try {
+        val url = URL("$supabaseUrl/rest/v1/admin_settings?limit=1")
+        val connection = url.openConnection() as HttpURLConnection
+        connection.requestMethod = "GET"
+        connection.setRequestProperty("apikey", apiKey)
+        connection.setRequestProperty("Authorization", "Bearer $apiKey")
+        connection.connectTimeout = 5000
+        connection.readTimeout = 5000
+        val responseCode = connection.responseCode
+        connection.disconnect()
+        responseCode == 200
+    } catch (e: Exception) {
+        e.printStackTrace()
+        false
+    }
+}
