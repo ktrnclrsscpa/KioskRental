@@ -8,8 +8,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
 
 class MainActivity : AppCompatActivity() {
@@ -17,13 +15,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var activateBtn: Button
     private lateinit var timerText: TextView
     private lateinit var statusText: TextView
-    private lateinit var appGrid: RecyclerView
     private var countDownTimer: CountDownTimer? = null
     private lateinit var supabase: SupabaseClient
     private var currentPin: String? = null
     private var syncJob: Job? = null
     private var isActive = false
-    private var appList = mutableListOf<AppInfo>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,7 +28,8 @@ class MainActivity : AppCompatActivity() {
         
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(30, 50, 30, 30)
+            gravity = android.view.Gravity.CENTER
+            setPadding(50, 50, 50, 50)
         }
         
         // Title
@@ -40,58 +37,46 @@ class MainActivity : AppCompatActivity() {
             text = "KCB RENTAL"
             textSize = 28f
             gravity = android.view.Gravity.CENTER
-            setPadding(0, 0, 0, 30)
+            setPadding(0, 0, 0, 50)
         }
         mainLayout.addView(title)
         
-        // PIN input row
-        val pinRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, 0, 0, 20)
-        }
-        
+        // PIN input
         pinInput = EditText(this).apply {
             hint = "Enter 6-digit PIN"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            textSize = 20f
+            textSize = 24f
             gravity = android.view.Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            setPadding(20, 15, 20, 15)
+            setPadding(20, 20, 20, 20)
         }
-        pinRow.addView(pinInput)
+        mainLayout.addView(pinInput)
         
+        // Activate button
         activateBtn = Button(this).apply {
             text = "ACTIVATE"
-            textSize = 16f
-            setPadding(20, 15, 20, 15)
+            textSize = 18f
+            setPadding(20, 20, 20, 20)
             setOnClickListener { validatePin() }
         }
-        pinRow.addView(activateBtn)
-        mainLayout.addView(pinRow)
+        mainLayout.addView(activateBtn)
         
-        // Timer and status
+        // Timer display
         timerText = TextView(this).apply {
             text = "--:--"
             textSize = 48f
             gravity = android.view.Gravity.CENTER
-            setPadding(0, 20, 0, 10)
+            setPadding(0, 50, 0, 0)
         }
         mainLayout.addView(timerText)
         
+        // Status display
         statusText = TextView(this).apply {
             text = ""
             textSize = 16f
             gravity = android.view.Gravity.CENTER
-            setPadding(0, 0, 0, 20)
+            setPadding(0, 20, 0, 0)
         }
         mainLayout.addView(statusText)
-        
-        // App grid (hidden initially)
-        appGrid = RecyclerView(this).apply {
-            layoutManager = GridLayoutManager(this@MainActivity, 3)
-            visibility = android.view.View.GONE
-        }
-        mainLayout.addView(appGrid)
         
         // Admin button
         val adminBtn = Button(this).apply {
@@ -101,35 +86,12 @@ class MainActivity : AppCompatActivity() {
             setTextColor(android.graphics.Color.GRAY)
             setPadding(0, 30, 0, 0)
             setOnClickListener {
-                val intent = android.content.Intent(this@MainActivity, AdminActivity::class.java)
-                startActivity(intent)
+                startActivity(android.content.Intent(this@MainActivity, AdminActivity::class.java))
             }
         }
         mainLayout.addView(adminBtn)
         
         setContentView(mainLayout)
-        
-        loadWhitelistApps()
-    }
-    
-    private fun loadWhitelistApps() {
-        CoroutineScope(Dispatchers.IO).launch {
-            val packages = supabase.getWhitelistApps()
-            val apps = mutableListOf<AppInfo>()
-            for (pkg in packages) {
-                try {
-                    val appName = packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
-                    apps.add(AppInfo(appName, pkg))
-                } catch (e: Exception) {
-                    apps.add(AppInfo(pkg.substringAfterLast('.'), pkg))
-                }
-            }
-            withContext(Dispatchers.Main) {
-                appList.clear()
-                appList.addAll(apps)
-                appGrid.adapter = AppAdapter(appList, packageManager)
-            }
-        }
     }
     
     private fun validatePin() {
@@ -166,9 +128,6 @@ class MainActivity : AppCompatActivity() {
         pinInput.isEnabled = false
         activateBtn.isEnabled = false
         statusText.text = "ACTIVE"
-        
-        // Show app grid
-        appGrid.visibility = android.view.View.VISIBLE
         
         countDownTimer?.cancel()
         countDownTimer = object : CountDownTimer(seconds * 1000L, 1000) {
@@ -229,7 +188,6 @@ class MainActivity : AppCompatActivity() {
         activateBtn.isEnabled = true
         statusText.text = ""
         timerText.text = "--:--"
-        appGrid.visibility = android.view.View.GONE
         Toast.makeText(this, "Session expired", Toast.LENGTH_LONG).show()
     }
     
