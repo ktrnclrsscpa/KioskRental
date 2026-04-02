@@ -101,7 +101,8 @@ class MainActivity : AppCompatActivity() {
             setTextColor(android.graphics.Color.GRAY)
             setPadding(0, 30, 0, 0)
             setOnClickListener {
-                startActivity(android.content.Intent(this@MainActivity, AdminActivity::class.java))
+                val intent = android.content.Intent(this@MainActivity, AdminActivity::class.java)
+                startActivity(intent)
             }
         }
         mainLayout.addView(adminBtn)
