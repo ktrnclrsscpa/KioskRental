@@ -38,7 +38,6 @@ class MainActivity : AppCompatActivity() {
             setPadding(30, 50, 30, 30)
         }
         
-        // Title
         val title = TextView(this).apply {
             text = "KCB RENTAL"
             textSize = 28f
@@ -47,7 +46,6 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(title)
         
-        // PIN input row
         val pinRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, 0, 0, 20)
@@ -72,7 +70,6 @@ class MainActivity : AppCompatActivity() {
         pinRow.addView(activateBtn)
         mainLayout.addView(pinRow)
         
-        // Timer and status
         timerText = TextView(this).apply {
             text = "--:--"
             textSize = 48f
@@ -89,7 +86,6 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(statusText)
         
-        // Debug/Status text
         debugText = TextView(this).apply {
             text = ""
             textSize = 11f
@@ -97,14 +93,12 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(debugText)
         
-        // App grid (hidden initially)
         appGrid = RecyclerView(this).apply {
             layoutManager = GridLayoutManager(this@MainActivity, 2)
             visibility = android.view.View.GONE
         }
         mainLayout.addView(appGrid)
         
-        // Load Apps button
         val loadAppsBtn = Button(this).apply {
             text = "📱 LOAD APPS"
             textSize = 12f
@@ -114,7 +108,6 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(loadAppsBtn)
         
-        // Admin button
         val adminBtn = Button(this).apply {
             text = "🔐 ADMIN"
             textSize = 14f
@@ -129,7 +122,6 @@ class MainActivity : AppCompatActivity() {
         
         setContentView(mainLayout)
         
-        // Load whitelisted apps when app starts
         loadWhitelistedApps()
     }
     
@@ -138,10 +130,8 @@ class MainActivity : AppCompatActivity() {
         
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Get whitelist from Supabase
                 val whitelistPackages = supabase.getWhitelistApps()
                 
-                // Get all installed apps that can be launched
                 val allInstalledApps = mutableListOf<AppInfo>()
                 val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
                 
@@ -152,7 +142,6 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 
-                // Find which whitelisted apps are actually installed
                 val matchedApps = mutableListOf<AppInfo>()
                 for (whitelistPkg in whitelistPackages) {
                     val found = allInstalledApps.find { it.packageName == whitelistPkg }
@@ -244,7 +233,6 @@ class MainActivity : AppCompatActivity() {
             activateBtn.isEnabled = false
             statusText.text = "ACTIVE"
             
-            // Show app grid if there are apps
             if (gridReady && appList.isNotEmpty()) {
                 appGrid.visibility = android.view.View.VISIBLE
             }
@@ -285,9 +273,7 @@ class MainActivity : AppCompatActivity() {
                             updateTimerFromDatabase(result.secondsLeft)
                         }
                     }
-                } catch (e: Exception) {
-                    // Ignore network errors during sync
-                }
+                } catch (e: Exception) { }
             }
         }
     }
@@ -319,9 +305,7 @@ class MainActivity : AppCompatActivity() {
             timerText.text = "--:--"
             appGrid.visibility = android.view.View.GONE
             Toast.makeText(this, "Session expired", Toast.LENGTH_LONG).show()
-        } catch (e: Exception) {
-            // Ignore cleanup errors
-        }
+        } catch (e: Exception) { }
     }
     
     override fun onDestroy() {
@@ -329,8 +313,6 @@ class MainActivity : AppCompatActivity() {
         try {
             countDownTimer?.cancel()
             syncJob?.cancel()
-        } catch (e: Exception) {
-            // Ignore
-        }
+        } catch (e: Exception) { }
     }
 }
