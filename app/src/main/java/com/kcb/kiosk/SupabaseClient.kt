@@ -105,6 +105,14 @@ class SupabaseClient private constructor() {
             return instance!!
         }
     }
+
+    suspend fun getWhitelistApps(): List<String> = withContext(Dispatchers.IO) {
+    listOf(
+        "com.google.android.youtube",
+        "com.roblox.client",
+        "com.gcash.gcash"
+    )
+}
 }
 
 data class PinValidationResult(val isValid: Boolean, val secondsLeft: Int, val error: String?)
