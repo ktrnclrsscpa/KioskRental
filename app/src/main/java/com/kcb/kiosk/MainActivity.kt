@@ -18,6 +18,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var timerText: TextView
     private lateinit var statusText: TextView
     private lateinit var appGrid: RecyclerView
+    private lateinit var gridStatusText: TextView
     private var countDownTimer: CountDownTimer? = null
     private lateinit var supabase: SupabaseClient
     private var currentPin: String? = null
@@ -86,6 +87,16 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(statusText)
         
+        // Grid status message (for debugging)
+        gridStatusText = TextView(this).apply {
+            text = ""
+            textSize = 12f
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 10)
+            visibility = android.view.View.GONE
+        }
+        mainLayout.addView(gridStatusText)
+        
         // App grid (hidden initially)
         appGrid = RecyclerView(this).apply {
             layoutManager = GridLayoutManager(this@MainActivity, 3)
@@ -122,7 +133,7 @@ class MainActivity : AppCompatActivity() {
                         val appName = packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
                         apps.add(AppInfo(appName, pkg))
                     } catch (e: Exception) {
-                        // App not installed, skip it
+                        apps.add(AppInfo(pkg.substringAfterLast('.'), pkg))
                     }
                 }
                 withContext(Dispatchers.Main) {
@@ -130,10 +141,18 @@ class MainActivity : AppCompatActivity() {
                     appList.addAll(apps)
                     if (appList.isNotEmpty()) {
                         appGrid.adapter = AppAdapter(appList, packageManager)
+                        gridStatusText.text = "✅ ${appList.size} apps loaded"
+                        gridStatusText.visibility = android.view.View.VISIBLE
+                    } else {
+                        gridStatusText.text = "❌ No apps found"
+                        gridStatusText.visibility = android.view.View.VISIBLE
                     }
                 }
             } catch (e: Exception) {
-                // Silent fail - no apps to show
+                withContext(Dispatchers.Main) {
+                    gridStatusText.text = "❌ Error: ${e.message}"
+                    gridStatusText.visibility = android.view.View.VISIBLE
+                }
             }
         }
     }
@@ -174,9 +193,10 @@ class MainActivity : AppCompatActivity() {
             activateBtn.isEnabled = false
             statusText.text = "ACTIVE"
             
-            // Show app grid if there are apps
+            // Show app grid and status if there are apps
             if (appList.isNotEmpty()) {
                 appGrid.visibility = android.view.View.VISIBLE
+                gridStatusText.visibility = android.view.View.VISIBLE
             }
             
             countDownTimer?.cancel()
@@ -243,6 +263,7 @@ class MainActivity : AppCompatActivity() {
         statusText.text = ""
         timerText.text = "--:--"
         appGrid.visibility = android.view.View.GONE
+        gridStatusText.visibility = android.view.View.GONE
         Toast.makeText(this, "Session expired", Toast.LENGTH_LONG).show()
     }
     
