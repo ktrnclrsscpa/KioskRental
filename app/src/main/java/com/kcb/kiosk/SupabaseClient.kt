@@ -191,6 +191,5 @@ class SupabaseClient private constructor() {
     }
 }
 
-// Data classes must be outside the class
 data class PinValidationResult(val isValid: Boolean, val secondsLeft: Int, val error: String?)
 data class PinData(val pin: String, val secondsLeft: Int)
