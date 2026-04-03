@@ -152,14 +152,6 @@ class AdminActivity : AppCompatActivity() {
         }
         appPanel.addView(testBtn)
         
-        // Direct save test button
-        val testSaveBtn = Button(this).apply {
-            text = "🧪 TEST DIRECT SAVE"
-            textSize = 12f
-            setOnClickListener { testDirectSave() }
-        }
-        appPanel.addView(testSaveBtn)
-        
         val scrollView = ScrollView(this)
         appContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -218,33 +210,6 @@ class AdminActivity : AppCompatActivity() {
                 } else {
                     appStatusText.text = "✗ Connection failed!"
                     appStatusText.setTextColor(android.graphics.Color.RED)
-                }
-            }
-        }
-    }
-    
-    private fun testDirectSave() {
-        appStatusText.text = "Testing direct save..."
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val testApps = listOf("com.test.app1", "com.test.app2")
-                val success = supabase.updateWhitelistApps(testApps)
-                withContext(Dispatchers.Main) {
-                    if (success) {
-                        appStatusText.text = "✓ Direct save succeeded!"
-                        appStatusText.setTextColor(android.graphics.Color.GREEN)
-                        Toast.makeText(this@AdminActivity, "Direct save succeeded!", Toast.LENGTH_SHORT).show()
-                    } else {
-                        appStatusText.text = "✗ Direct save failed!"
-                        appStatusText.setTextColor(android.graphics.Color.RED)
-                        Toast.makeText(this@AdminActivity, "Direct save failed!", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    appStatusText.text = "✗ Exception: ${e.message}"
-                    appStatusText.setTextColor(android.graphics.Color.RED)
-                    Toast.makeText(this@AdminActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -343,6 +308,7 @@ class AdminActivity : AppCompatActivity() {
                         appStatusText.text = "✓ Success! Saved ${selectedPackages.size} apps"
                         appStatusText.setTextColor(android.graphics.Color.GREEN)
                         Toast.makeText(this@AdminActivity, "Whitelist saved! ${selectedPackages.size} apps", Toast.LENGTH_LONG).show()
+                        loadCurrentWhitelist()
                     } else {
                         appStatusText.text = "✗ Failed to save. Check internet connection."
                         appStatusText.setTextColor(android.graphics.Color.RED)
