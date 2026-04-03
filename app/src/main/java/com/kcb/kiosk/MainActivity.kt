@@ -2,67 +2,107 @@ package com.kcb.kiosk
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.CountDownTimer
+import android.provider.Settings
+import android.speech.tts.TextToSpeech
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
     private lateinit var pinInput: EditText
     private lateinit var activateBtn: Button
     private lateinit var timerText: TextView
     private lateinit var statusText: TextView
+    private lateinit var appGrid: RecyclerView
+    private lateinit var debugText: TextView
     private var countDownTimer: CountDownTimer? = null
     private lateinit var supabase: SupabaseClient
     private var currentPin: String? = null
+    private var syncJob: Job? = null
     private var isActive = false
+    private var appList = mutableListOf<AppInfo>()
+    private var gridReady = false
+    private var currentRemainingSeconds = 0
+    
+    private lateinit var tts: TextToSpeech
+    
+    private lateinit var floatingTimer: TextView
+    private var windowManager: android.view.WindowManager? = null
+    private var isOverlayVisible = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Request overlay permission for floating timer
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!Settings.canDrawOverlays(this)) {
+                val intent = android.content.Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                startActivity(intent)
+            }
+        }
+        
+        // Initialize Text-to-Speech
+        tts = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                tts.language = Locale.US
+            }
+        }
         
         supabase = SupabaseClient.getInstance()
         
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(50, 50, 50, 50)
-            gravity = android.view.Gravity.CENTER
+            setPadding(30, 50, 30, 30)
         }
         
         val title = TextView(this).apply {
             text = "KCB RENTAL"
             textSize = 28f
             gravity = android.view.Gravity.CENTER
-            setPadding(0, 0, 0, 50)
+            setPadding(0, 0, 0, 30)
         }
         mainLayout.addView(title)
+        
+        val pinRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 0, 0, 20)
+        }
         
         pinInput = EditText(this).apply {
             hint = "Enter 6-digit PIN"
             inputType = android.text.InputType.TYPE_CLASS_TEXT
-            textSize = 24f
+            textSize = 20f
             gravity = android.view.Gravity.CENTER
-            setPadding(20, 20, 20, 20)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setPadding(20, 15, 20, 15)
+            maxLines = 1
         }
-        mainLayout.addView(pinInput)
+        pinRow.addView(pinInput)
         
         activateBtn = Button(this).apply {
             text = "ACTIVATE"
-            textSize = 18f
-            setPadding(20, 20, 20, 20)
+            textSize = 16f
+            setPadding(20, 15, 20, 15)
             setOnClickListener { validatePin() }
         }
-        mainLayout.addView(activateBtn)
+        pinRow.addView(activateBtn)
+        mainLayout.addView(pinRow)
         
         timerText = TextView(this).apply {
             text = "--:--"
             textSize = 48f
             gravity = android.view.Gravity.CENTER
-            setPadding(0, 50, 0, 0)
+            setPadding(0, 20, 0, 10)
         }
         mainLayout.addView(timerText)
         
@@ -70,16 +110,38 @@ class MainActivity : AppCompatActivity() {
             text = ""
             textSize = 16f
             gravity = android.view.Gravity.CENTER
-            setPadding(0, 20, 0, 0)
+            setPadding(0, 0, 0, 20)
         }
         mainLayout.addView(statusText)
+        
+        debugText = TextView(this).apply {
+            text = ""
+            textSize = 11f
+            setPadding(0, 0, 0, 10)
+        }
+        mainLayout.addView(debugText)
+        
+        appGrid = RecyclerView(this).apply {
+            layoutManager = GridLayoutManager(this@MainActivity, 2)
+            visibility = android.view.View.GONE
+        }
+        mainLayout.addView(appGrid)
+        
+        val loadAppsBtn = Button(this).apply {
+            text = "📱 LOAD APPS"
+            textSize = 12f
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            setTextColor(android.graphics.Color.GRAY)
+            setOnClickListener { loadWhitelistedApps() }
+        }
+        mainLayout.addView(loadAppsBtn)
         
         val adminBtn = Button(this).apply {
             text = "🔐 ADMIN"
             textSize = 14f
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
             setTextColor(android.graphics.Color.GRAY)
-            setPadding(0, 30, 0, 0)
+            setPadding(0, 10, 0, 0)
             setOnClickListener {
                 startActivity(android.content.Intent(this@MainActivity, AdminActivity::class.java))
             }
@@ -87,6 +149,61 @@ class MainActivity : AppCompatActivity() {
         mainLayout.addView(adminBtn)
         
         setContentView(mainLayout)
+        
+        loadWhitelistedApps()
+    }
+    
+    private fun loadWhitelistedApps() {
+        debugText.text = "Loading whitelisted apps from local storage..."
+        
+        val prefs = getSharedPreferences("kiosk_prefs", Context.MODE_PRIVATE)
+        val whitelistPackages = prefs.getStringSet("whitelist", emptySet()) ?: emptySet()
+        
+        val allInstalledApps = mutableListOf<AppInfo>()
+        val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+        
+        for (app in packages) {
+            val appName = packageManager.getApplicationLabel(app).toString()
+            allInstalledApps.add(AppInfo(appName, app.packageName))
+        }
+        
+        val matchedApps = mutableListOf<AppInfo>()
+        for (whitelistPkg in whitelistPackages) {
+            val found = allInstalledApps.find { it.packageName == whitelistPkg }
+            if (found != null) {
+                matchedApps.add(found)
+            }
+        }
+        
+        matchedApps.sortBy { it.name }
+        
+        appList.clear()
+        appList.addAll(matchedApps)
+        
+        val statusMsg = "Whitelist: ${whitelistPackages.size} apps | Installed: ${allInstalledApps.size} | Matched: ${matchedApps.size}"
+        debugText.text = statusMsg
+        
+        if (appList.isNotEmpty()) {
+            appGrid.adapter = SimpleAppAdapter(appList) { packageName ->
+                try {
+                    val intent = packageManager.getLaunchIntentForPackage(packageName)
+                    if (intent != null) {
+                        startActivity(intent)
+                    } else {
+                        Toast.makeText(this@MainActivity, "Cannot open app", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+            gridReady = true
+            if (isActive) {
+                appGrid.visibility = android.view.View.VISIBLE
+            }
+            Toast.makeText(this@MainActivity, "✅ Loaded ${appList.size} apps", Toast.LENGTH_SHORT).show()
+        } else {
+            debugText.text = "$statusMsg\nNo matching apps. Go to Admin > APPS to select apps."
+        }
     }
     
     private fun validatePin() {
@@ -110,6 +227,7 @@ class MainActivity : AppCompatActivity() {
                     
                     if (result.isValid && result.secondsLeft > 0) {
                         currentPin = pin
+                        currentRemainingSeconds = result.secondsLeft
                         startSession(result.secondsLeft)
                     } else {
                         Toast.makeText(this@MainActivity, "Invalid or expired PIN", Toast.LENGTH_LONG).show()
@@ -120,7 +238,7 @@ class MainActivity : AppCompatActivity() {
                     pinInput.isEnabled = true
                     activateBtn.isEnabled = true
                     statusText.text = ""
-                    Toast.makeText(this@MainActivity, "Connection error", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "Connection error: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -133,45 +251,192 @@ class MainActivity : AppCompatActivity() {
             activateBtn.isEnabled = false
             statusText.text = "ACTIVE"
             
-            // Display initial time
-            val startMinutes = seconds / 60
-            val startSecs = seconds % 60
-            timerText.text = String.format("%02d:%02d", startMinutes, startSecs)
+            // Show app grid if there are apps
+            if (appList.isNotEmpty()) {
+                appGrid.visibility = android.view.View.VISIBLE
+                gridReady = true
+            }
             
-            // Start countdown timer
+            // Show floating timer
+            showFloatingTimer()
+            
+            var timeLeft = seconds
+            currentRemainingSeconds = seconds
+            
+            // Display initial time
+            val startMinutes = timeLeft / 60
+            val startSecs = timeLeft % 60
+            timerText.text = String.format("%02d:%02d", startMinutes, startSecs)
+            if (::floatingTimer.isInitialized) {
+                floatingTimer.text = String.format("%02d:%02d", startMinutes, startSecs)
+            }
+            
             countDownTimer?.cancel()
             countDownTimer = object : CountDownTimer(seconds * 1000L, 1000) {
                 override fun onTick(millisUntilFinished: Long) {
-                    val remainingSeconds = (millisUntilFinished / 1000).toInt()
-                    val minutes = remainingSeconds / 60
-                    val secs = remainingSeconds % 60
-                    timerText.text = String.format("%02d:%02d", minutes, secs)
+                    timeLeft = (millisUntilFinished / 1000).toInt()
+                    currentRemainingSeconds = timeLeft
+                    val minutes = timeLeft / 60
+                    val secs = timeLeft % 60
+                    val timeString = String.format("%02d:%02d", minutes, secs)
+                    timerText.text = timeString
+                    if (::floatingTimer.isInitialized) {
+                        floatingTimer.text = timeString
+                    }
+                    
+                    when (timeLeft) {
+                        300 -> speakAlert("5 minutes remaining")
+                        60 -> speakAlert("1 minute remaining")
+                        30 -> speakAlert("30 seconds remaining")
+                    }
                 }
                 
                 override fun onFinish() {
+                    speakAlert("Time expired")
                     endSession()
                 }
             }.start()
             
+            startSync()
         } catch (e: Exception) {
             Toast.makeText(this, "Session error: ${e.message}", Toast.LENGTH_SHORT).show()
             endSession()
         }
     }
     
-    private fun endSession() {
-        isActive = false
+    private fun speakAlert(message: String) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, null)
+            } else {
+                tts.speak(message, TextToSpeech.QUEUE_FLUSH, null)
+            }
+        } catch (e: Exception) {
+            // TTS not available
+        }
+    }
+    
+    private fun showFloatingTimer() {
+        if (isOverlayVisible) return
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            return
+        }
+        
+        try {
+            windowManager = getSystemService(WINDOW_SERVICE) as android.view.WindowManager
+            
+            floatingTimer = TextView(this).apply {
+                text = timerText.text
+                textSize = 20f
+                setTextColor(android.graphics.Color.WHITE)
+                setBackgroundColor(android.graphics.Color.parseColor("#80000000"))
+                setPadding(25, 15, 25, 15)
+                gravity = android.view.Gravity.CENTER
+            }
+            
+            val params = android.view.WindowManager.LayoutParams(
+                android.view.WindowManager.LayoutParams.WRAP_CONTENT,
+                android.view.WindowManager.LayoutParams.WRAP_CONTENT,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                    android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                else
+                    android.view.WindowManager.LayoutParams.TYPE_PHONE,
+                android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                android.graphics.PixelFormat.TRANSLUCENT
+            )
+            
+            params.gravity = android.view.Gravity.TOP or android.view.Gravity.END
+            params.x = 20
+            params.y = 100
+            
+            windowManager?.addView(floatingTimer, params)
+            isOverlayVisible = true
+        } catch (e: Exception) {
+            // Overlay not allowed
+        }
+    }
+    
+    private fun hideFloatingTimer() {
+        if (!isOverlayVisible) return
+        try {
+            windowManager?.removeView(floatingTimer)
+            isOverlayVisible = false
+        } catch (e: Exception) {
+            // Ignore
+        }
+    }
+    
+    private fun startSync() {
+        syncJob?.cancel()
+        syncJob = CoroutineScope(Dispatchers.IO).launch {
+            while (isActive && currentPin != null) {
+                delay(5000)
+                try {
+                    val result = supabase.validatePin(currentPin!!)
+                    withContext(Dispatchers.Main) {
+                        if (!result.isValid || result.secondsLeft <= 0) {
+                            Toast.makeText(this@MainActivity, "Session expired (admin)", Toast.LENGTH_SHORT).show()
+                            // Delete PIN when expired
+                            CoroutineScope(Dispatchers.IO).launch {
+                                supabase.deletePin(currentPin!!)
+                            }
+                            endSession()
+                        } else if (result.secondsLeft != currentRemainingSeconds) {
+                            currentRemainingSeconds = result.secondsLeft
+                            updateTimerFromDatabase(result.secondsLeft)
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Ignore network errors
+                }
+            }
+        }
+    }
+    
+    private fun updateTimerFromDatabase(seconds: Int) {
         countDownTimer?.cancel()
-        currentPin = null
-        pinInput.isEnabled = true
-        activateBtn.isEnabled = true
-        statusText.text = ""
-        timerText.text = "--:--"
-        Toast.makeText(this, "Session expired", Toast.LENGTH_LONG).show()
+        startSession(seconds)
+    }
+    
+    private fun endSession() {
+        try {
+            isActive = false
+            syncJob?.cancel()
+            countDownTimer?.cancel()
+            
+            // Delete the PIN so it cannot be used again (one-time use)
+            if (currentPin != null) {
+                val pinToDelete = currentPin
+                CoroutineScope(Dispatchers.IO).launch {
+                    supabase.deletePin(pinToDelete!!)
+                }
+            }
+            
+            currentPin = null
+            currentRemainingSeconds = 0
+            pinInput.isEnabled = true
+            activateBtn.isEnabled = true
+            statusText.text = ""
+            timerText.text = "--:--"
+            appGrid.visibility = android.view.View.GONE
+            hideFloatingTimer()
+            Toast.makeText(this, "Session expired. PIN can no longer be used.", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            // Ignore
+        }
     }
     
     override fun onDestroy() {
         super.onDestroy()
-        countDownTimer?.cancel()
+        try {
+            countDownTimer?.cancel()
+            syncJob?.cancel()
+            hideFloatingTimer()
+            tts.stop()
+            tts.shutdown()
+        } catch (e: Exception) {
+            // Ignore
+        }
     }
 }
