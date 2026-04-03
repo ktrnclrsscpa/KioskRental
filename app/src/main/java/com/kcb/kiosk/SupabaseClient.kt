@@ -71,7 +71,6 @@ class SupabaseClient private constructor() {
 
     suspend fun generatePin(customPin: String?, seconds: Int): String? = withContext(Dispatchers.IO) {
         try {
-            // Generate alphanumeric + special characters PIN (6 chars)
             val pin = if (!customPin.isNullOrEmpty()) customPin else generateRandomPin()
             
             val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits"))
@@ -201,6 +200,54 @@ class SupabaseClient private constructor() {
             connection.readTimeout = 5000
             val responseCode = connection.responseCode
             connection.disconnect()
+            responseCode in 200..299
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun extendTime(pin: String, extraMinutes: Int): Boolean = withContext(Dispatchers.IO) {
+        try {
+            // First get current seconds left
+            val getUrl = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits?pin=eq.$pin"))
+            val getConnection = getUrl.openConnection() as HttpURLConnection
+            getConnection.requestMethod = "GET"
+            getConnection.setRequestProperty("apikey", apiKey)
+            getConnection.setRequestProperty("Authorization", "Bearer $apiKey")
+            getConnection.connectTimeout = 5000
+            getConnection.readTimeout = 5000
+            
+            val currentSeconds = if (getConnection.responseCode == 200) {
+                val responseText = getConnection.inputStream.bufferedReader().use { it.readText() }
+                val jsonArray = JSONArray(responseText)
+                if (jsonArray.length() > 0) {
+                    jsonArray.getJSONObject(0).getInt("seconds_left")
+                } else {
+                    return@withContext false
+                }
+            } else {
+                return@withContext false
+            }
+            getConnection.disconnect()
+            
+            // Update with new seconds
+            val newSeconds = currentSeconds + (extraMinutes * 60)
+            val updateUrl = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits?pin=eq.$pin"))
+            val updateConnection = updateUrl.openConnection() as HttpURLConnection
+            updateConnection.requestMethod = "PATCH"
+            updateConnection.setRequestProperty("apikey", apiKey)
+            updateConnection.setRequestProperty("Authorization", "Bearer $apiKey")
+            updateConnection.setRequestProperty("Content-Type", "application/json")
+            updateConnection.doOutput = true
+            updateConnection.connectTimeout = 5000
+            updateConnection.readTimeout = 5000
+            
+            val jsonBody = "{\"seconds_left\":$newSeconds}"
+            updateConnection.outputStream.write(jsonBody.toByteArray())
+            
+            val responseCode = updateConnection.responseCode
+            updateConnection.disconnect()
+            
             responseCode in 200..299
         } catch (e: Exception) {
             false
