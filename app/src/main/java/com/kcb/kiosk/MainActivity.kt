@@ -245,9 +245,16 @@ class MainActivity : AppCompatActivity() {
             activateBtn.isEnabled = false
             statusText.text = "ACTIVE"
             
+            // Debug: Show how many apps are in the list
+            debugText.text = "Apps in list: ${appList.size}"
+            
+            // Show app grid if there are apps
             if (appList.isNotEmpty()) {
                 appGrid.visibility = android.view.View.VISIBLE
                 appGrid.adapter?.notifyDataSetChanged()
+                Toast.makeText(this, "Showing ${appList.size} apps", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "No apps to show. Go to Admin > APPS to select apps.", Toast.LENGTH_LONG).show()
             }
             
             showFloatingTimer()
@@ -345,14 +352,10 @@ class MainActivity : AppCompatActivity() {
             isActive = false
             countDownTimer?.cancel()
             
-            // Delete the PIN from database (one-time use)
             if (currentPin != null) {
                 val pinToDelete = currentPin
                 CoroutineScope(Dispatchers.IO).launch {
                     supabase.deletePin(pinToDelete!!)
-                    withContext(Dispatchers.Main) {
-                        // PIN deleted
-                    }
                 }
             }
             
