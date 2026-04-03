@@ -148,47 +148,4 @@ class SupabaseClient private constructor() {
                 return@withContext emptyList()
             }
         } catch (e: Exception) {
-            return@withContext emptyList()
-        }
-    }
-
-    suspend fun updateWhitelistApps(apps: List<String>): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val appsString = apps.joinToString(",")
-            
-            // Simple PATCH request - same as browser test
-            val url = URL("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps")
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "PATCH"
-            connection.setRequestProperty("apikey", apiKey)
-            connection.setRequestProperty("Authorization", "Bearer $apiKey")
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.doOutput = true
-            connection.connectTimeout = 10000
-            connection.readTimeout = 10000
-            
-            val jsonBody = "{\"setting_value\":\"$appsString\"}"
-            connection.outputStream.write(jsonBody.toByteArray())
-            
-            val responseCode = connection.responseCode
-            connection.disconnect()
-            
-            // 204 means success (no content returned)
-            responseCode == 204 || responseCode == 200
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
-    }
-
-    companion object {
-        private var instance: SupabaseClient? = null
-        fun getInstance(): SupabaseClient {
-            if (instance == null) instance = SupabaseClient()
-            return instance!!
-        }
-    }
-}
-
-data class PinValidationResult(val isValid: Boolean, val secondsLeft: Int, val error: String?)
-data class PinData(val pin: String, val secondsLeft: Int)
+           
