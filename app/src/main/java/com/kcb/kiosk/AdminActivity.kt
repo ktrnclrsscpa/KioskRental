@@ -33,7 +33,6 @@ class AdminActivity : AppCompatActivity() {
     private val checkBoxes = mutableListOf<Pair<CheckBox, String>>()
     
     private val prefs by lazy { getSharedPreferences("kiosk_prefs", Context.MODE_PRIVATE) }
-    private var isAuthenticated = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,7 +54,6 @@ class AdminActivity : AppCompatActivity() {
                 val password = input.text.toString()
                 val savedPassword = prefs.getString("admin_password", "admin123")
                 if (password == savedPassword) {
-                    isAuthenticated = true
                     initAdminPanel()
                 } else {
                     Toast.makeText(this, "Wrong password!", Toast.LENGTH_SHORT).show()
@@ -138,9 +136,10 @@ class AdminActivity : AppCompatActivity() {
         }
         
         generatePinInput = EditText(this).apply {
-            hint = "PIN (leave blank)"
+            hint = "PIN (leave blank for random 6 chars)"
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             setPadding(10, 10, 10, 10)
+            maxLines = 1
         }
         pinRow.addView(generatePinInput)
         
@@ -335,7 +334,13 @@ class AdminActivity : AppCompatActivity() {
         }
         
         val customPin = generatePinInput.text.toString().trim()
-        val pin = if (customPin.length == 6) customPin else null
+        // Validate custom PIN length if provided
+        if (customPin.isNotEmpty() && customPin.length != 6) {
+            Toast.makeText(this, "PIN must be exactly 6 characters", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        val pin = if (customPin.isNotEmpty()) customPin else null
         
         generateBtn.isEnabled = false
         generateBtn.text = "GENERATING..."
