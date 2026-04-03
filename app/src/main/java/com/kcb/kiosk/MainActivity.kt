@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.provider.Settings
+import android.speech.tts.TextToSpeech
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -15,6 +16,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
     private lateinit var pinInput: EditText
@@ -31,6 +33,9 @@ class MainActivity : AppCompatActivity() {
     private var appList = mutableListOf<AppInfo>()
     private var gridReady = false
     
+    // Text-to-Speech for voice alerts
+    private lateinit var tts: TextToSpeech
+    
     // Floating timer
     private lateinit var floatingTimer: TextView
     private var windowManager: android.view.WindowManager? = null
@@ -39,10 +44,18 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        // Request overlay permission for floating timer
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 val intent = android.content.Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
                 startActivity(intent)
+            }
+        }
+        
+        // Initialize Text-to-Speech
+        tts = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                tts.language = Locale.US
             }
         }
         
@@ -184,7 +197,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             gridReady = true
-            // If session is active, show the grid immediately
             if (isActive) {
                 appGrid.visibility = android.view.View.VISIBLE
             }
@@ -239,7 +251,6 @@ class MainActivity : AppCompatActivity() {
             activateBtn.isEnabled = false
             statusText.text = "ACTIVE"
             
-            // Show app grid if there are apps
             if (appList.isNotEmpty()) {
                 appGrid.visibility = android.view.View.VISIBLE
                 gridReady = true
@@ -248,6 +259,7 @@ class MainActivity : AppCompatActivity() {
             showFloatingTimer()
             
             var timeLeft = seconds
+            var lastAlertSecond = -1
             
             countDownTimer?.cancel()
             countDownTimer = object : CountDownTimer(seconds * 1000L, 1000) {
@@ -260,9 +272,25 @@ class MainActivity : AppCompatActivity() {
                     if (::floatingTimer.isInitialized) {
                         floatingTimer.text = timeString
                     }
+                    
+                    // Voice alerts at specific times
+                    when (timeLeft) {
+                        300 -> speakAlert("5 minutes remaining")
+                        180 -> speakAlert("3 minutes remaining")
+                        120 -> speakAlert("2 minutes remaining")
+                        60 -> speakAlert("1 minute remaining")
+                        30 -> speakAlert("30 seconds remaining")
+                        10, 9, 8, 7, 6, 5, 4, 3, 2, 1 -> {
+                            if (lastAlertSecond != timeLeft) {
+                                speakAlert("$timeLeft seconds remaining")
+                                lastAlertSecond = timeLeft
+                            }
+                        }
+                    }
                 }
                 
                 override fun onFinish() {
+                    speakAlert("Time expired")
                     endSession()
                 }
             }.start()
@@ -271,6 +299,18 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Toast.makeText(this, "Session error: ${e.message}", Toast.LENGTH_SHORT).show()
             endSession()
+        }
+    }
+    
+    private fun speakAlert(message: String) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, null)
+            } else {
+                tts.speak(message, TextToSpeech.QUEUE_FLUSH, null)
+            }
+        } catch (e: Exception) {
+            // TTS not available
         }
     }
     
@@ -369,6 +409,8 @@ class MainActivity : AppCompatActivity() {
             countDownTimer?.cancel()
             syncJob?.cancel()
             hideFloatingTimer()
+            tts.stop()
+            tts.shutdown()
         } catch (e: Exception) {
             // Ignore
         }
