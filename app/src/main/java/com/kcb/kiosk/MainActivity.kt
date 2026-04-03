@@ -245,9 +245,11 @@ class MainActivity : AppCompatActivity() {
             activateBtn.isEnabled = false
             statusText.text = "ACTIVE"
             
-            // Show app grid
+            // Force show app grid
             if (appList.isNotEmpty()) {
                 appGrid.visibility = android.view.View.VISIBLE
+                // Force refresh adapter
+                appGrid.adapter?.notifyDataSetChanged()
             }
             
             // Show floating timer
@@ -266,7 +268,6 @@ class MainActivity : AppCompatActivity() {
                         floatingTimer.text = timeString
                     }
                     
-                    // Voice alerts
                     when (remainingSeconds) {
                         300 -> speakAlert("5 minutes remaining")
                         60 -> speakAlert("1 minute remaining")
@@ -348,7 +349,6 @@ class MainActivity : AppCompatActivity() {
             isActive = false
             countDownTimer?.cancel()
             
-            // Delete PIN (one-time use)
             if (currentPin != null) {
                 CoroutineScope(Dispatchers.IO).launch {
                     supabase.deletePin(currentPin!!)
