@@ -14,6 +14,7 @@ class SimpleAppAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val button = Button(parent.context)
         button.setPadding(20, 20, 20, 20)
+        button.textSize = 14f
         return ViewHolder(button)
     }
 
