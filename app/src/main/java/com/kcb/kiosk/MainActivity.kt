@@ -43,7 +43,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Request overlay permission for floating timer
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 val intent = android.content.Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
@@ -51,7 +50,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
-        // Initialize Text-to-Speech
         tts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts.language = Locale.US
@@ -251,13 +249,11 @@ class MainActivity : AppCompatActivity() {
             activateBtn.isEnabled = false
             statusText.text = "ACTIVE"
             
-            // Show app grid if there are apps
             if (appList.isNotEmpty()) {
                 appGrid.visibility = android.view.View.VISIBLE
                 gridReady = true
             }
             
-            // Show floating timer
             showFloatingTimer()
             
             var timeLeft = seconds
@@ -377,14 +373,11 @@ class MainActivity : AppCompatActivity() {
                     withContext(Dispatchers.Main) {
                         if (!result.isValid || result.secondsLeft <= 0) {
                             Toast.makeText(this@MainActivity, "Session expired (admin)", Toast.LENGTH_SHORT).show()
-                            // Delete PIN when expired
-                            CoroutineScope(Dispatchers.IO).launch {
-                                supabase.deletePin(currentPin!!)
-                            }
                             endSession()
                         } else if (result.secondsLeft != currentRemainingSeconds) {
+                            // Update remaining seconds without restarting timer
                             currentRemainingSeconds = result.secondsLeft
-                            updateTimerFromDatabase(result.secondsLeft)
+                            updateRemainingTimeOnly(result.secondsLeft)
                         }
                     }
                 } catch (e: Exception) {
@@ -394,9 +387,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
-    private fun updateTimerFromDatabase(seconds: Int) {
-        countDownTimer?.cancel()
-        startSession(seconds)
+    private fun updateRemainingTimeOnly(seconds: Int) {
+        // Just update the display without restarting timer
+        val minutes = seconds / 60
+        val secs = seconds % 60
+        val timeString = String.format("%02d:%02d", minutes, secs)
+        timerText.text = timeString
+        if (::floatingTimer.isInitialized) {
+            floatingTimer.text = timeString
+        }
     }
     
     private fun endSession() {
@@ -405,7 +404,6 @@ class MainActivity : AppCompatActivity() {
             syncJob?.cancel()
             countDownTimer?.cancel()
             
-            // Delete the PIN so it cannot be used again (one-time use)
             if (currentPin != null) {
                 val pinToDelete = currentPin
                 CoroutineScope(Dispatchers.IO).launch {
