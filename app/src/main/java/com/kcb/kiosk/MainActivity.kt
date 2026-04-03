@@ -33,10 +33,8 @@ class MainActivity : AppCompatActivity() {
     private var appList = mutableListOf<AppInfo>()
     private var gridReady = false
     
-    // Text-to-Speech for voice alerts
     private lateinit var tts: TextToSpeech
     
-    // Floating timer
     private lateinit var floatingTimer: TextView
     private var windowManager: android.view.WindowManager? = null
     private var isOverlayVisible = false
@@ -44,7 +42,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Request overlay permission for floating timer
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 val intent = android.content.Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
@@ -52,7 +49,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
-        // Initialize Text-to-Speech
         tts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts.language = Locale.US
@@ -259,7 +255,6 @@ class MainActivity : AppCompatActivity() {
             showFloatingTimer()
             
             var timeLeft = seconds
-            var lastAlertSecond = -1
             
             countDownTimer?.cancel()
             countDownTimer = object : CountDownTimer(seconds * 1000L, 1000) {
@@ -273,19 +268,11 @@ class MainActivity : AppCompatActivity() {
                         floatingTimer.text = timeString
                     }
                     
-                    // Voice alerts at specific times
+                    // Simplified voice alerts - only at 5 min, 1 min, 30 sec
                     when (timeLeft) {
                         300 -> speakAlert("5 minutes remaining")
-                        180 -> speakAlert("3 minutes remaining")
-                        120 -> speakAlert("2 minutes remaining")
                         60 -> speakAlert("1 minute remaining")
                         30 -> speakAlert("30 seconds remaining")
-                        10, 9, 8, 7, 6, 5, 4, 3, 2, 1 -> {
-                            if (lastAlertSecond != timeLeft) {
-                                speakAlert("$timeLeft seconds remaining")
-                                lastAlertSecond = timeLeft
-                            }
-                        }
                     }
                 }
                 
