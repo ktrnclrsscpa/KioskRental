@@ -32,6 +32,7 @@ class MainActivity : AppCompatActivity() {
     private var appList = mutableListOf<AppInfo>()
     private var gridReady = false
     private var remainingSeconds = 0
+    private var extendCheckJob: Job? = null
     
     private lateinit var tts: TextToSpeech
     
@@ -225,7 +226,7 @@ class MainActivity : AppCompatActivity() {
                     if (result.isValid && result.secondsLeft > 0) {
                         currentPin = pin
                         remainingSeconds = result.secondsLeft
-                        startSession(remainingSeconds)
+                        startSession()
                     } else {
                         Toast.makeText(this@MainActivity, "Invalid or expired PIN", Toast.LENGTH_LONG).show()
                     }
@@ -241,7 +242,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
-    private fun startSession(seconds: Int) {
+    private fun startSession() {
         try {
             isActive = true
             pinInput.isEnabled = false
@@ -254,11 +255,7 @@ class MainActivity : AppCompatActivity() {
             }
             
             showFloatingTimer()
-            
-            remainingSeconds = seconds
             startCountDownTimer()
-            
-            // Listen for extend time from admin (check every 2 seconds)
             startExtendListener()
         } catch (e: Exception) {
             Toast.makeText(this, "Session error: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -294,24 +291,31 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun startExtendListener() {
-        // Simple coroutine that checks for time extension every 3 seconds
-        CoroutineScope(Dispatchers.IO).launch {
-            var lastKnownTime = remainingSeconds
+        extendCheckJob?.cancel()
+        extendCheckJob = CoroutineScope(Dispatchers.IO).launch {
+            var lastKnownSeconds = remainingSeconds
             while (isActive && currentPin != null) {
                 delay(3000)
                 try {
                     val result = supabase.validatePin(currentPin!!)
-                    if (result.isValid && result.secondsLeft > lastKnownTime + 10) {
-                        // Time was extended!
-                        val newTime = result.secondsLeft
-                        withContext(Dispatchers.Main) {
-                            remainingSeconds = newTime
-                            startCountDownTimer()
-                            Toast.makeText(this@MainActivity, "Session extended! +${(newTime - lastKnownTime)/60} min", Toast.LENGTH_SHORT).show()
+                    if (result.isValid && result.secondsLeft > 0) {
+                        // Kapag mas malaki ang oras sa database kaysa sa alam natin, ibig sabihin ay na-extend
+                        if (result.secondsLeft > lastKnownSeconds) {
+                            val newTotalSeconds = result.secondsLeft
+                            withContext(Dispatchers.Main) {
+                                // I-cancel ang lumang timer
+                                countDownTimer?.cancel()
+                                // I-set ang bagong remaining seconds (ito na ang kabuuang oras)
+                                remainingSeconds = newTotalSeconds
+                                // Simulan ang bagong timer
+                                startCountDownTimer()
+                                val addedMinutes = (newTotalSeconds - lastKnownSeconds) / 60
+                                Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes. New time: ${newTotalSeconds/60} min", Toast.LENGTH_LONG).show()
+                            }
+                            lastKnownSeconds = newTotalSeconds
+                        } else {
+                            lastKnownSeconds = result.secondsLeft
                         }
-                        lastKnownTime = newTime
-                    } else if (result.isValid && result.secondsLeft > 0) {
-                        lastKnownTime = result.secondsLeft
                     } else if (result.secondsLeft <= 0) {
                         withContext(Dispatchers.Main) {
                             endSession()
@@ -383,6 +387,7 @@ class MainActivity : AppCompatActivity() {
     private fun endSession() {
         try {
             isActive = false
+            extendCheckJob?.cancel()
             countDownTimer?.cancel()
             
             if (currentPin != null) {
@@ -408,6 +413,7 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         try {
             countDownTimer?.cancel()
+            extendCheckJob?.cancel()
             hideFloatingTimer()
             tts.stop()
             tts.shutdown()
