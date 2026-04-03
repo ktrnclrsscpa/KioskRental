@@ -156,28 +156,41 @@ class SupabaseClient private constructor() {
         try {
             val appsString = apps.joinToString(",")
             
-            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps"))
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "PATCH"
-            connection.setRequestProperty("apikey", apiKey)
-            connection.setRequestProperty("Authorization", "Bearer $apiKey")
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.doOutput = true
-            connection.connectTimeout = 5000
-            connection.readTimeout = 5000
+            // DELETE existing record first
+            val deleteUrl = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps"))
+            val deleteConnection = deleteUrl.openConnection() as HttpURLConnection
+            deleteConnection.requestMethod = "DELETE"
+            deleteConnection.setRequestProperty("apikey", apiKey)
+            deleteConnection.setRequestProperty("Authorization", "Bearer $apiKey")
+            deleteConnection.connectTimeout = 5000
+            deleteConnection.readTimeout = 5000
+            deleteConnection.disconnect()
+            
+            // INSERT new record
+            val insertUrl = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings"))
+            val insertConnection = insertUrl.openConnection() as HttpURLConnection
+            insertConnection.requestMethod = "POST"
+            insertConnection.setRequestProperty("apikey", apiKey)
+            insertConnection.setRequestProperty("Authorization", "Bearer $apiKey")
+            insertConnection.setRequestProperty("Content-Type", "application/json")
+            insertConnection.doOutput = true
+            insertConnection.connectTimeout = 5000
+            insertConnection.readTimeout = 5000
             
             val jsonBody = JSONObject().apply {
+                put("setting_key", "whitelist_apps")
                 put("setting_value", appsString)
                 put("updated_at", System.currentTimeMillis())
             }.toString()
             
-            connection.outputStream.write(jsonBody.toByteArray())
+            insertConnection.outputStream.write(jsonBody.toByteArray())
             
-            val responseCode = connection.responseCode
-            connection.disconnect()
+            val responseCode = insertConnection.responseCode
+            insertConnection.disconnect()
             
             responseCode in 200..299
         } catch (e: Exception) {
+            e.printStackTrace()
             false
         }
     }
