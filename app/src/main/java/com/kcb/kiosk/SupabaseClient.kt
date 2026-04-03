@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -12,7 +13,8 @@ class SupabaseClient private constructor() {
     private val supabaseUrl = "https://qbricrnjchbdyseeuwif.supabase.co"
     private val apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicmljcm5qY2hiZHlzZWV1d2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDU0NDUsImV4cCI6MjA4OTc4MTQ0NX0.5sJqi3fZc4VIFQAIw1QptHt7MlGdnkn5SVxYdRu4f7Q"
 
-    private val characters = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789!@#$%&*"
+    // Only letters and numbers (no special characters to avoid URL encoding issues)
+    private val characters = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789"
     
     private fun generateRandomPin(): String {
         return (1..6).map { characters.random() }.joinToString("")
@@ -42,7 +44,9 @@ class SupabaseClient private constructor() {
 
     suspend fun validatePin(pin: String): PinValidationResult = withContext(Dispatchers.IO) {
         try {
-            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits?pin=eq.$pin"))
+            // URL encode the pin to handle special characters
+            val encodedPin = URLEncoder.encode(pin, "UTF-8")
+            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits?pin=eq.$encodedPin"))
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.setRequestProperty("apikey", apiKey)
@@ -191,7 +195,8 @@ class SupabaseClient private constructor() {
 
     suspend fun deletePin(pin: String): Boolean = withContext(Dispatchers.IO) {
         try {
-            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits?pin=eq.$pin"))
+            val encodedPin = URLEncoder.encode(pin, "UTF-8")
+            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits?pin=eq.$encodedPin"))
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "DELETE"
             connection.setRequestProperty("apikey", apiKey)
@@ -208,8 +213,9 @@ class SupabaseClient private constructor() {
 
     suspend fun extendTime(pin: String, extraMinutes: Int): Boolean = withContext(Dispatchers.IO) {
         try {
+            val encodedPin = URLEncoder.encode(pin, "UTF-8")
             // First get current seconds left
-            val getUrl = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits?pin=eq.$pin"))
+            val getUrl = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits?pin=eq.$encodedPin"))
             val getConnection = getUrl.openConnection() as HttpURLConnection
             getConnection.requestMethod = "GET"
             getConnection.setRequestProperty("apikey", apiKey)
@@ -232,7 +238,7 @@ class SupabaseClient private constructor() {
             
             // Update with new seconds
             val newSeconds = currentSeconds + (extraMinutes * 60)
-            val updateUrl = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits?pin=eq.$pin"))
+            val updateUrl = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits?pin=eq.$encodedPin"))
             val updateConnection = updateUrl.openConnection() as HttpURLConnection
             updateConnection.requestMethod = "PATCH"
             updateConnection.setRequestProperty("apikey", apiKey)
