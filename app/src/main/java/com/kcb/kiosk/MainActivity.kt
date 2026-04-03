@@ -77,7 +77,7 @@ class MainActivity : AppCompatActivity() {
         
         pinInput = EditText(this).apply {
             hint = "Enter 6-digit PIN"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
             textSize = 20f
             gravity = android.view.Gravity.CENTER
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
@@ -205,7 +205,7 @@ class MainActivity : AppCompatActivity() {
     private fun validatePin() {
         val pin = pinInput.text.toString().trim()
         if (pin.length != 6) {
-            Toast.makeText(this, "Enter 6-digit PIN", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Enter 6-digit PIN (letters, numbers, symbols)", Toast.LENGTH_SHORT).show()
             return
         }
         
@@ -225,7 +225,7 @@ class MainActivity : AppCompatActivity() {
                         currentPin = pin
                         startSession(result.secondsLeft)
                     } else {
-                        val errorMsg = result.error ?: "Invalid PIN or expired"
+                        val errorMsg = result.error ?: "Invalid or expired PIN"
                         Toast.makeText(this@MainActivity, errorMsg, Toast.LENGTH_LONG).show()
                     }
                 }
@@ -268,7 +268,6 @@ class MainActivity : AppCompatActivity() {
                         floatingTimer.text = timeString
                     }
                     
-                    // Simplified voice alerts - only at 5 min, 1 min, 30 sec
                     when (timeLeft) {
                         300 -> speakAlert("5 minutes remaining")
                         60 -> speakAlert("1 minute remaining")
@@ -377,6 +376,14 @@ class MainActivity : AppCompatActivity() {
             isActive = false
             syncJob?.cancel()
             countDownTimer?.cancel()
+            
+            // Delete the PIN so it cannot be used again (one-time use)
+            if (currentPin != null) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    supabase.deletePin(currentPin!!)
+                }
+            }
+            
             currentPin = null
             pinInput.isEnabled = true
             activateBtn.isEnabled = true
@@ -384,7 +391,7 @@ class MainActivity : AppCompatActivity() {
             timerText.text = "--:--"
             appGrid.visibility = android.view.View.GONE
             hideFloatingTimer()
-            Toast.makeText(this, "Session expired", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Session expired. PIN can no longer be used.", Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
             // Ignore
         }
