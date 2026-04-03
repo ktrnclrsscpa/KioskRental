@@ -1,5 +1,6 @@
 package com.kcb.kiosk
 
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -141,61 +142,54 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun loadWhitelistedApps() {
-        debugText.text = "Loading whitelisted apps..."
+        debugText.text = "Loading whitelisted apps from local storage..."
         
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val whitelistPackages = supabase.getWhitelistApps()
-                
-                val allInstalledApps = mutableListOf<AppInfo>()
-                val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
-                
-                for (app in packages) {
-                    val appName = packageManager.getApplicationLabel(app).toString()
-                    allInstalledApps.add(AppInfo(appName, app.packageName))
-                }
-                
-                val matchedApps = mutableListOf<AppInfo>()
-                for (whitelistPkg in whitelistPackages) {
-                    val found = allInstalledApps.find { it.packageName == whitelistPkg }
-                    if (found != null) {
-                        matchedApps.add(found)
-                    }
-                }
-                
-                matchedApps.sortBy { it.name }
-                
-                withContext(Dispatchers.Main) {
-                    appList.clear()
-                    appList.addAll(matchedApps)
-                    
-                    val statusMsg = "Whitelist: ${whitelistPackages.size} apps | Installed: ${allInstalledApps.size} | Matched: ${matchedApps.size}"
-                    debugText.text = statusMsg
-                    
-                    if (appList.isNotEmpty()) {
-                        appGrid.adapter = SimpleAppAdapter(appList) { packageName ->
-                            try {
-                                val intent = packageManager.getLaunchIntentForPackage(packageName)
-                                if (intent != null) {
-                                    startActivity(intent)
-                                } else {
-                                    Toast.makeText(this@MainActivity, "Cannot open app", Toast.LENGTH_SHORT).show()
-                                }
-                            } catch (e: Exception) {
-                                Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                        gridReady = true
-                        Toast.makeText(this@MainActivity, "✅ Loaded ${appList.size} apps", Toast.LENGTH_SHORT).show()
+        // Get whitelist from local SharedPreferences
+        val prefs = getSharedPreferences("kiosk_prefs", Context.MODE_PRIVATE)
+        val whitelistPackages = prefs.getStringSet("whitelist", emptySet()) ?: emptySet()
+        
+        val allInstalledApps = mutableListOf<AppInfo>()
+        val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+        
+        for (app in packages) {
+            val appName = packageManager.getApplicationLabel(app).toString()
+            allInstalledApps.add(AppInfo(appName, app.packageName))
+        }
+        
+        val matchedApps = mutableListOf<AppInfo>()
+        for (whitelistPkg in whitelistPackages) {
+            val found = allInstalledApps.find { it.packageName == whitelistPkg }
+            if (found != null) {
+                matchedApps.add(found)
+            }
+        }
+        
+        matchedApps.sortBy { it.name }
+        
+        appList.clear()
+        appList.addAll(matchedApps)
+        
+        val statusMsg = "Whitelist: ${whitelistPackages.size} apps | Installed: ${allInstalledApps.size} | Matched: ${matchedApps.size}"
+        debugText.text = statusMsg
+        
+        if (appList.isNotEmpty()) {
+            appGrid.adapter = SimpleAppAdapter(appList) { packageName ->
+                try {
+                    val intent = packageManager.getLaunchIntentForPackage(packageName)
+                    if (intent != null) {
+                        startActivity(intent)
                     } else {
-                        debugText.text = "$statusMsg\nNo matching apps. Go to Admin > APPS to select apps."
+                        Toast.makeText(this@MainActivity, "Cannot open app", Toast.LENGTH_SHORT).show()
                     }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    debugText.text = "Error: ${e.message}"
+                } catch (e: Exception) {
+                    Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
+            gridReady = true
+            Toast.makeText(this@MainActivity, "✅ Loaded ${appList.size} apps", Toast.LENGTH_SHORT).show()
+        } else {
+            debugText.text = "$statusMsg\nNo matching apps. Go to Admin > APPS to select apps."
+            Toast.makeText(this@MainActivity, "No whitelisted apps. Select apps in Admin panel.", Toast.LENGTH_LONG).show()
         }
     }
     
