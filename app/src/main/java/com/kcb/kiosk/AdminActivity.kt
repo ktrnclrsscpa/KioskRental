@@ -4,6 +4,7 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -12,6 +13,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.*
 
 class AdminActivity : AppCompatActivity() {
@@ -175,8 +177,7 @@ class AdminActivity : AppCompatActivity() {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 2
             )
-            setBackgroundColor(android.graphics.Color.parseColor("#333333"))
-            setPadding(0, 20, 0, 20)
+            setBackgroundColor(ContextCompat.getColor(context, android.R.color.darker_gray))
         }
         pinPanel.addView(extendSeparator)
         
