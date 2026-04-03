@@ -77,7 +77,7 @@ class MainActivity : AppCompatActivity() {
         }
         
         pinInput = EditText(this).apply {
-            hint = "Enter 6-digit PIN (letters, numbers, symbols)"
+            hint = "Enter 6-digit PIN"
             inputType = android.text.InputType.TYPE_CLASS_TEXT
             textSize = 20f
             gravity = android.view.Gravity.CENTER
@@ -207,7 +207,7 @@ class MainActivity : AppCompatActivity() {
     private fun validatePin() {
         val pin = pinInput.text.toString().trim()
         if (pin.length != 6) {
-            Toast.makeText(this, "Enter 6-digit PIN (letters, numbers, symbols)", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Enter 6-digit PIN", Toast.LENGTH_SHORT).show()
             return
         }
         
@@ -259,10 +259,15 @@ class MainActivity : AppCompatActivity() {
             var timeLeft = seconds
             currentRemainingSeconds = seconds
             
+            // Update timer display immediately
+            val startMinutes = timeLeft / 60
+            val startSecs = timeLeft % 60
+            timerText.text = String.format("%02d:%02d", startMinutes, startSecs)
+            
             countDownTimer?.cancel()
             countDownTimer = object : CountDownTimer(seconds * 1000L, 1000) {
                 override fun onTick(millisUntilFinished: Long) {
-                    timeLeft = (millisUntilFinished / 1000).toInt()
+                    timeLeft = ((millisUntilFinished + 500) / 1000).toInt()
                     currentRemainingSeconds = timeLeft
                     val minutes = timeLeft / 60
                     val secs = timeLeft % 60
