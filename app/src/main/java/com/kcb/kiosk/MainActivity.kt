@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.CountDownTimer
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import android.widget.Button
@@ -24,12 +25,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var appGrid: RecyclerView
     private lateinit var debugText: TextView
-    private var timerJob: Job? = null
+    private var countDownTimer: CountDownTimer? = null
     private lateinit var supabase: SupabaseClient
     private var currentPin: String? = null
     private var isActive = false
     private var appList = mutableListOf<AppInfo>()
     private var gridReady = false
+    private var remainingSeconds = 0
     
     private lateinit var tts: TextToSpeech
     
@@ -219,6 +221,7 @@ class MainActivity : AppCompatActivity() {
                     
                     if (result.isValid && result.secondsLeft > 0) {
                         currentPin = pin
+                        remainingSeconds = result.secondsLeft
                         startSession()
                     } else {
                         Toast.makeText(this@MainActivity, "Invalid or expired PIN", Toast.LENGTH_LONG).show()
@@ -242,62 +245,44 @@ class MainActivity : AppCompatActivity() {
             activateBtn.isEnabled = false
             statusText.text = "ACTIVE"
             
+            // Show app grid
             if (appList.isNotEmpty()) {
                 appGrid.visibility = android.view.View.VISIBLE
-                gridReady = true
             }
             
+            // Show floating timer
             showFloatingTimer()
             
-            // Start timer that syncs every second
-            startTimerSync()
+            // Start local timer
+            countDownTimer?.cancel()
+            countDownTimer = object : CountDownTimer(remainingSeconds * 1000L, 1000) {
+                override fun onTick(millisUntilFinished: Long) {
+                    remainingSeconds = (millisUntilFinished / 1000).toInt()
+                    val minutes = remainingSeconds / 60
+                    val secs = remainingSeconds % 60
+                    val timeString = String.format("%02d:%02d", minutes, secs)
+                    timerText.text = timeString
+                    if (::floatingTimer.isInitialized) {
+                        floatingTimer.text = timeString
+                    }
+                    
+                    // Voice alerts
+                    when (remainingSeconds) {
+                        300 -> speakAlert("5 minutes remaining")
+                        60 -> speakAlert("1 minute remaining")
+                        30 -> speakAlert("30 seconds remaining")
+                    }
+                }
+                
+                override fun onFinish() {
+                    speakAlert("Time expired")
+                    endSession()
+                }
+            }.start()
             
         } catch (e: Exception) {
             Toast.makeText(this, "Session error: ${e.message}", Toast.LENGTH_SHORT).show()
             endSession()
-        }
-    }
-    
-    private fun startTimerSync() {
-        timerJob?.cancel()
-        timerJob = CoroutineScope(Dispatchers.IO).launch {
-            var lastAlertMinute = -1
-            
-            while (isActive && currentPin != null) {
-                // Get current time from database
-                val result = supabase.validatePin(currentPin!!)
-                
-                withContext(Dispatchers.Main) {
-                    if (!result.isValid || result.secondsLeft <= 0) {
-                        speakAlert("Time expired")
-                        endSession()
-                    } else {
-                        // Update display
-                        val minutes = result.secondsLeft / 60
-                        val secs = result.secondsLeft % 60
-                        val timeString = String.format("%02d:%02d", minutes, secs)
-                        timerText.text = timeString
-                        if (::floatingTimer.isInitialized) {
-                            floatingTimer.text = timeString
-                        }
-                        
-                        // Voice alerts
-                        when (result.secondsLeft) {
-                            300 -> speakAlert("5 minutes remaining")
-                            60 -> speakAlert("1 minute remaining")
-                            30 -> speakAlert("30 seconds remaining")
-                        }
-                        
-                        // Decrease time in database
-                        if (result.secondsLeft > 0) {
-                            val newSeconds = result.secondsLeft - 1
-                            supabase.updateTime(currentPin!!, newSeconds)
-                        }
-                    }
-                }
-                
-                delay(1000) // Wait 1 second before next sync
-            }
         }
     }
     
@@ -308,9 +293,7 @@ class MainActivity : AppCompatActivity() {
             } else {
                 tts.speak(message, TextToSpeech.QUEUE_FLUSH, null)
             }
-        } catch (e: Exception) {
-            // TTS not available
-        }
+        } catch (e: Exception) { }
     }
     
     private fun showFloatingTimer() {
@@ -349,9 +332,7 @@ class MainActivity : AppCompatActivity() {
             
             windowManager?.addView(floatingTimer, params)
             isOverlayVisible = true
-        } catch (e: Exception) {
-            // Overlay not allowed
-        }
+        } catch (e: Exception) { }
     }
     
     private fun hideFloatingTimer() {
@@ -359,24 +340,23 @@ class MainActivity : AppCompatActivity() {
         try {
             windowManager?.removeView(floatingTimer)
             isOverlayVisible = false
-        } catch (e: Exception) {
-            // Ignore
-        }
+        } catch (e: Exception) { }
     }
     
     private fun endSession() {
         try {
             isActive = false
-            timerJob?.cancel()
+            countDownTimer?.cancel()
             
+            // Delete PIN (one-time use)
             if (currentPin != null) {
-                val pinToDelete = currentPin
                 CoroutineScope(Dispatchers.IO).launch {
-                    supabase.deletePin(pinToDelete!!)
+                    supabase.deletePin(currentPin!!)
                 }
             }
             
             currentPin = null
+            remainingSeconds = 0
             pinInput.isEnabled = true
             activateBtn.isEnabled = true
             statusText.text = ""
@@ -384,20 +364,16 @@ class MainActivity : AppCompatActivity() {
             appGrid.visibility = android.view.View.GONE
             hideFloatingTimer()
             Toast.makeText(this, "Session expired. PIN can no longer be used.", Toast.LENGTH_LONG).show()
-        } catch (e: Exception) {
-            // Ignore
-        }
+        } catch (e: Exception) { }
     }
     
     override fun onDestroy() {
         super.onDestroy()
         try {
-            timerJob?.cancel()
+            countDownTimer?.cancel()
             hideFloatingTimer()
             tts.stop()
             tts.shutdown()
-        } catch (e: Exception) {
-            // Ignore
-        }
+        } catch (e: Exception) { }
     }
 }
