@@ -299,20 +299,23 @@ class MainActivity : AppCompatActivity() {
                 try {
                     val result = supabase.validatePin(currentPin!!)
                     if (result.isValid && result.secondsLeft > 0) {
-                        // Kapag mas malaki ang oras sa database kaysa sa alam natin, ibig sabihin ay na-extend
+                        // Kapag mas malaki ang oras sa database, ibig sabihin ay na-extend
                         if (result.secondsLeft > lastKnownSeconds) {
-                            val newTotalSeconds = result.secondsLeft
+                            // Kunin ang CURRENT remaining seconds mula sa timer (hindi ang lastKnownSeconds)
+                            val currentRemaining = remainingSeconds
+                            // Ang idinagdag na oras ay ang pagkakaiba
+                            val addedSeconds = result.secondsLeft - lastKnownSeconds
+                            // Bagong kabuuang oras = current remaining + idinagdag na oras
+                            val newTotalSeconds = currentRemaining + addedSeconds
+                            
                             withContext(Dispatchers.Main) {
-                                // I-cancel ang lumang timer
                                 countDownTimer?.cancel()
-                                // I-set ang bagong remaining seconds (ito na ang kabuuang oras)
                                 remainingSeconds = newTotalSeconds
-                                // Simulan ang bagong timer
                                 startCountDownTimer()
-                                val addedMinutes = (newTotalSeconds - lastKnownSeconds) / 60
-                                Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes. New time: ${newTotalSeconds/60} min", Toast.LENGTH_LONG).show()
+                                val addedMinutes = addedSeconds / 60
+                                Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes. New time: ${newTotalSeconds/60} min ${newTotalSeconds%60} sec", Toast.LENGTH_LONG).show()
                             }
-                            lastKnownSeconds = newTotalSeconds
+                            lastKnownSeconds = result.secondsLeft
                         } else {
                             lastKnownSeconds = result.secondsLeft
                         }
