@@ -43,7 +43,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Request overlay permission for floating timer
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 val intent = android.content.Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
@@ -51,7 +50,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
-        // Initialize Text-to-Speech
         tts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts.language = Locale.US
@@ -367,13 +365,8 @@ class MainActivity : AppCompatActivity() {
                     withContext(Dispatchers.Main) {
                         if (!result.isValid || result.secondsLeft <= 0) {
                             Toast.makeText(this@MainActivity, "Session expired (admin)", Toast.LENGTH_SHORT).show()
-                            // Delete the PIN when admin expires it
-                            CoroutineScope(Dispatchers.IO).launch {
-                                supabase.deletePin(currentPin!!)
-                            }
                             endSession()
                         } else if (result.secondsLeft != currentRemainingSeconds) {
-                            // Update timer with new time from database (for extend time)
                             currentRemainingSeconds = result.secondsLeft
                             updateTimerFromDatabase(result.secondsLeft)
                         }
@@ -396,7 +389,6 @@ class MainActivity : AppCompatActivity() {
             syncJob?.cancel()
             countDownTimer?.cancel()
             
-            // Delete the PIN so it cannot be used again (one-time use)
             if (currentPin != null) {
                 val pinToDelete = currentPin
                 CoroutineScope(Dispatchers.IO).launch {
