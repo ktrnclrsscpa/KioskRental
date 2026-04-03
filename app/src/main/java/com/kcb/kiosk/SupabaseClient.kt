@@ -44,7 +44,6 @@ class SupabaseClient private constructor() {
 
     suspend fun validatePin(pin: String): PinValidationResult = withContext(Dispatchers.IO) {
         try {
-            // URL encode the pin to handle special characters
             val encodedPin = URLEncoder.encode(pin, "UTF-8")
             val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits?pin=eq.$encodedPin"))
             val connection = url.openConnection() as HttpURLConnection
@@ -253,6 +252,31 @@ class SupabaseClient private constructor() {
             
             val responseCode = updateConnection.responseCode
             updateConnection.disconnect()
+            
+            responseCode in 200..299
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun updateTime(pin: String, seconds: Int): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val encodedPin = URLEncoder.encode(pin, "UTF-8")
+            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits?pin=eq.$encodedPin"))
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "PATCH"
+            connection.setRequestProperty("apikey", apiKey)
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
+            
+            val jsonBody = "{\"seconds_left\":$seconds}"
+            connection.outputStream.write(jsonBody.toByteArray())
+            
+            val responseCode = connection.responseCode
+            connection.disconnect()
             
             responseCode in 200..299
         } catch (e: Exception) {
