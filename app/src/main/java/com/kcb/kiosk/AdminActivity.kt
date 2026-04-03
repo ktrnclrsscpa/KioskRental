@@ -181,6 +181,7 @@ class AdminActivity : AppCompatActivity() {
         
         setContentView(mainLayout)
         
+        // Load initial data
         loadPins()
         loadInstalledApps()
         loadCurrentWhitelist()
@@ -221,7 +222,7 @@ class AdminActivity : AppCompatActivity() {
         
         val installedApps = mutableListOf<Pair<String, String>>()
         
-        // Method 1: Get all installed apps via PackageManager
+        // Get all installed apps
         val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
         
         for (app in packages) {
@@ -235,7 +236,7 @@ class AdminActivity : AppCompatActivity() {
             }
         }
         
-        // Method 2: Get launchable apps (apps with icons)
+        // Also get launchable apps (apps with icons)
         val mainIntent = android.content.Intent(android.content.Intent.ACTION_MAIN, null)
         mainIntent.addCategory(android.content.Intent.CATEGORY_LAUNCHER)
         val launchableApps = packageManager.queryIntentActivities(mainIntent, 0)
@@ -293,6 +294,7 @@ class AdminActivity : AppCompatActivity() {
     private fun saveWhitelist() {
         saveAppsBtn.isEnabled = false
         saveAppsBtn.text = "SAVING..."
+        appStatusText.text = "Saving..."
         
         val selectedPackages = mutableListOf<String>()
         for ((checkBox, packageName) in checkBoxes) {
