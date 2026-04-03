@@ -25,6 +25,11 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var generateBtn: Button
     private lateinit var refreshPinsBtn: Button
     
+    // Extend Time
+    private lateinit var extendPinInput: EditText
+    private lateinit var extendMinutesInput: EditText
+    private lateinit var extendBtn: Button
+    
     // APPS panel
     private lateinit var appPanel: LinearLayout
     private lateinit var appContainer: LinearLayout
@@ -37,7 +42,6 @@ class AdminActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Show password dialog first
         showPasswordDialog()
     }
     
@@ -164,6 +168,60 @@ class AdminActivity : AppCompatActivity() {
             setOnClickListener { loadPins() }
         }
         pinPanel.addView(refreshPinsBtn)
+        
+        // ========== EXTEND TIME SECTION ==========
+        val extendSeparator = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                2
+            )
+            setBackgroundColor(android.graphics.Color.parseColor("#333333"))
+            setPadding(0, 20, 0, 20)
+        }
+        pinPanel.addView(extendSeparator)
+        
+        val extendLabel = TextView(this).apply {
+            text = "⏰ Extend Active PIN"
+            textSize = 18f
+            setPadding(0, 10, 0, 10)
+        }
+        pinPanel.addView(extendLabel)
+        
+        val extendRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 0, 0, 10)
+        }
+        
+        extendPinInput = EditText(this).apply {
+            hint = "PIN to extend"
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setPadding(10, 10, 10, 10)
+            maxLines = 1
+        }
+        extendRow.addView(extendPinInput)
+        
+        extendMinutesInput = EditText(this).apply {
+            hint = "Minutes to add"
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.5f)
+            setPadding(10, 10, 10, 10)
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        }
+        extendRow.addView(extendMinutesInput)
+        pinPanel.addView(extendRow)
+        
+        extendBtn = Button(this).apply {
+            text = "⏰ EXTEND TIME"
+            setOnClickListener {
+                val pin = extendPinInput.text.toString().trim()
+                val minutes = extendMinutesInput.text.toString().toIntOrNull()
+                if (pin.isEmpty() || minutes == null || minutes <= 0) {
+                    Toast.makeText(this@AdminActivity, "Enter PIN and valid minutes", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                extendTime(pin, minutes)
+            }
+        }
+        pinPanel.addView(extendBtn)
         
         pinListText = TextView(this).apply {
             text = "Loading PINs..."
@@ -334,7 +392,6 @@ class AdminActivity : AppCompatActivity() {
         }
         
         val customPin = generatePinInput.text.toString().trim()
-        // Validate custom PIN length if provided
         if (customPin.isNotEmpty() && customPin.length != 6) {
             Toast.makeText(this, "PIN must be exactly 6 characters", Toast.LENGTH_SHORT).show()
             return
@@ -357,6 +414,27 @@ class AdminActivity : AppCompatActivity() {
                     loadPins()
                 } else {
                     Toast.makeText(this@AdminActivity, "Failed to generate PIN", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+    
+    private fun extendTime(pin: String, minutes: Int) {
+        extendBtn.isEnabled = false
+        extendBtn.text = "EXTENDING..."
+        
+        CoroutineScope(Dispatchers.IO).launch {
+            val success = supabase.extendTime(pin, minutes)
+            withContext(Dispatchers.Main) {
+                extendBtn.isEnabled = true
+                extendBtn.text = "⏰ EXTEND TIME"
+                if (success) {
+                    Toast.makeText(this@AdminActivity, "Added $minutes minutes to PIN $pin", Toast.LENGTH_LONG).show()
+                    loadPins()
+                    extendPinInput.text.clear()
+                    extendMinutesInput.text.clear()
+                } else {
+                    Toast.makeText(this@AdminActivity, "Failed to extend. PIN not found or expired.", Toast.LENGTH_SHORT).show()
                 }
             }
         }
