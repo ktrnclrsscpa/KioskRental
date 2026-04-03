@@ -156,33 +156,28 @@ class SupabaseClient private constructor() {
         try {
             val appsString = apps.joinToString(",")
             
-            // DELETE existing record first
-            val deleteUrl = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps"))
+            // Step 1: DELETE existing record
+            val deleteUrl = URL("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps")
             val deleteConnection = deleteUrl.openConnection() as HttpURLConnection
             deleteConnection.requestMethod = "DELETE"
             deleteConnection.setRequestProperty("apikey", apiKey)
             deleteConnection.setRequestProperty("Authorization", "Bearer $apiKey")
-            deleteConnection.connectTimeout = 5000
-            deleteConnection.readTimeout = 5000
+            deleteConnection.connectTimeout = 10000
+            deleteConnection.readTimeout = 10000
             deleteConnection.disconnect()
             
-            // INSERT new record
-            val insertUrl = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings"))
+            // Step 2: INSERT new record
+            val insertUrl = URL("$supabaseUrl/rest/v1/admin_settings")
             val insertConnection = insertUrl.openConnection() as HttpURLConnection
             insertConnection.requestMethod = "POST"
             insertConnection.setRequestProperty("apikey", apiKey)
             insertConnection.setRequestProperty("Authorization", "Bearer $apiKey")
             insertConnection.setRequestProperty("Content-Type", "application/json")
             insertConnection.doOutput = true
-            insertConnection.connectTimeout = 5000
-            insertConnection.readTimeout = 5000
+            insertConnection.connectTimeout = 10000
+            insertConnection.readTimeout = 10000
             
-            val jsonBody = JSONObject().apply {
-                put("setting_key", "whitelist_apps")
-                put("setting_value", appsString)
-                put("updated_at", System.currentTimeMillis())
-            }.toString()
-            
+            val jsonBody = "{\"setting_key\":\"whitelist_apps\",\"setting_value\":\"$appsString\"}"
             insertConnection.outputStream.write(jsonBody.toByteArray())
             
             val responseCode = insertConnection.responseCode
