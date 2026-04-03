@@ -352,18 +352,19 @@ class MainActivity : AppCompatActivity() {
         syncJob?.cancel()
         syncJob = CoroutineScope(Dispatchers.IO).launch {
             while (isActive && currentPin != null) {
-                delay(3000)
+                delay(5000)
                 try {
                     val result = supabase.validatePin(currentPin!!)
                     withContext(Dispatchers.Main) {
                         if (!result.isValid || result.secondsLeft <= 0) {
                             Toast.makeText(this@MainActivity, "Session expired (admin)", Toast.LENGTH_SHORT).show()
                             endSession()
-                        } else if (result.secondsLeft != currentRemainingSeconds) {
-                            // Time extended - restart timer with new time
+                        } else if (result.secondsLeft > currentRemainingSeconds + 30) {
+                            // Only restart if time INCREASED significantly (extend time)
+                            // This prevents constant resets
                             currentRemainingSeconds = result.secondsLeft
                             startCountDownTimer(result.secondsLeft)
-                            Toast.makeText(this@MainActivity, "Session extended! New time: ${result.secondsLeft/60} min", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MainActivity, "Session extended! +${(result.secondsLeft - currentRemainingSeconds)} min", Toast.LENGTH_SHORT).show()
                         }
                     }
                 } catch (e: Exception) { }
