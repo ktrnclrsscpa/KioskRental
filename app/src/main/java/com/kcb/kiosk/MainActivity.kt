@@ -32,6 +32,7 @@ class MainActivity : AppCompatActivity() {
     private var isActive = false
     private var appList = mutableListOf<AppInfo>()
     private var gridReady = false
+    private var currentRemainingSeconds = 0
     
     private lateinit var tts: TextToSpeech
     
@@ -42,6 +43,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        // Request overlay permission for floating timer
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 val intent = android.content.Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
@@ -49,6 +51,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
+        // Initialize Text-to-Speech
         tts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts.language = Locale.US
@@ -224,6 +227,7 @@ class MainActivity : AppCompatActivity() {
                     
                     if (result.isValid && result.secondsLeft > 0) {
                         currentPin = pin
+                        currentRemainingSeconds = result.secondsLeft
                         startSession(result.secondsLeft)
                     } else {
                         Toast.makeText(this@MainActivity, "Invalid or expired PIN", Toast.LENGTH_LONG).show()
@@ -255,11 +259,13 @@ class MainActivity : AppCompatActivity() {
             showFloatingTimer()
             
             var timeLeft = seconds
+            currentRemainingSeconds = seconds
             
             countDownTimer?.cancel()
             countDownTimer = object : CountDownTimer(seconds * 1000L, 1000) {
                 override fun onTick(millisUntilFinished: Long) {
                     timeLeft = (millisUntilFinished / 1000).toInt()
+                    currentRemainingSeconds = timeLeft
                     val minutes = timeLeft / 60
                     val secs = timeLeft % 60
                     val timeString = String.format("%02d:%02d", minutes, secs)
@@ -366,6 +372,10 @@ class MainActivity : AppCompatActivity() {
                                 supabase.deletePin(currentPin!!)
                             }
                             endSession()
+                        } else if (result.secondsLeft != currentRemainingSeconds) {
+                            // Update timer with new time from database (for extend time)
+                            currentRemainingSeconds = result.secondsLeft
+                            updateTimerFromDatabase(result.secondsLeft)
                         }
                     }
                 } catch (e: Exception) {
@@ -373,6 +383,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+    
+    private fun updateTimerFromDatabase(seconds: Int) {
+        countDownTimer?.cancel()
+        startSession(seconds)
     }
     
     private fun endSession() {
@@ -390,6 +405,7 @@ class MainActivity : AppCompatActivity() {
             }
             
             currentPin = null
+            currentRemainingSeconds = 0
             pinInput.isEnabled = true
             activateBtn.isEnabled = true
             statusText.text = ""
