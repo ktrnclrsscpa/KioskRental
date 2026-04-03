@@ -1,5 +1,6 @@
 package com.kcb.kiosk
 
+import android.app.AlertDialog
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -31,12 +32,44 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var appStatusText: TextView
     private val checkBoxes = mutableListOf<Pair<CheckBox, String>>()
     
-    // Local storage for whitelist
     private val prefs by lazy { getSharedPreferences("kiosk_prefs", Context.MODE_PRIVATE) }
+    private var isAuthenticated = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        // Show password dialog first
+        showPasswordDialog()
+    }
+    
+    private fun showPasswordDialog() {
+        val input = EditText(this)
+        input.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        input.hint = "Enter admin password"
+        
+        AlertDialog.Builder(this)
+            .setTitle("🔐 Admin Access")
+            .setMessage("Enter password to continue")
+            .setView(input)
+            .setPositiveButton("Login") { _, _ ->
+                val password = input.text.toString()
+                val savedPassword = prefs.getString("admin_password", "admin123")
+                if (password == savedPassword) {
+                    isAuthenticated = true
+                    initAdminPanel()
+                } else {
+                    Toast.makeText(this, "Wrong password!", Toast.LENGTH_SHORT).show()
+                    finish()
+                }
+            }
+            .setNegativeButton("Cancel") { _, _ ->
+                finish()
+            }
+            .setCancelable(false)
+            .show()
+    }
+    
+    private fun initAdminPanel() {
         supabase = SupabaseClient.getInstance()
         
         val mainLayout = LinearLayout(this).apply {
@@ -44,13 +77,27 @@ class AdminActivity : AppCompatActivity() {
             setPadding(30, 50, 30, 30)
         }
         
+        // Title with change password option
+        val titleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 0, 0, 20)
+        }
+        
         val title = TextView(this).apply {
             text = "🔐 ADMIN PANEL"
             textSize = 24f
-            gravity = android.view.Gravity.CENTER
-            setPadding(0, 0, 0, 20)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
-        mainLayout.addView(title)
+        titleRow.addView(title)
+        
+        val changePwdBtn = Button(this).apply {
+            text = "Change Password"
+            textSize = 12f
+            setOnClickListener { showChangePasswordDialog() }
+        }
+        titleRow.addView(changePwdBtn)
+        
+        mainLayout.addView(titleRow)
         
         // Tab buttons
         val tabLayout = LinearLayout(this).apply {
@@ -180,6 +227,28 @@ class AdminActivity : AppCompatActivity() {
         loadPins()
         loadInstalledApps()
         loadCurrentWhitelistLocal()
+    }
+    
+    private fun showChangePasswordDialog() {
+        val input = EditText(this)
+        input.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        input.hint = "New password (min 4 characters)"
+        
+        AlertDialog.Builder(this)
+            .setTitle("Change Admin Password")
+            .setMessage("Enter new password")
+            .setView(input)
+            .setPositiveButton("Save") { _, _ ->
+                val newPassword = input.text.toString()
+                if (newPassword.length >= 4) {
+                    prefs.edit().putString("admin_password", newPassword).apply()
+                    Toast.makeText(this, "Password changed!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "Password must be at least 4 characters", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
     
     private fun showPinPanel() {
