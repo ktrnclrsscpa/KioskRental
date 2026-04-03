@@ -255,8 +255,6 @@ class MainActivity : AppCompatActivity() {
             }
             
             showFloatingTimer()
-            
-            currentRemainingSeconds = seconds
             startCountDownTimer(seconds)
             startSync()
         } catch (e: Exception) {
@@ -354,7 +352,7 @@ class MainActivity : AppCompatActivity() {
         syncJob?.cancel()
         syncJob = CoroutineScope(Dispatchers.IO).launch {
             while (isActive && currentPin != null) {
-                delay(3000) // Check every 3 seconds
+                delay(3000)
                 try {
                     val result = supabase.validatePin(currentPin!!)
                     withContext(Dispatchers.Main) {
@@ -362,47 +360,15 @@ class MainActivity : AppCompatActivity() {
                             Toast.makeText(this@MainActivity, "Session expired (admin)", Toast.LENGTH_SHORT).show()
                             endSession()
                         } else if (result.secondsLeft != currentRemainingSeconds) {
-                            // Time was extended - restart timer with new time
+                            // Time extended - restart timer with new time
                             currentRemainingSeconds = result.secondsLeft
                             startCountDownTimer(result.secondsLeft)
-                            Toast.makeText(this@MainActivity, "Session extended! +${(result.secondsLeft - currentRemainingSecondsOld)} minutes", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MainActivity, "Session extended! New time: ${result.secondsLeft/60} min", Toast.LENGTH_SHORT).show()
                         }
                     }
                 } catch (e: Exception) { }
             }
         }
-    }
-    
-    // Store old value for toast message
-    private var currentRemainingSecondsOld = 0
-    
-    private fun startCountDownTimer(seconds: Int) {
-        currentRemainingSecondsOld = seconds
-        countDownTimer?.cancel()
-        countDownTimer = object : CountDownTimer(seconds * 1000L, 1000) {
-            override fun onTick(millisUntilFinished: Long) {
-                val timeLeft = (millisUntilFinished / 1000).toInt()
-                currentRemainingSeconds = timeLeft
-                val minutes = timeLeft / 60
-                val secs = timeLeft % 60
-                val timeString = String.format("%02d:%02d", minutes, secs)
-                timerText.text = timeString
-                if (::floatingTimer.isInitialized) {
-                    floatingTimer.text = timeString
-                }
-                
-                when (timeLeft) {
-                    300 -> speakAlert("5 minutes remaining")
-                    60 -> speakAlert("1 minute remaining")
-                    30 -> speakAlert("30 seconds remaining")
-                }
-            }
-            
-            override fun onFinish() {
-                speakAlert("Time expired")
-                endSession()
-            }
-        }.start()
     }
     
     private fun endSession() {
