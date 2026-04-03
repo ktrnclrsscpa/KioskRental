@@ -148,4 +148,49 @@ class SupabaseClient private constructor() {
                 return@withContext emptyList()
             }
         } catch (e: Exception) {
-           
+            return@withContext emptyList()
+        }
+    }
+
+    suspend fun updateWhitelistApps(apps: List<String>): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val appsString = apps.joinToString(",")
+            
+            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps"))
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "PATCH"
+            connection.setRequestProperty("apikey", apiKey)
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
+            
+            val jsonBody = JSONObject().apply {
+                put("setting_value", appsString)
+                put("updated_at", System.currentTimeMillis())
+            }.toString()
+            
+            connection.outputStream.write(jsonBody.toByteArray())
+            
+            val responseCode = connection.responseCode
+            connection.disconnect()
+            
+            responseCode in 200..299
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    companion object {
+        private var instance: SupabaseClient? = null
+        fun getInstance(): SupabaseClient {
+            if (instance == null) instance = SupabaseClient()
+            return instance!!
+        }
+    }
+}
+
+// Data classes must be outside the class
+data class PinValidationResult(val isValid: Boolean, val secondsLeft: Int, val error: String?)
+data class PinData(val pin: String, val secondsLeft: Int)
