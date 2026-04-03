@@ -39,7 +39,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Request overlay permission for floating timer
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 val intent = android.content.Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
@@ -144,7 +143,6 @@ class MainActivity : AppCompatActivity() {
     private fun loadWhitelistedApps() {
         debugText.text = "Loading whitelisted apps from local storage..."
         
-        // Get whitelist from local SharedPreferences
         val prefs = getSharedPreferences("kiosk_prefs", Context.MODE_PRIVATE)
         val whitelistPackages = prefs.getStringSet("whitelist", emptySet()) ?: emptySet()
         
@@ -186,10 +184,13 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             gridReady = true
+            // If session is active, show the grid immediately
+            if (isActive) {
+                appGrid.visibility = android.view.View.VISIBLE
+            }
             Toast.makeText(this@MainActivity, "✅ Loaded ${appList.size} apps", Toast.LENGTH_SHORT).show()
         } else {
             debugText.text = "$statusMsg\nNo matching apps. Go to Admin > APPS to select apps."
-            Toast.makeText(this@MainActivity, "No whitelisted apps. Select apps in Admin panel.", Toast.LENGTH_LONG).show()
         }
     }
     
@@ -238,11 +239,12 @@ class MainActivity : AppCompatActivity() {
             activateBtn.isEnabled = false
             statusText.text = "ACTIVE"
             
-            if (gridReady && appList.isNotEmpty()) {
+            // Show app grid if there are apps
+            if (appList.isNotEmpty()) {
                 appGrid.visibility = android.view.View.VISIBLE
+                gridReady = true
             }
             
-            // Show floating timer
             showFloatingTimer()
             
             var timeLeft = seconds
