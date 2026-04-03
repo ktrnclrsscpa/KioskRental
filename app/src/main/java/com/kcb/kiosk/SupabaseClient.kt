@@ -17,8 +17,6 @@ class SupabaseClient private constructor() {
         return "$urlString${separator}apikey=$apiKey"
     }
 
-    // ==================== TEST CONNECTION ====================
-    
     suspend fun testConnection(): Boolean = withContext(Dispatchers.IO) {
         try {
             val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?limit=1"))
@@ -35,8 +33,6 @@ class SupabaseClient private constructor() {
             false
         }
     }
-
-    // ==================== PIN FUNCTIONS ====================
 
     suspend fun validatePin(pin: String): PinValidationResult = withContext(Dispatchers.IO) {
         try {
@@ -128,8 +124,6 @@ class SupabaseClient private constructor() {
         }
     }
 
-    // ==================== WHITELIST FUNCTIONS ====================
-
     suspend fun getWhitelistApps(): List<String> = withContext(Dispatchers.IO) {
         try {
             val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps"))
@@ -162,7 +156,7 @@ class SupabaseClient private constructor() {
         try {
             val appsString = apps.joinToString(",")
             
-            // Use POST with upsert (merge-duplicates) - This is the most reliable method
+            // Use POST with upsert - most reliable method
             val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings"))
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "POST"
@@ -185,7 +179,6 @@ class SupabaseClient private constructor() {
             val responseCode = connection.responseCode
             connection.disconnect()
             
-            // 200, 201, or 204 are all success codes
             responseCode in 200..299
         } catch (e: Exception) {
             e.printStackTrace()
