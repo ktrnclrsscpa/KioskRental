@@ -76,12 +76,13 @@ class MainActivity : AppCompatActivity() {
         }
         
         pinInput = EditText(this).apply {
-            hint = "Enter 6-digit PIN"
+            hint = "Enter 6-digit PIN (letters, numbers, symbols)"
             inputType = android.text.InputType.TYPE_CLASS_TEXT
             textSize = 20f
             gravity = android.view.Gravity.CENTER
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             setPadding(20, 15, 20, 15)
+            maxLines = 1
         }
         pinRow.addView(pinInput)
         
@@ -225,8 +226,7 @@ class MainActivity : AppCompatActivity() {
                         currentPin = pin
                         startSession(result.secondsLeft)
                     } else {
-                        val errorMsg = result.error ?: "Invalid or expired PIN"
-                        Toast.makeText(this@MainActivity, errorMsg, Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@MainActivity, "Invalid or expired PIN", Toast.LENGTH_LONG).show()
                     }
                 }
             } catch (e: Exception) {
@@ -361,6 +361,10 @@ class MainActivity : AppCompatActivity() {
                     withContext(Dispatchers.Main) {
                         if (!result.isValid || result.secondsLeft <= 0) {
                             Toast.makeText(this@MainActivity, "Session expired (admin)", Toast.LENGTH_SHORT).show()
+                            // Delete the PIN when admin expires it
+                            CoroutineScope(Dispatchers.IO).launch {
+                                supabase.deletePin(currentPin!!)
+                            }
                             endSession()
                         }
                     }
@@ -379,8 +383,9 @@ class MainActivity : AppCompatActivity() {
             
             // Delete the PIN so it cannot be used again (one-time use)
             if (currentPin != null) {
+                val pinToDelete = currentPin
                 CoroutineScope(Dispatchers.IO).launch {
-                    supabase.deletePin(currentPin!!)
+                    supabase.deletePin(pinToDelete!!)
                 }
             }
             
