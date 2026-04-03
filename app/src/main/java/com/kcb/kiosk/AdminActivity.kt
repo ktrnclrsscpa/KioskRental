@@ -220,12 +220,38 @@ class AdminActivity : AppCompatActivity() {
         saveAppsBtn.isEnabled = false
         
         val installedApps = mutableListOf<Pair<String, String>>()
+        
+        // Method 1: Get all installed apps via PackageManager
         val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
         
-        // Show ALL installed apps (no filter)
         for (app in packages) {
-            val appName = packageManager.getApplicationLabel(app).toString()
-            installedApps.add(Pair(appName, app.packageName))
+            // Filter out system apps, keep only user-installed apps
+            val isSystemApp = (app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+            val isUpdatedSystemApp = (app.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+            
+            if (!isSystemApp || isUpdatedSystemApp) {
+                val appName = packageManager.getApplicationLabel(app).toString()
+                installedApps.add(Pair(appName, app.packageName))
+            }
+        }
+        
+        // Method 2: Get launchable apps (apps with icons)
+        val mainIntent = android.content.Intent(android.content.Intent.ACTION_MAIN, null)
+        mainIntent.addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+        val launchableApps = packageManager.queryIntentActivities(mainIntent, 0)
+        
+        for (resolveInfo in launchableApps) {
+            val packageName = resolveInfo.activityInfo.packageName
+            val existing = installedApps.find { it.second == packageName }
+            if (existing == null) {
+                try {
+                    val appInfo = packageManager.getApplicationInfo(packageName, 0)
+                    val appName = packageManager.getApplicationLabel(appInfo).toString()
+                    installedApps.add(Pair(appName, packageName))
+                } catch (e: Exception) {
+                    installedApps.add(Pair(packageName, packageName))
+                }
+            }
         }
         
         installedApps.sortBy { it.first }
@@ -243,7 +269,7 @@ class AdminActivity : AppCompatActivity() {
             checkBoxes.add(Pair(checkBox, app.second))
         }
         
-        appStatusText.text = "Found ${installedApps.size} apps. Select which ones to allow."
+        appStatusText.text = "Found ${installedApps.size} user apps. Select which ones to allow."
         saveAppsBtn.isEnabled = true
     }
     
