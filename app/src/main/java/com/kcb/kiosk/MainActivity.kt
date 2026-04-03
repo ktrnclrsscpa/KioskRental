@@ -245,17 +245,13 @@ class MainActivity : AppCompatActivity() {
             activateBtn.isEnabled = false
             statusText.text = "ACTIVE"
             
-            // Force show app grid
             if (appList.isNotEmpty()) {
                 appGrid.visibility = android.view.View.VISIBLE
-                // Force refresh adapter
                 appGrid.adapter?.notifyDataSetChanged()
             }
             
-            // Show floating timer
             showFloatingTimer()
             
-            // Start local timer
             countDownTimer?.cancel()
             countDownTimer = object : CountDownTimer(remainingSeconds * 1000L, 1000) {
                 override fun onTick(millisUntilFinished: Long) {
@@ -349,9 +345,14 @@ class MainActivity : AppCompatActivity() {
             isActive = false
             countDownTimer?.cancel()
             
+            // Delete the PIN from database (one-time use)
             if (currentPin != null) {
+                val pinToDelete = currentPin
                 CoroutineScope(Dispatchers.IO).launch {
-                    supabase.deletePin(currentPin!!)
+                    supabase.deletePin(pinToDelete!!)
+                    withContext(Dispatchers.Main) {
+                        // PIN deleted
+                    }
                 }
             }
             
