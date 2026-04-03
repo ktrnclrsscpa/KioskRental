@@ -17,6 +17,8 @@ class SupabaseClient private constructor() {
         return "$urlString${separator}apikey=$apiKey"
     }
 
+    // ==================== TEST CONNECTION ====================
+    
     suspend fun testConnection(): Boolean = withContext(Dispatchers.IO) {
         try {
             val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?limit=1"))
@@ -33,6 +35,8 @@ class SupabaseClient private constructor() {
             false
         }
     }
+
+    // ==================== PIN FUNCTIONS ====================
 
     suspend fun validatePin(pin: String): PinValidationResult = withContext(Dispatchers.IO) {
         try {
@@ -124,6 +128,8 @@ class SupabaseClient private constructor() {
         }
     }
 
+    // ==================== WHITELIST FUNCTIONS ====================
+
     suspend fun getWhitelistApps(): List<String> = withContext(Dispatchers.IO) {
         try {
             val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps"))
@@ -156,33 +162,30 @@ class SupabaseClient private constructor() {
         try {
             val appsString = apps.joinToString(",")
             
-            // Step 1: DELETE existing record
-            val deleteUrl = URL("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.whitelist_apps")
-            val deleteConnection = deleteUrl.openConnection() as HttpURLConnection
-            deleteConnection.requestMethod = "DELETE"
-            deleteConnection.setRequestProperty("apikey", apiKey)
-            deleteConnection.setRequestProperty("Authorization", "Bearer $apiKey")
-            deleteConnection.connectTimeout = 10000
-            deleteConnection.readTimeout = 10000
-            deleteConnection.disconnect()
+            // Use POST with upsert (merge-duplicates) - This is the most reliable method
+            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings"))
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("apikey", apiKey)
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Prefer", "resolution=merge-duplicates")
+            connection.doOutput = true
+            connection.connectTimeout = 10000
+            connection.readTimeout = 10000
             
-            // Step 2: INSERT new record
-            val insertUrl = URL("$supabaseUrl/rest/v1/admin_settings")
-            val insertConnection = insertUrl.openConnection() as HttpURLConnection
-            insertConnection.requestMethod = "POST"
-            insertConnection.setRequestProperty("apikey", apiKey)
-            insertConnection.setRequestProperty("Authorization", "Bearer $apiKey")
-            insertConnection.setRequestProperty("Content-Type", "application/json")
-            insertConnection.doOutput = true
-            insertConnection.connectTimeout = 10000
-            insertConnection.readTimeout = 10000
+            val jsonBody = JSONObject().apply {
+                put("setting_key", "whitelist_apps")
+                put("setting_value", appsString)
+                put("updated_at", System.currentTimeMillis())
+            }.toString()
             
-            val jsonBody = "{\"setting_key\":\"whitelist_apps\",\"setting_value\":\"$appsString\"}"
-            insertConnection.outputStream.write(jsonBody.toByteArray())
+            connection.outputStream.write(jsonBody.toByteArray())
             
-            val responseCode = insertConnection.responseCode
-            insertConnection.disconnect()
+            val responseCode = connection.responseCode
+            connection.disconnect()
             
+            // 200, 201, or 204 are all success codes
             responseCode in 200..299
         } catch (e: Exception) {
             e.printStackTrace()
