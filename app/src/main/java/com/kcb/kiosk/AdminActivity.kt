@@ -1,5 +1,6 @@
 package com.kcb.kiosk
 
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.Button
@@ -29,6 +30,9 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var saveAppsBtn: Button
     private lateinit var appStatusText: TextView
     private val checkBoxes = mutableListOf<Pair<CheckBox, String>>()
+    
+    // Local storage for whitelist
+    private val prefs by lazy { getSharedPreferences("kiosk_prefs", Context.MODE_PRIVATE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,7 +44,6 @@ class AdminActivity : AppCompatActivity() {
             setPadding(30, 50, 30, 30)
         }
         
-        // Title
         val title = TextView(this).apply {
             text = "🔐 ADMIN PANEL"
             textSize = 24f
@@ -145,13 +148,6 @@ class AdminActivity : AppCompatActivity() {
         }
         appPanel.addView(appStatusText)
         
-        val testBtn = Button(this).apply {
-            text = "🔌 TEST CONNECTION"
-            textSize = 12f
-            setOnClickListener { testConnection() }
-        }
-        appPanel.addView(testBtn)
-        
         val scrollView = ScrollView(this)
         appContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -171,9 +167,9 @@ class AdminActivity : AppCompatActivity() {
         appPanel.addView(scrollContainer)
         
         saveAppsBtn = Button(this).apply {
-            text = "💾 SAVE WHITELIST"
+            text = "💾 SAVE WHITELIST (LOCAL)"
             setPadding(0, 20, 0, 20)
-            setOnClickListener { saveWhitelist() }
+            setOnClickListener { saveWhitelistLocal() }
         }
         appPanel.addView(saveAppsBtn)
         
@@ -183,7 +179,7 @@ class AdminActivity : AppCompatActivity() {
         
         loadPins()
         loadInstalledApps()
-        loadCurrentWhitelist()
+        loadCurrentWhitelistLocal()
     }
     
     private fun showPinPanel() {
@@ -196,23 +192,7 @@ class AdminActivity : AppCompatActivity() {
         pinPanel.visibility = android.view.View.GONE
         appPanel.visibility = android.view.View.VISIBLE
         loadInstalledApps()
-        loadCurrentWhitelist()
-    }
-    
-    private fun testConnection() {
-        appStatusText.text = "Testing connection..."
-        CoroutineScope(Dispatchers.IO).launch {
-            val result = supabase.testConnection()
-            withContext(Dispatchers.Main) {
-                if (result) {
-                    appStatusText.text = "✓ Connection successful!"
-                    appStatusText.setTextColor(android.graphics.Color.GREEN)
-                } else {
-                    appStatusText.text = "✗ Connection failed!"
-                    appStatusText.setTextColor(android.graphics.Color.RED)
-                }
-            }
-        }
+        loadCurrentWhitelistLocal()
     }
     
     private fun loadInstalledApps() {
@@ -229,24 +209,6 @@ class AdminActivity : AppCompatActivity() {
             if (!isSystemApp || isUpdatedSystemApp) {
                 val appName = packageManager.getApplicationLabel(app).toString()
                 installedApps.add(Pair(appName, app.packageName))
-            }
-        }
-        
-        val mainIntent = android.content.Intent(android.content.Intent.ACTION_MAIN, null)
-        mainIntent.addCategory(android.content.Intent.CATEGORY_LAUNCHER)
-        val launchableApps = packageManager.queryIntentActivities(mainIntent, 0)
-        
-        for (resolveInfo in launchableApps) {
-            val packageName = resolveInfo.activityInfo.packageName
-            val existing = installedApps.find { it.second == packageName }
-            if (existing == null) {
-                try {
-                    val appInfo = packageManager.getApplicationInfo(packageName, 0)
-                    val appName = packageManager.getApplicationLabel(appInfo).toString()
-                    installedApps.add(Pair(appName, packageName))
-                } catch (e: Exception) {
-                    installedApps.add(Pair(packageName, packageName))
-                }
             }
         }
         
@@ -269,62 +231,31 @@ class AdminActivity : AppCompatActivity() {
         saveAppsBtn.isEnabled = true
     }
     
-    private fun loadCurrentWhitelist() {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val whitelist = supabase.getWhitelistApps()
-                withContext(Dispatchers.Main) {
-                    for ((checkBox, packageName) in checkBoxes) {
-                        checkBox.isChecked = whitelist.contains(packageName)
-                    }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    appStatusText.text = "Error loading: ${e.message}"
-                }
-            }
+    private fun loadCurrentWhitelistLocal() {
+        val savedWhitelist = prefs.getStringSet("whitelist", emptySet()) ?: emptySet()
+        for ((checkBox, packageName) in checkBoxes) {
+            checkBox.isChecked = savedWhitelist.contains(packageName)
         }
     }
     
-    private fun saveWhitelist() {
+    private fun saveWhitelistLocal() {
         saveAppsBtn.isEnabled = false
         saveAppsBtn.text = "SAVING..."
-        appStatusText.text = "Saving..."
         
-        val selectedPackages = mutableListOf<String>()
+        val selectedPackages = mutableSetOf<String>()
         for ((checkBox, packageName) in checkBoxes) {
             if (checkBox.isChecked) {
                 selectedPackages.add(packageName)
             }
         }
         
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val success = supabase.updateWhitelistApps(selectedPackages)
-                withContext(Dispatchers.Main) {
-                    saveAppsBtn.isEnabled = true
-                    saveAppsBtn.text = "💾 SAVE WHITELIST"
-                    if (success) {
-                        appStatusText.text = "✓ Success! Saved ${selectedPackages.size} apps"
-                        appStatusText.setTextColor(android.graphics.Color.GREEN)
-                        Toast.makeText(this@AdminActivity, "Whitelist saved! ${selectedPackages.size} apps", Toast.LENGTH_LONG).show()
-                        loadCurrentWhitelist()
-                    } else {
-                        appStatusText.text = "✗ Failed to save. Check internet connection."
-                        appStatusText.setTextColor(android.graphics.Color.RED)
-                        Toast.makeText(this@AdminActivity, "Failed to save", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    saveAppsBtn.isEnabled = true
-                    saveAppsBtn.text = "💾 SAVE WHITELIST"
-                    appStatusText.text = "✗ Error: ${e.message}"
-                    appStatusText.setTextColor(android.graphics.Color.RED)
-                    Toast.makeText(this@AdminActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                }
-            }
-        }
+        prefs.edit().putStringSet("whitelist", selectedPackages).apply()
+        
+        saveAppsBtn.isEnabled = true
+        saveAppsBtn.text = "💾 SAVE WHITELIST (LOCAL)"
+        appStatusText.text = "✓ Success! Saved ${selectedPackages.size} apps locally"
+        appStatusText.setTextColor(android.graphics.Color.GREEN)
+        Toast.makeText(this, "Whitelist saved locally! ${selectedPackages.size} apps", Toast.LENGTH_LONG).show()
     }
     
     private fun generatePin() {
