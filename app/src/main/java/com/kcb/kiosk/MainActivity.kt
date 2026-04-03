@@ -360,10 +360,24 @@ class MainActivity : AppCompatActivity() {
                         if (!result.isValid || result.secondsLeft <= 0) {
                             Toast.makeText(this@MainActivity, "Session expired (admin)", Toast.LENGTH_SHORT).show()
                             endSession()
+                        } else if (result.secondsLeft != currentRemainingSeconds) {
+                            // Time was extended - update the timer display only
+                            currentRemainingSeconds = result.secondsLeft
+                            updateTimerDisplayOnly(result.secondsLeft)
                         }
                     }
                 } catch (e: Exception) { }
             }
+        }
+    }
+    
+    private fun updateTimerDisplayOnly(seconds: Int) {
+        val minutes = seconds / 60
+        val secs = seconds % 60
+        val timeString = String.format("%02d:%02d", minutes, secs)
+        timerText.text = timeString
+        if (::floatingTimer.isInitialized) {
+            floatingTimer.text = timeString
         }
     }
     
