@@ -261,7 +261,6 @@ class MainActivity : AppCompatActivity() {
                     val secs = timeLeft % 60
                     val timeString = String.format("%02d:%02d", minutes, secs)
                     timerText.text = timeString
-                    // Update floating timer
                     if (::floatingTimer.isInitialized) {
                         floatingTimer.text = timeString
                     }
