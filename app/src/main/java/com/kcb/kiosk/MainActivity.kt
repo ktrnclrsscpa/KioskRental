@@ -28,10 +28,11 @@ class MainActivity : AppCompatActivity() {
     private var countDownTimer: CountDownTimer? = null
     private lateinit var supabase: SupabaseClient
     private var currentPin: String? = null
+    private var syncJob: Job? = null
     private var isActive = false
     private var appList = mutableListOf<AppInfo>()
     private var gridReady = false
-    private var remainingSeconds = 0
+    private var currentRemainingSeconds = 0
     
     private lateinit var tts: TextToSpeech
     
@@ -194,6 +195,9 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             gridReady = true
+            if (isActive) {
+                appGrid.visibility = android.view.View.VISIBLE
+            }
             Toast.makeText(this@MainActivity, "✅ Loaded ${appList.size} apps", Toast.LENGTH_SHORT).show()
         } else {
             debugText.text = "$statusMsg\nNo matching apps. Go to Admin > APPS to select apps."
@@ -221,8 +225,8 @@ class MainActivity : AppCompatActivity() {
                     
                     if (result.isValid && result.secondsLeft > 0) {
                         currentPin = pin
-                        remainingSeconds = result.secondsLeft
-                        startSession()
+                        currentRemainingSeconds = result.secondsLeft
+                        startSession(result.secondsLeft)
                     } else {
                         Toast.makeText(this@MainActivity, "Invalid or expired PIN", Toast.LENGTH_LONG).show()
                     }
@@ -238,40 +242,37 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
-    private fun startSession() {
+    private fun startSession(seconds: Int) {
         try {
             isActive = true
             pinInput.isEnabled = false
             activateBtn.isEnabled = false
             statusText.text = "ACTIVE"
             
-            // Debug: Show how many apps are in the list
-            debugText.text = "Apps in list: ${appList.size}"
-            
-            // Show app grid if there are apps
             if (appList.isNotEmpty()) {
                 appGrid.visibility = android.view.View.VISIBLE
-                appGrid.adapter?.notifyDataSetChanged()
-                Toast.makeText(this, "Showing ${appList.size} apps", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "No apps to show. Go to Admin > APPS to select apps.", Toast.LENGTH_LONG).show()
+                gridReady = true
             }
             
             showFloatingTimer()
             
+            var timeLeft = seconds
+            currentRemainingSeconds = seconds
+            
             countDownTimer?.cancel()
-            countDownTimer = object : CountDownTimer(remainingSeconds * 1000L, 1000) {
+            countDownTimer = object : CountDownTimer(seconds * 1000L, 1000) {
                 override fun onTick(millisUntilFinished: Long) {
-                    remainingSeconds = (millisUntilFinished / 1000).toInt()
-                    val minutes = remainingSeconds / 60
-                    val secs = remainingSeconds % 60
+                    timeLeft = (millisUntilFinished / 1000).toInt()
+                    currentRemainingSeconds = timeLeft
+                    val minutes = timeLeft / 60
+                    val secs = timeLeft % 60
                     val timeString = String.format("%02d:%02d", minutes, secs)
                     timerText.text = timeString
                     if (::floatingTimer.isInitialized) {
                         floatingTimer.text = timeString
                     }
                     
-                    when (remainingSeconds) {
+                    when (timeLeft) {
                         300 -> speakAlert("5 minutes remaining")
                         60 -> speakAlert("1 minute remaining")
                         30 -> speakAlert("30 seconds remaining")
@@ -284,6 +285,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }.start()
             
+            startSync()
         } catch (e: Exception) {
             Toast.makeText(this, "Session error: ${e.message}", Toast.LENGTH_SHORT).show()
             endSession()
@@ -347,9 +349,28 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) { }
     }
     
+    private fun startSync() {
+        syncJob?.cancel()
+        syncJob = CoroutineScope(Dispatchers.IO).launch {
+            while (isActive && currentPin != null) {
+                delay(5000)
+                try {
+                    val result = supabase.validatePin(currentPin!!)
+                    withContext(Dispatchers.Main) {
+                        if (!result.isValid || result.secondsLeft <= 0) {
+                            Toast.makeText(this@MainActivity, "Session expired (admin)", Toast.LENGTH_SHORT).show()
+                            endSession()
+                        }
+                    }
+                } catch (e: Exception) { }
+            }
+        }
+    }
+    
     private fun endSession() {
         try {
             isActive = false
+            syncJob?.cancel()
             countDownTimer?.cancel()
             
             if (currentPin != null) {
@@ -360,7 +381,7 @@ class MainActivity : AppCompatActivity() {
             }
             
             currentPin = null
-            remainingSeconds = 0
+            currentRemainingSeconds = 0
             pinInput.isEnabled = true
             activateBtn.isEnabled = true
             statusText.text = ""
@@ -375,6 +396,7 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         try {
             countDownTimer?.cancel()
+            syncJob?.cancel()
             hideFloatingTimer()
             tts.stop()
             tts.shutdown()
