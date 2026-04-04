@@ -37,6 +37,7 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var pinListText: TextView
     private lateinit var generatePinInput: EditText
     private lateinit var generateMinutesInput: EditText
+    private lateinit var generateAmountInput: EditText
     private lateinit var generateBtn: Button
     private lateinit var refreshPinsBtn: Button
     private lateinit var extendPinInput: EditText
@@ -263,11 +264,20 @@ class AdminActivity : AppCompatActivity() {
         
         generateMinutesInput = EditText(this).apply {
             hint = "Minutes"
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.5f)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.33f)
             setPadding(10, 10, 10, 10)
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
         }
         pinRow.addView(generateMinutesInput)
+        
+        generateAmountInput = EditText(this).apply {
+            hint = "Amount (₱)"
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.33f)
+            setPadding(10, 10, 10, 10)
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+        }
+        pinRow.addView(generateAmountInput)
+        
         pinPanel.addView(pinRow)
         
         generateBtn = Button(this).apply {
@@ -656,7 +666,6 @@ class AdminActivity : AppCompatActivity() {
     }
     
     private fun testTelegram() {
-        // Get values directly from input fields
         val token = telegramTokenInput.text.toString().trim()
         val chatId = telegramChatIdInput.text.toString().trim()
 
@@ -671,7 +680,6 @@ class AdminActivity : AppCompatActivity() {
         appStatusText.text = "Sending test message..."
         appStatusText.setTextColor(android.graphics.Color.BLUE)
 
-        // Run network request on background thread
         Thread {
             try {
                 val urlString = "https://api.telegram.org/bot$token/sendMessage?chat_id=$chatId&text=✅%20Test%20notification%20from%20KCB%20Rental%20Kiosk!&parse_mode=HTML"
@@ -682,7 +690,6 @@ class AdminActivity : AppCompatActivity() {
                 connection.readTimeout = 10000
 
                 val responseCode = connection.responseCode
-                val responseMessage = connection.responseMessage
                 connection.disconnect()
 
                 runOnUiThread {
@@ -693,7 +700,7 @@ class AdminActivity : AppCompatActivity() {
                         appStatusText.setTextColor(android.graphics.Color.GREEN)
                         Toast.makeText(this@AdminActivity, "Test sent! Check Telegram.", Toast.LENGTH_LONG).show()
                     } else {
-                        appStatusText.text = "✗ Failed! HTTP $responseCode: $responseMessage"
+                        appStatusText.text = "✗ Failed! HTTP $responseCode"
                         appStatusText.setTextColor(android.graphics.Color.RED)
                         Toast.makeText(this@AdminActivity, "Failed: HTTP $responseCode", Toast.LENGTH_LONG).show()
                     }
@@ -708,6 +715,72 @@ class AdminActivity : AppCompatActivity() {
                 }
             }
         }.start()
+    }
+    
+    private fun generatePin() {
+        val minutes = generateMinutesInput.text.toString().toIntOrNull()
+        val amount = generateAmountInput.text.toString().toDoubleOrNull()
+        
+        if (minutes == null || minutes <= 0) {
+            Toast.makeText(this, "Enter valid minutes (1-1440)", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        if (amount == null || amount <= 0) {
+            Toast.makeText(this, "Enter valid amount (₱)", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        val customPin = generatePinInput.text.toString().trim()
+        if (customPin.isNotEmpty() && customPin.length != 6) {
+            Toast.makeText(this, "PIN must be exactly 6 characters", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val pin = if (customPin.isNotEmpty()) customPin else null
+        
+        generateBtn.isEnabled = false
+        generateBtn.text = "GENERATING..."
+        
+        CoroutineScope(Dispatchers.IO).launch {
+            val result = supabase.generatePin(pin, minutes * 60)
+            withContext(Dispatchers.Main) {
+                generateBtn.isEnabled = true
+                generateBtn.text = "GENERATE PIN"
+                if (result != null) {
+                    // Send Telegram notification for new PIN
+                    supabase.sendTelegramNotification("💰 *New PIN Generated!*%0APIN: $result%0ADuration: $minutes minutes%0AAmount: ₱${String.format("%.2f", amount)}")
+                    
+                    Toast.makeText(this@AdminActivity, "PIN: $result ($minutes min - ₱$amount)", Toast.LENGTH_LONG).show()
+                    generatePinInput.text.clear()
+                    generateMinutesInput.text.clear()
+                    generateAmountInput.text.clear()
+                    loadPins()
+                } else {
+                    Toast.makeText(this@AdminActivity, "Failed to generate PIN", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+    
+    private fun extendTime(pin: String, minutes: Int) {
+        extendBtn.isEnabled = false
+        extendBtn.text = "EXTENDING..."
+        
+        CoroutineScope(Dispatchers.IO).launch {
+            val success = supabase.extendTime(pin, minutes)
+            withContext(Dispatchers.Main) {
+                extendBtn.isEnabled = true
+                extendBtn.text = "⏰ EXTEND TIME"
+                if (success) {
+                    Toast.makeText(this@AdminActivity, "Added $minutes minutes to PIN $pin", Toast.LENGTH_LONG).show()
+                    loadPins()
+                    extendPinInput.text.clear()
+                    extendMinutesInput.text.clear()
+                } else {
+                    Toast.makeText(this@AdminActivity, "Failed to extend", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
     
     private fun exportReport() {
@@ -829,58 +902,6 @@ class AdminActivity : AppCompatActivity() {
         appStatusText.text = "✓ Success! Saved ${selectedPackages.size} apps locally"
         appStatusText.setTextColor(android.graphics.Color.GREEN)
         Toast.makeText(this, "Whitelist saved locally! ${selectedPackages.size} apps", Toast.LENGTH_LONG).show()
-    }
-    
-    private fun generatePin() {
-        val minutes = generateMinutesInput.text.toString().toIntOrNull()
-        if (minutes == null || minutes <= 0) {
-            Toast.makeText(this, "Enter valid minutes", Toast.LENGTH_SHORT).show()
-            return
-        }
-        val customPin = generatePinInput.text.toString().trim()
-        if (customPin.isNotEmpty() && customPin.length != 6) {
-            Toast.makeText(this, "PIN must be exactly 6 characters", Toast.LENGTH_SHORT).show()
-            return
-        }
-        val pin = if (customPin.isNotEmpty()) customPin else null
-        
-        generateBtn.isEnabled = false
-        generateBtn.text = "GENERATING..."
-        CoroutineScope(Dispatchers.IO).launch {
-            val result = supabase.generatePin(pin, minutes * 60)
-            withContext(Dispatchers.Main) {
-                generateBtn.isEnabled = true
-                generateBtn.text = "GENERATE PIN"
-                if (result != null) {
-                    Toast.makeText(this@AdminActivity, "PIN: $result ($minutes min)", Toast.LENGTH_LONG).show()
-                    generatePinInput.text.clear()
-                    generateMinutesInput.text.clear()
-                    loadPins()
-                } else {
-                    Toast.makeText(this@AdminActivity, "Failed to generate PIN", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-    
-    private fun extendTime(pin: String, minutes: Int) {
-        extendBtn.isEnabled = false
-        extendBtn.text = "EXTENDING..."
-        CoroutineScope(Dispatchers.IO).launch {
-            val success = supabase.extendTime(pin, minutes)
-            withContext(Dispatchers.Main) {
-                extendBtn.isEnabled = true
-                extendBtn.text = "⏰ EXTEND TIME"
-                if (success) {
-                    Toast.makeText(this@AdminActivity, "Added $minutes minutes to PIN $pin", Toast.LENGTH_LONG).show()
-                    loadPins()
-                    extendPinInput.text.clear()
-                    extendMinutesInput.text.clear()
-                } else {
-                    Toast.makeText(this@AdminActivity, "Failed to extend", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
     }
     
     private fun loadPins() {
