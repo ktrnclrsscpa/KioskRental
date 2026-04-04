@@ -18,6 +18,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
 import java.text.NumberFormat
+import java.util.*
 
 class AdminActivity : AppCompatActivity() {
     private lateinit var supabase: SupabaseClient
@@ -146,7 +147,7 @@ class AdminActivity : AppCompatActivity() {
         // ========== DASHBOARD PANEL ==========
         dashboardPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            visibility = android.view.View.VISIBLE
+            visibility = View.VISIBLE
         }
         
         val incomeTitle = TextView(this).apply {
@@ -215,7 +216,7 @@ class AdminActivity : AppCompatActivity() {
         // ========== PINS PANEL ==========
         pinPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            visibility = android.view.View.GONE
+            visibility = View.GONE
         }
         
         val genLabel = TextView(this).apply {
@@ -261,7 +262,7 @@ class AdminActivity : AppCompatActivity() {
         
         val extendSeparator = View(this).apply {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 2)
-            setBackgroundColor(ContextCompat.getColor(context, android.R.color.darker_gray))
+            setBackgroundColor(ContextCompat.getColor(this@AdminActivity, android.R.color.darker_gray))
         }
         pinPanel.addView(extendSeparator)
         
@@ -320,7 +321,7 @@ class AdminActivity : AppCompatActivity() {
         // ========== APPS PANEL ==========
         appPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            visibility = android.view.View.GONE
+            visibility = View.GONE
         }
         
         val appLabel = TextView(this).apply {
@@ -369,23 +370,23 @@ class AdminActivity : AppCompatActivity() {
     }
     
     private fun showDashboardPanel() {
-        dashboardPanel.visibility = android.view.View.VISIBLE
-        pinPanel.visibility = android.view.View.GONE
-        appPanel.visibility = android.view.View.GONE
+        dashboardPanel.visibility = View.VISIBLE
+        pinPanel.visibility = View.GONE
+        appPanel.visibility = View.GONE
         loadDashboardStats()
     }
     
     private fun showPinPanel() {
-        dashboardPanel.visibility = android.view.View.GONE
-        pinPanel.visibility = android.view.View.VISIBLE
-        appPanel.visibility = android.view.View.GONE
+        dashboardPanel.visibility = View.GONE
+        pinPanel.visibility = View.VISIBLE
+        appPanel.visibility = View.GONE
         loadPins()
     }
     
     private fun showAppPanel() {
-        dashboardPanel.visibility = android.view.View.GONE
-        pinPanel.visibility = android.view.View.GONE
-        appPanel.visibility = android.view.View.VISIBLE
+        dashboardPanel.visibility = View.GONE
+        pinPanel.visibility = View.GONE
+        appPanel.visibility = View.VISIBLE
         loadInstalledApps()
         loadCurrentWhitelistLocal()
     }
