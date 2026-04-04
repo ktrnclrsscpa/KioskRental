@@ -657,60 +657,67 @@ class AdminActivity : AppCompatActivity() {
     }
     
     private fun testTelegram() {
-        testTelegramBtn.isEnabled = false
-        testTelegramBtn.text = "SENDING..."
-        appStatusText.text = "Sending test message..."
-        
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val (token, chatId) = supabase.getTelegramConfig()
-                if (token.isEmpty() || chatId.isEmpty()) {
-                    withContext(Dispatchers.Main) {
-                        appStatusText.text = "❌ Bot Token or Chat ID is empty!"
-                        appStatusText.setTextColor(android.graphics.Color.RED)
-                        testTelegramBtn.isEnabled = true
-                        testTelegramBtn.text = "📨 TEST"
-                    }
-                    return@launch
-                }
-                
-                // Manual test using direct HTTP
-                val encodedMessage = URLEncoder.encode("✅ Test notification from KCB Rental Kiosk!", "UTF-8")
-                val url = URL("https://api.telegram.org/bot$token/sendMessage?chat_id=$chatId&text=$encodedMessage&parse_mode=HTML")
-                val connection = url.openConnection() as HttpURLConnection
-                connection.requestMethod = "GET"
-                connection.connectTimeout = 10000
-                connection.readTimeout = 10000
-                
-                val responseCode = connection.responseCode
-                val responseText = if (responseCode == 200) {
-                    connection.inputStream.bufferedReader().use { it.readText() }
-                } else {
-                    connection.errorStream?.bufferedReader()?.readText() ?: "No error details"
-                }
-                connection.disconnect()
-                
+    testTelegramBtn.isEnabled = false
+    testTelegramBtn.text = "SENDING..."
+    
+    CoroutineScope(Dispatchers.IO).launch {
+        try {
+            val (token, chatId) = supabase.getTelegramConfig()
+            
+            // Show what we have
+            withContext(Dispatchers.Main) {
+                appStatusText.text = "Token: ${token.take(10)}... Chat ID: $chatId"
+                appStatusText.setTextColor(android.graphics.Color.BLUE)
+            }
+            
+            if (token.isEmpty() || chatId.isEmpty()) {
                 withContext(Dispatchers.Main) {
-                    testTelegramBtn.isEnabled = true
-                    testTelegramBtn.text = "📨 TEST"
-                    if (responseCode == 200) {
-                        appStatusText.text = "✓ Test sent! Check Telegram."
-                        appStatusText.setTextColor(android.graphics.Color.GREEN)
-                    } else {
-                        appStatusText.text = "✗ Failed! Response: $responseCode - $responseText"
-                        appStatusText.setTextColor(android.graphics.Color.RED)
-                    }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    testTelegramBtn.isEnabled = true
-                    testTelegramBtn.text = "📨 TEST"
-                    appStatusText.text = "✗ Error: ${e.message}"
+                    appStatusText.text = "❌ Token or Chat ID is empty! Please save them first."
                     appStatusText.setTextColor(android.graphics.Color.RED)
+                    testTelegramBtn.isEnabled = true
+                    testTelegramBtn.text = "📨 TEST"
                 }
+                return@launch
+            }
+            
+            // Direct test using the same method that worked in browser
+            val urlString = "https://api.telegram.org/bot$token/sendMessage?chat_id=$chatId&text=Test%20from%20KCB%20App!&parse_mode=HTML"
+            val url = URL(urlString)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 10000
+            connection.readTimeout = 10000
+            
+            val responseCode = connection.responseCode
+            val responseMessage = connection.responseMessage
+            
+            withContext(Dispatchers.Main) {
+                testTelegramBtn.isEnabled = true
+                testTelegramBtn.text = "📨 TEST"
+                
+                if (responseCode == 200) {
+                    appStatusText.text = "✓ Test sent successfully! Check Telegram."
+                    appStatusText.setTextColor(android.graphics.Color.GREEN)
+                    Toast.makeText(this@AdminActivity, "Test sent! Check Telegram.", Toast.LENGTH_SHORT).show()
+                } else {
+                    appStatusText.text = "✗ Failed! HTTP $responseCode: $responseMessage"
+                    appStatusText.setTextColor(android.graphics.Color.RED)
+                    Toast.makeText(this@AdminActivity, "Failed: HTTP $responseCode", Toast.LENGTH_SHORT).show()
+                }
+            }
+            connection.disconnect()
+            
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                testTelegramBtn.isEnabled = true
+                testTelegramBtn.text = "📨 TEST"
+                appStatusText.text = "✗ Error: ${e.message}"
+                appStatusText.setTextColor(android.graphics.Color.RED)
+                Toast.makeText(this@AdminActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
+}
     
     private fun exportReport() {
         CoroutineScope(Dispatchers.IO).launch {
