@@ -245,10 +245,14 @@ class MainActivity : AppCompatActivity() {
     
     private fun recordSessionToHistory(pin: String, minutes: Int) {
         CoroutineScope(Dispatchers.IO).launch {
-            val price = supabase.getPricePerMinute()
-            val amount = minutes * price
+            val config = supabase.getPricingConfig()
+            val amount = if (config.pricingType == "fixed") {
+                config.priceAmount
+            } else {
+                (minutes.toDouble() / 60.0) * config.priceAmount
+            }
             supabase.recordSession(pin, minutes, amount)
-            supabase.sendTelegramNotification("🎮 *New Rental Session!*%0APIN: $pin%0AMinutes: $minutes%0AAmount: ₱${String.format("%.2f", amount)}")
+            supabase.sendTelegramNotification("🎮 *New Rental Session!*%0APIN: $pin%0ADuration: ${minutes} minutes%0AAmount: ₱${String.format("%.2f", amount)}")
         }
     }
     
@@ -318,10 +322,8 @@ class MainActivity : AppCompatActivity() {
                                 val addedMinutes = (newTotalSeconds - lastKnownSeconds) / 60
                                 Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes. New time: ${newTotalSeconds/60} min", Toast.LENGTH_LONG).show()
                                 
-                                // Send Telegram notification for extension
-                                CoroutineScope(Dispatchers.IO).launch {
-                                    supabase.sendTelegramNotification("⏰ *Session Extended!*%0APIN: ${currentPin}%0AAdded: $addedMinutes minutes%0ANew total: ${newTotalSeconds/60} minutes")
-                                }
+                                val config = supabase.getPricingConfig()
+                                supabase.sendTelegramNotification("⏰ *Session Extended!*%0APIN: ${currentPin}%0AAdded: $addedMinutes minutes%0AAdditional Payment: ₱${String.format("%.2f", config.extendPrice)}")
                             }
                             lastKnownSeconds = newTotalSeconds
                         } else {
