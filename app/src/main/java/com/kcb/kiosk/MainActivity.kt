@@ -7,6 +7,8 @@ import android.os.Bundle
 import android.os.CountDownTimer
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
+import android.view.MotionEvent
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -36,9 +38,13 @@ class MainActivity : AppCompatActivity() {
     
     private lateinit var tts: TextToSpeech
     
+    // Movable floating timer
+    private lateinit var floatingTimerContainer: LinearLayout
     private lateinit var floatingTimer: TextView
     private var windowManager: android.view.WindowManager? = null
     private var isOverlayVisible = false
+    private var lastTouchX = 0f
+    private var lastTouchY = 0f
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -277,13 +283,9 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     (minutes.toDouble() / 60.0) * config.priceAmount
                 }
-                // Record session in history
                 supabase.recordSession(currentPin!!, minutes, amount)
-                // Send Telegram notification
                 supabase.sendTelegramNotification("🎮 *New Rental Session!*%0APIN: ${currentPin}%0ADuration: ${minutes} minutes%0AAmount: ₱${String.format("%.2f", amount)}")
-            } catch (e: Exception) {
-                // Silent fail - don't let notification failure break the session
-            }
+            } catch (e: Exception) { }
         }
     }
     
@@ -331,8 +333,6 @@ class MainActivity : AppCompatActivity() {
                                 startCountDownTimer()
                                 val addedMinutes = (newTotalSeconds - lastKnownSeconds) / 60
                                 Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes", Toast.LENGTH_LONG).show()
-                                
-                                // Send Telegram notification for extension
                                 sendExtensionNotification(addedMinutes)
                             }
                             lastKnownSeconds = newTotalSeconds
@@ -355,9 +355,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 val config = supabase.getPricingConfig()
                 supabase.sendTelegramNotification("⏰ *Session Extended!*%0APIN: ${currentPin}%0AAdded: $addedMinutes minutes%0AAdditional Payment: ₱${String.format("%.2f", config.extendPrice)}")
-            } catch (e: Exception) {
-                // Silent fail
-            }
+            } catch (e: Exception) { }
         }
     }
     
@@ -381,13 +379,54 @@ class MainActivity : AppCompatActivity() {
         try {
             windowManager = getSystemService(WINDOW_SERVICE) as android.view.WindowManager
             
-            floatingTimer = TextView(this).apply {
-                text = timerText.text
-                textSize = 20f
-                setTextColor(android.graphics.Color.WHITE)
-                setBackgroundColor(android.graphics.Color.parseColor("#80000000"))
-                setPadding(25, 15, 25, 15)
+            // Create container for timer with drag handle
+            floatingTimerContainer = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setBackgroundColor(android.graphics.Color.parseColor("#CC000000"))
+                setPadding(12, 8, 12, 8)
                 gravity = android.view.Gravity.CENTER
+                
+                // Drag handle (three dots)
+                val dragHandle = TextView(this@MainActivity).apply {
+                    text = "⋮⋮"
+                    textSize = 18f
+                    setTextColor(android.graphics.Color.WHITE)
+                    setPadding(8, 0, 8, 0)
+                }
+                addView(dragHandle)
+                
+                // Timer text
+                floatingTimer = TextView(this@MainActivity).apply {
+                    text = timerText.text
+                    textSize = 18f
+                    setTextColor(android.graphics.Color.WHITE)
+                    setPadding(8, 0, 8, 0)
+                    typeface = android.graphics.Typeface.MONOSPACE
+                }
+                addView(floatingTimer)
+                
+                // Make it movable
+                setOnTouchListener { _, event ->
+                    when (event.action) {
+                        MotionEvent.ACTION_DOWN -> {
+                            lastTouchX = event.rawX
+                            lastTouchY = event.rawY
+                            true
+                        }
+                        MotionEvent.ACTION_MOVE -> {
+                            val dx = event.rawX - lastTouchX
+                            val dy = event.rawY - lastTouchY
+                            val params = floatingTimerContainer.layoutParams as android.view.WindowManager.LayoutParams
+                            params.x += dx.toInt()
+                            params.y += dy.toInt()
+                            windowManager?.updateViewLayout(floatingTimerContainer, params)
+                            lastTouchX = event.rawX
+                            lastTouchY = event.rawY
+                            true
+                        }
+                        else -> false
+                    }
+                }
             }
             
             val params = android.view.WindowManager.LayoutParams(
@@ -401,11 +440,11 @@ class MainActivity : AppCompatActivity() {
                 android.graphics.PixelFormat.TRANSLUCENT
             )
             
-            params.gravity = android.view.Gravity.TOP or android.view.Gravity.END
+            params.gravity = android.view.Gravity.TOP or android.view.Gravity.START
             params.x = 20
             params.y = 100
             
-            windowManager?.addView(floatingTimer, params)
+            windowManager?.addView(floatingTimerContainer, params)
             isOverlayVisible = true
         } catch (e: Exception) { }
     }
@@ -413,7 +452,7 @@ class MainActivity : AppCompatActivity() {
     private fun hideFloatingTimer() {
         if (!isOverlayVisible) return
         try {
-            windowManager?.removeView(floatingTimer)
+            windowManager?.removeView(floatingTimerContainer)
             isOverlayVisible = false
         } catch (e: Exception) { }
     }
