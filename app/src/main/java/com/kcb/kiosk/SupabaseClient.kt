@@ -217,47 +217,163 @@ class SupabaseClient private constructor() {
         } catch (e: Exception) { false }
     }
 
-    // ==================== PRICE & TELEGRAM FUNCTIONS ====================
+    // ==================== PRICING FUNCTIONS ====================
 
-    suspend fun getPricePerMinute(): Double = withContext(Dispatchers.IO) {
+    data class PricingConfig(
+        val pricingType: String, // "fixed" or "hourly"
+        val priceAmount: Double,
+        val durationMinutes: Int,
+        val extendPrice: Double,
+        val extendDuration: Int
+    )
+
+    suspend fun getPricingConfig(): PricingConfig = withContext(Dispatchers.IO) {
         try {
-            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.price_per_minute"))
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "GET"
-            connection.setRequestProperty("apikey", apiKey)
-            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            var pricingType = "fixed"
+            var priceAmount = 15.0
+            var durationMinutes = 60
+            var extendPrice = 10.0
+            var extendDuration = 30
             
-            var price = 1.0
-            if (connection.responseCode == 200) {
-                val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+            val url1 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.pricing_type"))
+            val conn1 = url1.openConnection() as HttpURLConnection
+            conn1.requestMethod = "GET"
+            conn1.setRequestProperty("apikey", apiKey)
+            conn1.setRequestProperty("Authorization", "Bearer $apiKey")
+            if (conn1.responseCode == 200) {
+                val responseText = conn1.inputStream.bufferedReader().use { it.readText() }
                 val jsonArray = JSONArray(responseText)
                 if (jsonArray.length() > 0) {
-                    price = jsonArray.getJSONObject(0).getString("setting_value").toDoubleOrNull() ?: 1.0
+                    pricingType = jsonArray.getJSONObject(0).getString("setting_value")
                 }
             }
-            connection.disconnect()
-            price
-        } catch (e: Exception) { 1.0 }
+            conn1.disconnect()
+            
+            val url2 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.price_amount"))
+            val conn2 = url2.openConnection() as HttpURLConnection
+            conn2.requestMethod = "GET"
+            conn2.setRequestProperty("apikey", apiKey)
+            conn2.setRequestProperty("Authorization", "Bearer $apiKey")
+            if (conn2.responseCode == 200) {
+                val responseText = conn2.inputStream.bufferedReader().use { it.readText() }
+                val jsonArray = JSONArray(responseText)
+                if (jsonArray.length() > 0) {
+                    priceAmount = jsonArray.getJSONObject(0).getString("setting_value").toDoubleOrNull() ?: 15.0
+                }
+            }
+            conn2.disconnect()
+            
+            val url3 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.price_duration_minutes"))
+            val conn3 = url3.openConnection() as HttpURLConnection
+            conn3.requestMethod = "GET"
+            conn3.setRequestProperty("apikey", apiKey)
+            conn3.setRequestProperty("Authorization", "Bearer $apiKey")
+            if (conn3.responseCode == 200) {
+                val responseText = conn3.inputStream.bufferedReader().use { it.readText() }
+                val jsonArray = JSONArray(responseText)
+                if (jsonArray.length() > 0) {
+                    durationMinutes = jsonArray.getJSONObject(0).getString("setting_value").toIntOrNull() ?: 60
+                }
+            }
+            conn3.disconnect()
+            
+            val url4 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.extend_price_amount"))
+            val conn4 = url4.openConnection() as HttpURLConnection
+            conn4.requestMethod = "GET"
+            conn4.setRequestProperty("apikey", apiKey)
+            conn4.setRequestProperty("Authorization", "Bearer $apiKey")
+            if (conn4.responseCode == 200) {
+                val responseText = conn4.inputStream.bufferedReader().use { it.readText() }
+                val jsonArray = JSONArray(responseText)
+                if (jsonArray.length() > 0) {
+                    extendPrice = jsonArray.getJSONObject(0).getString("setting_value").toDoubleOrNull() ?: 10.0
+                }
+            }
+            conn4.disconnect()
+            
+            val url5 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.extend_duration_minutes"))
+            val conn5 = url5.openConnection() as HttpURLConnection
+            conn5.requestMethod = "GET"
+            conn5.setRequestProperty("apikey", apiKey)
+            conn5.setRequestProperty("Authorization", "Bearer $apiKey")
+            if (conn5.responseCode == 200) {
+                val responseText = conn5.inputStream.bufferedReader().use { it.readText() }
+                val jsonArray = JSONArray(responseText)
+                if (jsonArray.length() > 0) {
+                    extendDuration = jsonArray.getJSONObject(0).getString("setting_value").toIntOrNull() ?: 30
+                }
+            }
+            conn5.disconnect()
+            
+            PricingConfig(pricingType, priceAmount, durationMinutes, extendPrice, extendDuration)
+        } catch (e: Exception) {
+            PricingConfig("fixed", 15.0, 60, 10.0, 30)
+        }
     }
 
-    suspend fun updatePricePerMinute(price: Double): Boolean = withContext(Dispatchers.IO) {
+    suspend fun updatePricingConfig(
+        pricingType: String,
+        priceAmount: Double,
+        durationMinutes: Int,
+        extendPrice: Double,
+        extendDuration: Int
+    ): Boolean = withContext(Dispatchers.IO) {
         try {
-            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.price_per_minute"))
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "PATCH"
-            connection.setRequestProperty("apikey", apiKey)
-            connection.setRequestProperty("Authorization", "Bearer $apiKey")
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.doOutput = true
+            val url1 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.pricing_type"))
+            val conn1 = url1.openConnection() as HttpURLConnection
+            conn1.requestMethod = "PATCH"
+            conn1.setRequestProperty("apikey", apiKey)
+            conn1.setRequestProperty("Authorization", "Bearer $apiKey")
+            conn1.setRequestProperty("Content-Type", "application/json")
+            conn1.doOutput = true
+            conn1.outputStream.write("{\"setting_value\":\"$pricingType\"}".toByteArray())
+            conn1.disconnect()
             
-            val jsonBody = "{\"setting_value\":\"$price\"}"
-            connection.outputStream.write(jsonBody.toByteArray())
+            val url2 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.price_amount"))
+            val conn2 = url2.openConnection() as HttpURLConnection
+            conn2.requestMethod = "PATCH"
+            conn2.setRequestProperty("apikey", apiKey)
+            conn2.setRequestProperty("Authorization", "Bearer $apiKey")
+            conn2.setRequestProperty("Content-Type", "application/json")
+            conn2.doOutput = true
+            conn2.outputStream.write("{\"setting_value\":\"$priceAmount\"}".toByteArray())
+            conn2.disconnect()
             
-            val responseCode = connection.responseCode
-            connection.disconnect()
-            responseCode in 200..299
+            val url3 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.price_duration_minutes"))
+            val conn3 = url3.openConnection() as HttpURLConnection
+            conn3.requestMethod = "PATCH"
+            conn3.setRequestProperty("apikey", apiKey)
+            conn3.setRequestProperty("Authorization", "Bearer $apiKey")
+            conn3.setRequestProperty("Content-Type", "application/json")
+            conn3.doOutput = true
+            conn3.outputStream.write("{\"setting_value\":\"$durationMinutes\"}".toByteArray())
+            conn3.disconnect()
+            
+            val url4 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.extend_price_amount"))
+            val conn4 = url4.openConnection() as HttpURLConnection
+            conn4.requestMethod = "PATCH"
+            conn4.setRequestProperty("apikey", apiKey)
+            conn4.setRequestProperty("Authorization", "Bearer $apiKey")
+            conn4.setRequestProperty("Content-Type", "application/json")
+            conn4.doOutput = true
+            conn4.outputStream.write("{\"setting_value\":\"$extendPrice\"}".toByteArray())
+            conn4.disconnect()
+            
+            val url5 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.extend_duration_minutes"))
+            val conn5 = url5.openConnection() as HttpURLConnection
+            conn5.requestMethod = "PATCH"
+            conn5.setRequestProperty("apikey", apiKey)
+            conn5.setRequestProperty("Authorization", "Bearer $apiKey")
+            conn5.setRequestProperty("Content-Type", "application/json")
+            conn5.doOutput = true
+            conn5.outputStream.write("{\"setting_value\":\"$extendDuration\"}".toByteArray())
+            conn5.disconnect()
+            
+            true
         } catch (e: Exception) { false }
     }
+
+    // ==================== TELEGRAM FUNCTIONS ====================
 
     suspend fun getTelegramConfig(): Pair<String, String> = withContext(Dispatchers.IO) {
         try {
