@@ -440,10 +440,10 @@ class SupabaseClient private constructor() {
         } catch (e: Exception) { false }
     }
 
-    // Fixed Telegram notification function using GET request (same as browser test)
     suspend fun sendTelegramNotification(message: String) {
         try {
             val (token, chatId) = getTelegramConfig()
+            
             if (token.isEmpty() || chatId.isEmpty()) {
                 return
             }
@@ -455,13 +455,10 @@ class SupabaseClient private constructor() {
             connection.requestMethod = "GET"
             connection.connectTimeout = 10000
             connection.readTimeout = 10000
-            
             connection.responseCode
             connection.disconnect()
             
-        } catch (e: Exception) {
-            // Silent fail
-        }
+        } catch (e: Exception) { }
     }
 
     // ==================== DASHBOARD FUNCTIONS ====================
