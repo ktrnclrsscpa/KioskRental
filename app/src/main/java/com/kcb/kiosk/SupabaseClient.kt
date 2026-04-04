@@ -7,6 +7,8 @@ import java.net.URL
 import java.net.URLEncoder
 import org.json.JSONArray
 import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.*
 
 class SupabaseClient private constructor() {
 
@@ -197,7 +199,6 @@ class SupabaseClient private constructor() {
         } catch (e: Exception) { false }
     }
 
-    // This is the missing function!
     suspend fun updateTime(pin: String, seconds: Int): Boolean = withContext(Dispatchers.IO) {
         try {
             val encodedPin = URLEncoder.encode(pin, "UTF-8")
@@ -216,6 +217,116 @@ class SupabaseClient private constructor() {
         } catch (e: Exception) { false }
     }
 
+    // ==================== DASHBOARD FUNCTIONS ====================
+
+    suspend fun recordSession(pin: String, minutes: Int, amount: Double): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/session_history"))
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("apikey", apiKey)
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
+            
+            val jsonBody = JSONObject().apply {
+                put("pin", pin)
+                put("minutes", minutes)
+                put("amount", amount)
+                put("status", "completed")
+            }.toString()
+            
+            connection.outputStream.write(jsonBody.toByteArray())
+            val responseCode = connection.responseCode
+            connection.disconnect()
+            responseCode in 200..299
+        } catch (e: Exception) { false }
+    }
+
+    suspend fun getIncomeStats(): IncomeStats = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/session_history?order=started_at.desc"))
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("apikey", apiKey)
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
+            
+            val now = System.currentTimeMillis()
+            val oneDay = 24 * 60 * 60 * 1000L
+            val oneWeek = 7 * oneDay
+            val oneMonth = 30 * oneDay
+            val oneYear = 365 * oneDay
+            
+            var daily = 0.0
+            var weekly = 0.0
+            var monthly = 0.0
+            var yearly = 0.0
+            var totalSessions = 0
+            
+            if (connection.responseCode == 200) {
+                val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonArray = JSONArray(responseText)
+                totalSessions = jsonArray.length()
+                
+                for (i in 0 until jsonArray.length()) {
+                    val obj = jsonArray.getJSONObject(i)
+                    val amount = obj.getDouble("amount")
+                    val startedAt = obj.getString("started_at")
+                    try {
+                        val date = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS", Locale.US).parse(startedAt)
+                        val time = date.time
+                        if (time >= now - oneDay) daily += amount
+                        if (time >= now - oneWeek) weekly += amount
+                        if (time >= now - oneMonth) monthly += amount
+                        if (time >= now - oneYear) yearly += amount
+                    } catch (e: Exception) { }
+                }
+            }
+            connection.disconnect()
+            IncomeStats(daily, weekly, monthly, yearly, totalSessions)
+        } catch (e: Exception) {
+            IncomeStats(0.0, 0.0, 0.0, 0.0, 0)
+        }
+    }
+
+    suspend fun getSessionHistory(): List<SessionRecord> = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/session_history?order=started_at.desc&limit=50"))
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("apikey", apiKey)
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
+            
+            val list = mutableListOf<SessionRecord>()
+            if (connection.responseCode == 200) {
+                val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonArray = JSONArray(responseText)
+                val dateFormat = SimpleDateFormat("MM/dd HH:mm", Locale.US)
+                val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS", Locale.US)
+                
+                for (i in 0 until jsonArray.length()) {
+                    val obj = jsonArray.getJSONObject(i)
+                    val pin = obj.getString("pin")
+                    val minutes = obj.getInt("minutes")
+                    val amount = obj.getDouble("amount")
+                    val startedAt = obj.getString("started_at")
+                    val date = try {
+                        dateFormat.format(inputFormat.parse(startedAt))
+                    } catch (e: Exception) { startedAt.substring(0, 16) }
+                    list.add(SessionRecord(pin, minutes, amount, date))
+                }
+            }
+            connection.disconnect()
+            list
+        } catch (e: Exception) { emptyList() }
+    }
+
     companion object {
         private var instance: SupabaseClient? = null
         fun getInstance(): SupabaseClient {
@@ -227,3 +338,5 @@ class SupabaseClient private constructor() {
 
 data class PinValidationResult(val isValid: Boolean, val secondsLeft: Int, val error: String?)
 data class PinData(val pin: String, val secondsLeft: Int)
+data class IncomeStats(val daily: Double, val weekly: Double, val monthly: Double, val yearly: Double, val totalSessions: Int)
+data class SessionRecord(val pin: String, val minutes: Int, val amount: Double, val date: String)
