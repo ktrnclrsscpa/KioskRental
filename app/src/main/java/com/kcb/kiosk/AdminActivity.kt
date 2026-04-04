@@ -19,7 +19,6 @@ import kotlinx.coroutines.*
 class AdminActivity : AppCompatActivity() {
     private lateinit var supabase: SupabaseClient
     
-    // PINS panel
     private lateinit var pinPanel: LinearLayout
     private lateinit var pinListText: TextView
     private lateinit var generatePinInput: EditText
@@ -27,12 +26,10 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var generateBtn: Button
     private lateinit var refreshPinsBtn: Button
     
-    // Extend Time
     private lateinit var extendPinInput: EditText
     private lateinit var extendMinutesInput: EditText
     private lateinit var extendBtn: Button
     
-    // APPS panel
     private lateinit var appPanel: LinearLayout
     private lateinit var appContainer: LinearLayout
     private lateinit var saveAppsBtn: Button
@@ -43,7 +40,6 @@ class AdminActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
         showPasswordDialog()
     }
     
@@ -81,7 +77,6 @@ class AdminActivity : AppCompatActivity() {
             setPadding(30, 50, 30, 30)
         }
         
-        // Title with change password option
         val titleRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, 0, 0, 20)
@@ -103,7 +98,6 @@ class AdminActivity : AppCompatActivity() {
         
         mainLayout.addView(titleRow)
         
-        // Tab buttons
         val tabLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, 0, 0, 20)
@@ -125,7 +119,7 @@ class AdminActivity : AppCompatActivity() {
         
         mainLayout.addView(tabLayout)
         
-        // ========== PINS PANEL ==========
+        // PINS PANEL
         pinPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
@@ -171,12 +165,9 @@ class AdminActivity : AppCompatActivity() {
         }
         pinPanel.addView(refreshPinsBtn)
         
-        // ========== EXTEND TIME SECTION ==========
+        // EXTEND TIME SECTION
         val extendSeparator = View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                2
-            )
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 2)
             setBackgroundColor(ContextCompat.getColor(context, android.R.color.darker_gray))
         }
         pinPanel.addView(extendSeparator)
@@ -233,7 +224,7 @@ class AdminActivity : AppCompatActivity() {
         
         mainLayout.addView(pinPanel)
         
-        // ========== APPS PANEL ==========
+        // APPS PANEL
         appPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = android.view.View.GONE
@@ -262,11 +253,7 @@ class AdminActivity : AppCompatActivity() {
         
         val scrollContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-            )
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
             addView(scrollView)
         }
         appPanel.addView(scrollContainer)
@@ -452,7 +439,8 @@ class AdminActivity : AppCompatActivity() {
                     val sb = StringBuilder()
                     for (p in pins) {
                         val minutes = p.secondsLeft / 60
-                        sb.append("🔑 ${p.pin} - ${minutes} min left\n")
+                        // FIXED: Changed "min left" to "min total" for clarity
+                        sb.append("🔑 ${p.pin} - ${minutes} min TOTAL\n")
                     }
                     pinListText.text = sb.toString()
                 }
