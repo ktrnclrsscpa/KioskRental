@@ -226,6 +226,8 @@ class MainActivity : AppCompatActivity() {
                     if (result.isValid && result.secondsLeft > 0) {
                         currentPin = pin
                         remainingSeconds = result.secondsLeft
+                        // Record session to history
+                        recordSessionToHistory(pin, result.secondsLeft / 60)
                         startSession()
                     } else {
                         Toast.makeText(this@MainActivity, "Invalid or expired PIN", Toast.LENGTH_LONG).show()
@@ -239,6 +241,12 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this@MainActivity, "Connection error: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
+        }
+    }
+    
+    private fun recordSessionToHistory(pin: String, minutes: Int) {
+        CoroutineScope(Dispatchers.IO).launch {
+            supabase.recordSession(pin, minutes, minutes * 1.0)
         }
     }
     
@@ -299,23 +307,16 @@ class MainActivity : AppCompatActivity() {
                 try {
                     val result = supabase.validatePin(currentPin!!)
                     if (result.isValid && result.secondsLeft > 0) {
-                        // Kapag mas malaki ang oras sa database, ibig sabihin ay na-extend
-                        if (result.secondsLeft > lastKnownSeconds) {
-                            // Kunin ang CURRENT remaining seconds mula sa timer (hindi ang lastKnownSeconds)
-                            val currentRemaining = remainingSeconds
-                            // Ang idinagdag na oras ay ang pagkakaiba
-                            val addedSeconds = result.secondsLeft - lastKnownSeconds
-                            // Bagong kabuuang oras = current remaining + idinagdag na oras
-                            val newTotalSeconds = currentRemaining + addedSeconds
-                            
+                        if (result.secondsLeft > lastKnownSeconds + 10) {
+                            val newTotalSeconds = result.secondsLeft
                             withContext(Dispatchers.Main) {
                                 countDownTimer?.cancel()
                                 remainingSeconds = newTotalSeconds
                                 startCountDownTimer()
-                                val addedMinutes = addedSeconds / 60
-                                Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes. New time: ${newTotalSeconds/60} min ${newTotalSeconds%60} sec", Toast.LENGTH_LONG).show()
+                                val addedMinutes = (newTotalSeconds - lastKnownSeconds) / 60
+                                Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes. New time: ${newTotalSeconds/60} min", Toast.LENGTH_LONG).show()
                             }
-                            lastKnownSeconds = result.secondsLeft
+                            lastKnownSeconds = newTotalSeconds
                         } else {
                             lastKnownSeconds = result.secondsLeft
                         }
