@@ -14,27 +14,42 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
+import java.text.NumberFormat
 
 class AdminActivity : AppCompatActivity() {
     private lateinit var supabase: SupabaseClient
     
+    // Panels
+    private lateinit var dashboardPanel: LinearLayout
     private lateinit var pinPanel: LinearLayout
+    private lateinit var appPanel: LinearLayout
+    
+    // PINS panel
     private lateinit var pinListText: TextView
     private lateinit var generatePinInput: EditText
     private lateinit var generateMinutesInput: EditText
     private lateinit var generateBtn: Button
     private lateinit var refreshPinsBtn: Button
-    
     private lateinit var extendPinInput: EditText
     private lateinit var extendMinutesInput: EditText
     private lateinit var extendBtn: Button
     
-    private lateinit var appPanel: LinearLayout
+    // APPS panel
     private lateinit var appContainer: LinearLayout
     private lateinit var saveAppsBtn: Button
     private lateinit var appStatusText: TextView
     private val checkBoxes = mutableListOf<Pair<CheckBox, String>>()
+    
+    // Dashboard panel
+    private lateinit var dailyIncomeText: TextView
+    private lateinit var weeklyIncomeText: TextView
+    private lateinit var monthlyIncomeText: TextView
+    private lateinit var yearlyIncomeText: TextView
+    private lateinit var totalSessionsText: TextView
+    private lateinit var sessionHistoryRecycler: RecyclerView
     
     private val prefs by lazy { getSharedPreferences("kiosk_prefs", Context.MODE_PRIVATE) }
 
@@ -77,6 +92,7 @@ class AdminActivity : AppCompatActivity() {
             setPadding(30, 50, 30, 30)
         }
         
+        // Title row
         val titleRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, 0, 0, 20)
@@ -98,10 +114,18 @@ class AdminActivity : AppCompatActivity() {
         
         mainLayout.addView(titleRow)
         
+        // Tab buttons
         val tabLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, 0, 0, 20)
         }
+        
+        val dashboardTab = Button(this).apply {
+            text = "📊 DASHBOARD"
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setOnClickListener { showDashboardPanel() }
+        }
+        tabLayout.addView(dashboardTab)
         
         val pinsTab = Button(this).apply {
             text = "📋 PINS"
@@ -119,9 +143,79 @@ class AdminActivity : AppCompatActivity() {
         
         mainLayout.addView(tabLayout)
         
-        // PINS PANEL
+        // ========== DASHBOARD PANEL ==========
+        dashboardPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = android.view.View.VISIBLE
+        }
+        
+        val incomeTitle = TextView(this).apply {
+            text = "💰 INCOME SUMMARY"
+            textSize = 18f
+            setPadding(0, 20, 0, 10)
+        }
+        dashboardPanel.addView(incomeTitle)
+        
+        dailyIncomeText = TextView(this).apply {
+            text = "Today: ₱0.00"
+            textSize = 16f
+            setPadding(0, 5, 0, 5)
+        }
+        dashboardPanel.addView(dailyIncomeText)
+        
+        weeklyIncomeText = TextView(this).apply {
+            text = "This Week: ₱0.00"
+            textSize = 16f
+            setPadding(0, 5, 0, 5)
+        }
+        dashboardPanel.addView(weeklyIncomeText)
+        
+        monthlyIncomeText = TextView(this).apply {
+            text = "This Month: ₱0.00"
+            textSize = 16f
+            setPadding(0, 5, 0, 5)
+        }
+        dashboardPanel.addView(monthlyIncomeText)
+        
+        yearlyIncomeText = TextView(this).apply {
+            text = "This Year: ₱0.00"
+            textSize = 16f
+            setPadding(0, 5, 0, 5)
+        }
+        dashboardPanel.addView(yearlyIncomeText)
+        
+        totalSessionsText = TextView(this).apply {
+            text = "Total Sessions: 0"
+            textSize = 16f
+            setPadding(0, 5, 0, 5)
+        }
+        dashboardPanel.addView(totalSessionsText)
+        
+        val historyTitle = TextView(this).apply {
+            text = "📜 SESSION HISTORY"
+            textSize = 18f
+            setPadding(0, 20, 0, 10)
+        }
+        dashboardPanel.addView(historyTitle)
+        
+        sessionHistoryRecycler = RecyclerView(this).apply {
+            layoutManager = LinearLayoutManager(this@AdminActivity)
+            setPadding(0, 0, 0, 20)
+        }
+        dashboardPanel.addView(sessionHistoryRecycler)
+        
+        val refreshStatsBtn = Button(this).apply {
+            text = "🔄 REFRESH STATS"
+            setOnClickListener { loadDashboardStats() }
+        }
+        dashboardPanel.addView(refreshStatsBtn)
+        
+        mainLayout.addView(dashboardPanel)
+        
+        // ========== PINS PANEL ==========
         pinPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            visibility = android.view.View.GONE
         }
         
         val genLabel = TextView(this).apply {
@@ -136,7 +230,7 @@ class AdminActivity : AppCompatActivity() {
         }
         
         generatePinInput = EditText(this).apply {
-            hint = "PIN (leave blank for random 6 chars)"
+            hint = "PIN (leave blank for random)"
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             setPadding(10, 10, 10, 10)
             maxLines = 1
@@ -165,7 +259,6 @@ class AdminActivity : AppCompatActivity() {
         }
         pinPanel.addView(refreshPinsBtn)
         
-        // EXTEND TIME SECTION
         val extendSeparator = View(this).apply {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 2)
             setBackgroundColor(ContextCompat.getColor(context, android.R.color.darker_gray))
@@ -224,7 +317,7 @@ class AdminActivity : AppCompatActivity() {
         
         mainLayout.addView(pinPanel)
         
-        // APPS PANEL
+        // ========== APPS PANEL ==========
         appPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = android.view.View.GONE
@@ -269,9 +362,48 @@ class AdminActivity : AppCompatActivity() {
         
         setContentView(mainLayout)
         
+        loadDashboardStats()
         loadPins()
         loadInstalledApps()
         loadCurrentWhitelistLocal()
+    }
+    
+    private fun showDashboardPanel() {
+        dashboardPanel.visibility = android.view.View.VISIBLE
+        pinPanel.visibility = android.view.View.GONE
+        appPanel.visibility = android.view.View.GONE
+        loadDashboardStats()
+    }
+    
+    private fun showPinPanel() {
+        dashboardPanel.visibility = android.view.View.GONE
+        pinPanel.visibility = android.view.View.VISIBLE
+        appPanel.visibility = android.view.View.GONE
+        loadPins()
+    }
+    
+    private fun showAppPanel() {
+        dashboardPanel.visibility = android.view.View.GONE
+        pinPanel.visibility = android.view.View.GONE
+        appPanel.visibility = android.view.View.VISIBLE
+        loadInstalledApps()
+        loadCurrentWhitelistLocal()
+    }
+    
+    private fun loadDashboardStats() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val stats = supabase.getIncomeStats()
+            val history = supabase.getSessionHistory()
+            withContext(Dispatchers.Main) {
+                val currency = NumberFormat.getCurrencyInstance().apply { maximumFractionDigits = 2 }
+                dailyIncomeText.text = "Today: ${currency.format(stats.daily)}"
+                weeklyIncomeText.text = "This Week: ${currency.format(stats.weekly)}"
+                monthlyIncomeText.text = "This Month: ${currency.format(stats.monthly)}"
+                yearlyIncomeText.text = "This Year: ${currency.format(stats.yearly)}"
+                totalSessionsText.text = "Total Sessions: ${stats.totalSessions}"
+                sessionHistoryRecycler.adapter = SessionHistoryAdapter(history)
+            }
+        }
     }
     
     private fun showChangePasswordDialog() {
@@ -296,19 +428,6 @@ class AdminActivity : AppCompatActivity() {
             .show()
     }
     
-    private fun showPinPanel() {
-        pinPanel.visibility = android.view.View.VISIBLE
-        appPanel.visibility = android.view.View.GONE
-        loadPins()
-    }
-    
-    private fun showAppPanel() {
-        pinPanel.visibility = android.view.View.GONE
-        appPanel.visibility = android.view.View.VISIBLE
-        loadInstalledApps()
-        loadCurrentWhitelistLocal()
-    }
-    
     private fun loadInstalledApps() {
         appStatusText.text = "Scanning apps..."
         saveAppsBtn.isEnabled = false
@@ -319,7 +438,6 @@ class AdminActivity : AppCompatActivity() {
         for (app in packages) {
             val isSystemApp = (app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
             val isUpdatedSystemApp = (app.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
-            
             if (!isSystemApp || isUpdatedSystemApp) {
                 val appName = packageManager.getApplicationLabel(app).toString()
                 installedApps.add(Pair(appName, app.packageName))
@@ -327,7 +445,6 @@ class AdminActivity : AppCompatActivity() {
         }
         
         installedApps.sortBy { it.first }
-        
         appContainer.removeAllViews()
         checkBoxes.clear()
         
@@ -355,16 +472,11 @@ class AdminActivity : AppCompatActivity() {
     private fun saveWhitelistLocal() {
         saveAppsBtn.isEnabled = false
         saveAppsBtn.text = "SAVING..."
-        
         val selectedPackages = mutableSetOf<String>()
         for ((checkBox, packageName) in checkBoxes) {
-            if (checkBox.isChecked) {
-                selectedPackages.add(packageName)
-            }
+            if (checkBox.isChecked) selectedPackages.add(packageName)
         }
-        
         prefs.edit().putStringSet("whitelist", selectedPackages).apply()
-        
         saveAppsBtn.isEnabled = true
         saveAppsBtn.text = "💾 SAVE WHITELIST (LOCAL)"
         appStatusText.text = "✓ Success! Saved ${selectedPackages.size} apps locally"
@@ -375,21 +487,18 @@ class AdminActivity : AppCompatActivity() {
     private fun generatePin() {
         val minutes = generateMinutesInput.text.toString().toIntOrNull()
         if (minutes == null || minutes <= 0) {
-            Toast.makeText(this, "Enter valid minutes (1-1440)", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Enter valid minutes", Toast.LENGTH_SHORT).show()
             return
         }
-        
         val customPin = generatePinInput.text.toString().trim()
         if (customPin.isNotEmpty() && customPin.length != 6) {
             Toast.makeText(this, "PIN must be exactly 6 characters", Toast.LENGTH_SHORT).show()
             return
         }
-        
         val pin = if (customPin.isNotEmpty()) customPin else null
         
         generateBtn.isEnabled = false
         generateBtn.text = "GENERATING..."
-        
         CoroutineScope(Dispatchers.IO).launch {
             val result = supabase.generatePin(pin, minutes * 60)
             withContext(Dispatchers.Main) {
@@ -410,7 +519,6 @@ class AdminActivity : AppCompatActivity() {
     private fun extendTime(pin: String, minutes: Int) {
         extendBtn.isEnabled = false
         extendBtn.text = "EXTENDING..."
-        
         CoroutineScope(Dispatchers.IO).launch {
             val success = supabase.extendTime(pin, minutes)
             withContext(Dispatchers.Main) {
@@ -422,7 +530,7 @@ class AdminActivity : AppCompatActivity() {
                     extendPinInput.text.clear()
                     extendMinutesInput.text.clear()
                 } else {
-                    Toast.makeText(this@AdminActivity, "Failed to extend. PIN not found or expired.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@AdminActivity, "Failed to extend", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -439,7 +547,6 @@ class AdminActivity : AppCompatActivity() {
                     val sb = StringBuilder()
                     for (p in pins) {
                         val minutes = p.secondsLeft / 60
-                        // FIXED: Changed "min left" to "min total" for clarity
                         sb.append("🔑 ${p.pin} - ${minutes} min TOTAL\n")
                     }
                     pinListText.text = sb.toString()
