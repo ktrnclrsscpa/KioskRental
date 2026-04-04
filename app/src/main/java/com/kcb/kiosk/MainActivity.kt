@@ -34,6 +34,7 @@ class MainActivity : AppCompatActivity() {
     private var gridReady = false
     private var remainingSeconds = 0
     private var extendCheckJob: Job? = null
+    private var paidAmount = 0.0   // <-- ADD THIS
     
     private lateinit var tts: TextToSpeech
     
@@ -231,6 +232,7 @@ class MainActivity : AppCompatActivity() {
                     if (result.isValid && result.secondsLeft > 0) {
                         currentPin = pin
                         remainingSeconds = result.secondsLeft
+                        paidAmount = result.amount   // store the exact amount from the PIN
                         startSession()
                     } else {
                         Toast.makeText(this@MainActivity, "Invalid or expired PIN", Toast.LENGTH_LONG).show()
@@ -275,16 +277,15 @@ class MainActivity : AppCompatActivity() {
     private fun sendNewSessionNotification() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val config = supabase.getPricingConfig()
                 val minutes = remainingSeconds / 60
-                val amount = if (config.pricingType == "fixed") {
-                    config.priceAmount
-                } else {
-                    (minutes.toDouble() / 60.0) * config.priceAmount
-                }
-                supabase.recordSession(currentPin!!, minutes, amount)
-                supabase.sendTelegramNotification("🎮 *New Rental Session!*%0APIN: ${currentPin}%0ADuration: ${minutes} minutes%0AAmount: ₱${String.format("%.2f", amount)}")
-            } catch (e: Exception) { }
+                // Record session with the actual paid amount from the PIN
+                supabase.recordSession(currentPin!!, minutes, paidAmount)
+                // Send Telegram notification
+                val message = "🎮 *New Rental Session!*%0APIN: ${currentPin}%0ADuration: ${minutes} minutes%0AAmount: ₱${String.format("%.2f", paidAmount)}"
+                supabase.sendTelegramNotification(message)
+            } catch (e: Exception) {
+                // Silent fail – don't interrupt the session
+            }
         }
     }
     
@@ -471,6 +472,7 @@ class MainActivity : AppCompatActivity() {
             
             currentPin = null
             remainingSeconds = 0
+            paidAmount = 0.0
             pinInput.isEnabled = true
             activateBtn.isEnabled = true
             statusText.text = ""
