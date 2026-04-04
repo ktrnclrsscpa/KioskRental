@@ -226,7 +226,6 @@ class MainActivity : AppCompatActivity() {
                     if (result.isValid && result.secondsLeft > 0) {
                         currentPin = pin
                         remainingSeconds = result.secondsLeft
-                        recordSessionToHistory(pin, result.secondsLeft / 60)
                         startSession()
                     } else {
                         Toast.makeText(this@MainActivity, "Invalid or expired PIN", Toast.LENGTH_LONG).show()
@@ -240,19 +239,6 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this@MainActivity, "Connection error: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
-        }
-    }
-    
-    private fun recordSessionToHistory(pin: String, minutes: Int) {
-        CoroutineScope(Dispatchers.IO).launch {
-            val config = supabase.getPricingConfig()
-            val amount = if (config.pricingType == "fixed") {
-                config.priceAmount
-            } else {
-                (minutes.toDouble() / 60.0) * config.priceAmount
-            }
-            supabase.recordSession(pin, minutes, amount)
-            supabase.sendTelegramNotification("🎮 *New Rental Session!*%0APIN: $pin%0ADuration: ${minutes} minutes%0AAmount: ₱${String.format("%.2f", amount)}")
         }
     }
     
@@ -271,9 +257,33 @@ class MainActivity : AppCompatActivity() {
             showFloatingTimer()
             startCountDownTimer()
             startExtendListener()
+            
+            // Send Telegram notification for new session
+            sendNewSessionNotification()
+            
         } catch (e: Exception) {
             Toast.makeText(this, "Session error: ${e.message}", Toast.LENGTH_SHORT).show()
             endSession()
+        }
+    }
+    
+    private fun sendNewSessionNotification() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val config = supabase.getPricingConfig()
+                val minutes = remainingSeconds / 60
+                val amount = if (config.pricingType == "fixed") {
+                    config.priceAmount
+                } else {
+                    (minutes.toDouble() / 60.0) * config.priceAmount
+                }
+                // Record session in history
+                supabase.recordSession(currentPin!!, minutes, amount)
+                // Send Telegram notification
+                supabase.sendTelegramNotification("🎮 *New Rental Session!*%0APIN: ${currentPin}%0ADuration: ${minutes} minutes%0AAmount: ₱${String.format("%.2f", amount)}")
+            } catch (e: Exception) {
+                // Silent fail - don't let notification failure break the session
+            }
         }
     }
     
@@ -320,10 +330,10 @@ class MainActivity : AppCompatActivity() {
                                 remainingSeconds = newTotalSeconds
                                 startCountDownTimer()
                                 val addedMinutes = (newTotalSeconds - lastKnownSeconds) / 60
-                                Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes. New time: ${newTotalSeconds/60} min", Toast.LENGTH_LONG).show()
+                                Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes", Toast.LENGTH_LONG).show()
                                 
-                                val config = supabase.getPricingConfig()
-                                supabase.sendTelegramNotification("⏰ *Session Extended!*%0APIN: ${currentPin}%0AAdded: $addedMinutes minutes%0AAdditional Payment: ₱${String.format("%.2f", config.extendPrice)}")
+                                // Send Telegram notification for extension
+                                sendExtensionNotification(addedMinutes)
                             }
                             lastKnownSeconds = newTotalSeconds
                         } else {
@@ -336,6 +346,17 @@ class MainActivity : AppCompatActivity() {
                         break
                     }
                 } catch (e: Exception) { }
+            }
+        }
+    }
+    
+    private fun sendExtensionNotification(addedMinutes: Int) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val config = supabase.getPricingConfig()
+                supabase.sendTelegramNotification("⏰ *Session Extended!*%0APIN: ${currentPin}%0AAdded: $addedMinutes minutes%0AAdditional Payment: ₱${String.format("%.2f", config.extendPrice)}")
+            } catch (e: Exception) {
+                // Silent fail
             }
         }
     }
