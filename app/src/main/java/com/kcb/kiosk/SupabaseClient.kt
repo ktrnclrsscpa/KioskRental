@@ -220,7 +220,7 @@ class SupabaseClient private constructor() {
     // ==================== PRICING FUNCTIONS ====================
 
     data class PricingConfig(
-        val pricingType: String, // "fixed" or "hourly"
+        val pricingType: String,
         val priceAmount: Double,
         val durationMinutes: Int,
         val extendPrice: Double,
