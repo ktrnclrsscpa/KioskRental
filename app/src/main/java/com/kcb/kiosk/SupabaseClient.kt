@@ -217,6 +217,132 @@ class SupabaseClient private constructor() {
         } catch (e: Exception) { false }
     }
 
+    // ==================== PRICE & TELEGRAM FUNCTIONS ====================
+
+    suspend fun getPricePerMinute(): Double = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.price_per_minute"))
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("apikey", apiKey)
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            
+            var price = 1.0
+            if (connection.responseCode == 200) {
+                val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonArray = JSONArray(responseText)
+                if (jsonArray.length() > 0) {
+                    price = jsonArray.getJSONObject(0).getString("setting_value").toDoubleOrNull() ?: 1.0
+                }
+            }
+            connection.disconnect()
+            price
+        } catch (e: Exception) { 1.0 }
+    }
+
+    suspend fun updatePricePerMinute(price: Double): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.price_per_minute"))
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "PATCH"
+            connection.setRequestProperty("apikey", apiKey)
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            
+            val jsonBody = "{\"setting_value\":\"$price\"}"
+            connection.outputStream.write(jsonBody.toByteArray())
+            
+            val responseCode = connection.responseCode
+            connection.disconnect()
+            responseCode in 200..299
+        } catch (e: Exception) { false }
+    }
+
+    suspend fun getTelegramConfig(): Pair<String, String> = withContext(Dispatchers.IO) {
+        try {
+            var token = ""
+            var chatId = ""
+            
+            val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.telegram_bot_token"))
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("apikey", apiKey)
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            
+            if (connection.responseCode == 200) {
+                val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonArray = JSONArray(responseText)
+                if (jsonArray.length() > 0) {
+                    token = jsonArray.getJSONObject(0).getString("setting_value")
+                }
+            }
+            connection.disconnect()
+            
+            val url2 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.telegram_chat_id"))
+            val connection2 = url2.openConnection() as HttpURLConnection
+            connection2.requestMethod = "GET"
+            connection2.setRequestProperty("apikey", apiKey)
+            connection2.setRequestProperty("Authorization", "Bearer $apiKey")
+            
+            if (connection2.responseCode == 200) {
+                val responseText = connection2.inputStream.bufferedReader().use { it.readText() }
+                val jsonArray = JSONArray(responseText)
+                if (jsonArray.length() > 0) {
+                    chatId = jsonArray.getJSONObject(0).getString("setting_value")
+                }
+            }
+            connection2.disconnect()
+            
+            Pair(token, chatId)
+        } catch (e: Exception) { Pair("", "") }
+    }
+
+    suspend fun updateTelegramConfig(token: String, chatId: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val url1 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.telegram_bot_token"))
+            val conn1 = url1.openConnection() as HttpURLConnection
+            conn1.requestMethod = "PATCH"
+            conn1.setRequestProperty("apikey", apiKey)
+            conn1.setRequestProperty("Authorization", "Bearer $apiKey")
+            conn1.setRequestProperty("Content-Type", "application/json")
+            conn1.doOutput = true
+            conn1.outputStream.write("{\"setting_value\":\"$token\"}".toByteArray())
+            conn1.disconnect()
+            
+            val url2 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.telegram_chat_id"))
+            val conn2 = url2.openConnection() as HttpURLConnection
+            conn2.requestMethod = "PATCH"
+            conn2.setRequestProperty("apikey", apiKey)
+            conn2.setRequestProperty("Authorization", "Bearer $apiKey")
+            conn2.setRequestProperty("Content-Type", "application/json")
+            conn2.doOutput = true
+            conn2.outputStream.write("{\"setting_value\":\"$chatId\"}".toByteArray())
+            conn2.disconnect()
+            
+            true
+        } catch (e: Exception) { false }
+    }
+
+    suspend fun sendTelegramNotification(message: String) {
+        try {
+            val (token, chatId) = getTelegramConfig()
+            if (token.isEmpty() || chatId.isEmpty()) return
+            
+            val url = URL("https://api.telegram.org/bot$token/sendMessage")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
+            
+            val jsonBody = "{\"chat_id\":\"$chatId\",\"text\":\"$message\",\"parse_mode\":\"HTML\"}"
+            connection.outputStream.write(jsonBody.toByteArray())
+            connection.disconnect()
+        } catch (e: Exception) { }
+    }
+
     // ==================== DASHBOARD FUNCTIONS ====================
 
     suspend fun recordSession(pin: String, minutes: Int, amount: Double): Boolean = withContext(Dispatchers.IO) {
