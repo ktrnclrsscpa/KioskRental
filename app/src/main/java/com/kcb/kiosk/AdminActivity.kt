@@ -548,15 +548,6 @@ class AdminActivity : AppCompatActivity() {
         }
         telegramButtonRow.addView(testTelegramBtn)
         
-        // DIRECT TEST button
-        val directTestBtn = Button(this).apply {
-            text = "🔧 DIRECT"
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            setPadding(10, 15, 10, 15)
-            setOnClickListener { testTelegramDirect() }
-        }
-        telegramButtonRow.addView(directTestBtn)
-        
         settingsInner.addView(telegramButtonRow)
         
         val separator3 = View(this).apply {
@@ -726,84 +717,38 @@ class AdminActivity : AppCompatActivity() {
         }.start()
     }
     
-    private fun testTelegramDirect() {
-        val token = telegramTokenInput.text.toString().trim()
-        val chatId = telegramChatIdInput.text.toString().trim()
-        
-        if (token.isEmpty() || chatId.isEmpty()) {
-            appStatusText.text = "❌ Token or Chat ID is empty!"
-            appStatusText.setTextColor(android.graphics.Color.RED)
-            return
-        }
-        
-        appStatusText.text = "Testing with: $token -> $chatId"
-        appStatusText.setTextColor(android.graphics.Color.BLUE)
-        
-        Thread {
-            try {
-                val urlString = "https://api.telegram.org/bot$token/sendMessage?chat_id=$chatId&text=✅%20DIRECT%20TEST%20FROM%20KCB%20APP!&parse_mode=HTML"
-                val url = URL(urlString)
-                val connection = url.openConnection() as HttpURLConnection
-                connection.requestMethod = "GET"
-                connection.connectTimeout = 10000
-                connection.readTimeout = 10000
-                
-                val responseCode = connection.responseCode
-                val responseText = connection.inputStream.bufferedReader().use { it.readText() }
-                connection.disconnect()
-                
-                runOnUiThread {
-                    if (responseCode == 200) {
-                        appStatusText.text = "✓ SUCCESS! Response: $responseText"
-                        appStatusText.setTextColor(android.graphics.Color.GREEN)
-                        Toast.makeText(this@AdminActivity, "Direct test sent! Check Telegram.", Toast.LENGTH_LONG).show()
-                    } else {
-                        appStatusText.text = "✗ FAILED! HTTP $responseCode: $responseText"
-                        appStatusText.setTextColor(android.graphics.Color.RED)
-                    }
-                }
-            } catch (e: Exception) {
-                runOnUiThread {
-                    appStatusText.text = "✗ ERROR: ${e.message}"
-                    appStatusText.setTextColor(android.graphics.Color.RED)
-                }
-            }
-        }.start()
-    }
-    
     private fun generatePin() {
         val minutes = generateMinutesInput.text.toString().toIntOrNull()
         val amount = generateAmountInput.text.toString().toDoubleOrNull()
-        
+
         if (minutes == null || minutes <= 0) {
             Toast.makeText(this, "Enter valid minutes (1-1440)", Toast.LENGTH_SHORT).show()
             return
         }
-        
         if (amount == null || amount <= 0) {
             Toast.makeText(this, "Enter valid amount (₱)", Toast.LENGTH_SHORT).show()
             return
         }
-        
+
         val customPin = generatePinInput.text.toString().trim()
         if (customPin.isNotEmpty() && customPin.length != 6) {
             Toast.makeText(this, "PIN must be exactly 6 characters", Toast.LENGTH_SHORT).show()
             return
         }
         val pin = if (customPin.isNotEmpty()) customPin else null
-        
+
         generateBtn.isEnabled = false
         generateBtn.text = "GENERATING..."
-        
+
         CoroutineScope(Dispatchers.IO).launch {
-            val result = supabase.generatePin(pin, minutes * 60)
+            val result = supabase.generatePin(pin, minutes * 60, amount)
             withContext(Dispatchers.Main) {
                 generateBtn.isEnabled = true
                 generateBtn.text = "GENERATE PIN"
                 if (result != null) {
                     // Send Telegram notification for new PIN
-                    supabase.sendTelegramNotification("💰 *New PIN Generated!*%0APIN: $result%0ADuration: $minutes minutes%0AAmount: ₱${String.format("%.2f", amount)}")
-                    
+                    val message = "💰 *New PIN Generated!*%0APIN: $result%0ADuration: $minutes minutes%0AAmount: ₱${String.format("%.2f", amount)}"
+                    supabase.sendTelegramNotification(message)
                     Toast.makeText(this@AdminActivity, "PIN: $result ($minutes min - ₱$amount)", Toast.LENGTH_LONG).show()
                     generatePinInput.text.clear()
                     generateMinutesInput.text.clear()
