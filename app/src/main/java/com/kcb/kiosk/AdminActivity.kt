@@ -17,6 +17,7 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
+import java.io.File
 import java.text.NumberFormat
 import java.util.*
 
@@ -27,6 +28,7 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var dashboardPanel: LinearLayout
     private lateinit var pinPanel: LinearLayout
     private lateinit var appPanel: LinearLayout
+    private lateinit var settingsPanel: LinearLayout
     
     // PINS panel
     private lateinit var pinListText: TextView
@@ -51,6 +53,15 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var yearlyIncomeText: TextView
     private lateinit var totalSessionsText: TextView
     private lateinit var sessionHistoryRecycler: RecyclerView
+    
+    // Settings panel
+    private lateinit var priceInput: EditText
+    private lateinit var savePriceBtn: Button
+    private lateinit var telegramTokenInput: EditText
+    private lateinit var telegramChatIdInput: EditText
+    private lateinit var saveTelegramBtn: Button
+    private lateinit var testTelegramBtn: Button
+    private lateinit var exportReportBtn: Button
     
     private val prefs by lazy { getSharedPreferences("kiosk_prefs", Context.MODE_PRIVATE) }
 
@@ -141,6 +152,13 @@ class AdminActivity : AppCompatActivity() {
             setOnClickListener { showAppPanel() }
         }
         tabLayout.addView(appsTab)
+        
+        val settingsTab = Button(this).apply {
+            text = "⚙️ SETTINGS"
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setOnClickListener { showSettingsPanel() }
+        }
+        tabLayout.addView(settingsTab)
         
         mainLayout.addView(tabLayout)
         
@@ -361,18 +379,103 @@ class AdminActivity : AppCompatActivity() {
         
         mainLayout.addView(appPanel)
         
+        // ========== SETTINGS PANEL ==========
+        settingsPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+        }
+        
+        val priceLabel = TextView(this).apply {
+            text = "💰 Price per Minute (₱)"
+            textSize = 16f
+            setPadding(0, 20, 0, 10)
+        }
+        settingsPanel.addView(priceLabel)
+        
+        val priceRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        priceInput = EditText(this).apply {
+            hint = "Enter price per minute"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setPadding(10, 10, 10, 10)
+        }
+        priceRow.addView(priceInput)
+        
+        savePriceBtn = Button(this).apply {
+            text = "💾 SAVE PRICE"
+            setOnClickListener { savePricePerMinute() }
+        }
+        priceRow.addView(savePriceBtn)
+        settingsPanel.addView(priceRow)
+        
+        val telegramLabel = TextView(this).apply {
+            text = "🤖 Telegram Notifications"
+            textSize = 16f
+            setPadding(0, 20, 0, 10)
+        }
+        settingsPanel.addView(telegramLabel)
+        
+        telegramTokenInput = EditText(this).apply {
+            hint = "Bot Token"
+            setPadding(10, 10, 10, 10)
+        }
+        settingsPanel.addView(telegramTokenInput)
+        
+        telegramChatIdInput = EditText(this).apply {
+            hint = "Chat ID"
+            setPadding(10, 10, 10, 10)
+        }
+        settingsPanel.addView(telegramChatIdInput)
+        
+        val telegramRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        saveTelegramBtn = Button(this).apply {
+            text = "💾 SAVE TELEGRAM"
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setOnClickListener { saveTelegramConfig() }
+        }
+        telegramRow.addView(saveTelegramBtn)
+        
+        testTelegramBtn = Button(this).apply {
+            text = "📨 TEST NOTIFICATION"
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setOnClickListener { testTelegram() }
+        }
+        telegramRow.addView(testTelegramBtn)
+        settingsPanel.addView(telegramRow)
+        
+        val exportLabel = TextView(this).apply {
+            text = "📊 Export Report"
+            textSize = 16f
+            setPadding(0, 20, 0, 10)
+        }
+        settingsPanel.addView(exportLabel)
+        
+        exportReportBtn = Button(this).apply {
+            text = "📥 EXPORT CSV REPORT"
+            setOnClickListener { exportReport() }
+        }
+        settingsPanel.addView(exportReportBtn)
+        
+        mainLayout.addView(settingsPanel)
+        
         setContentView(mainLayout)
         
         loadDashboardStats()
         loadPins()
         loadInstalledApps()
         loadCurrentWhitelistLocal()
+        loadSettings()
     }
     
     private fun showDashboardPanel() {
         dashboardPanel.visibility = View.VISIBLE
         pinPanel.visibility = View.GONE
         appPanel.visibility = View.GONE
+        settingsPanel.visibility = View.GONE
         loadDashboardStats()
     }
     
@@ -380,6 +483,7 @@ class AdminActivity : AppCompatActivity() {
         dashboardPanel.visibility = View.GONE
         pinPanel.visibility = View.VISIBLE
         appPanel.visibility = View.GONE
+        settingsPanel.visibility = View.GONE
         loadPins()
     }
     
@@ -387,8 +491,90 @@ class AdminActivity : AppCompatActivity() {
         dashboardPanel.visibility = View.GONE
         pinPanel.visibility = View.GONE
         appPanel.visibility = View.VISIBLE
+        settingsPanel.visibility = View.GONE
         loadInstalledApps()
         loadCurrentWhitelistLocal()
+    }
+    
+    private fun showSettingsPanel() {
+        dashboardPanel.visibility = View.GONE
+        pinPanel.visibility = View.GONE
+        appPanel.visibility = View.GONE
+        settingsPanel.visibility = View.VISIBLE
+        loadSettings()
+    }
+    
+    private fun loadSettings() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val price = supabase.getPricePerMinute()
+            val (token, chatId) = supabase.getTelegramConfig()
+            withContext(Dispatchers.Main) {
+                priceInput.setText(price.toString())
+                telegramTokenInput.setText(token)
+                telegramChatIdInput.setText(chatId)
+            }
+        }
+    }
+    
+    private fun savePricePerMinute() {
+        val price = priceInput.text.toString().toDoubleOrNull()
+        if (price == null || price <= 0) {
+            Toast.makeText(this, "Enter valid price", Toast.LENGTH_SHORT).show()
+            return
+        }
+        CoroutineScope(Dispatchers.IO).launch {
+            val success = supabase.updatePricePerMinute(price)
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@AdminActivity, if (success) "Price saved!" else "Failed to save", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    
+    private fun saveTelegramConfig() {
+        val token = telegramTokenInput.text.toString().trim()
+        val chatId = telegramChatIdInput.text.toString().trim()
+        CoroutineScope(Dispatchers.IO).launch {
+            val success = supabase.updateTelegramConfig(token, chatId)
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@AdminActivity, if (success) "Telegram config saved!" else "Failed to save", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    
+    private fun testTelegram() {
+        CoroutineScope(Dispatchers.IO).launch {
+            supabase.sendTelegramNotification("✅ Test notification from KCB Rental Kiosk!")
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@AdminActivity, "Test notification sent!", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    
+    private fun exportReport() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val history = supabase.getSessionHistory()
+            val csv = StringBuilder("PIN,Minutes,Amount,Date\n")
+            for (record in history) {
+                csv.append("${record.pin},${record.minutes},${record.amount},${record.date}\n")
+            }
+            withContext(Dispatchers.Main) {
+                val file = File(cacheDir, "sales_report.csv")
+                file.writeText(csv.toString())
+                
+                val uri = androidx.core.content.FileProvider.getUriForFile(
+                    this@AdminActivity,
+                    "${packageName}.fileprovider",
+                    file
+                )
+                
+                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "text/csv"
+                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                startActivity(android.content.Intent.createChooser(intent, "Export Report"))
+            }
+        }
     }
     
     private fun loadDashboardStats() {
@@ -396,7 +582,7 @@ class AdminActivity : AppCompatActivity() {
             val stats = supabase.getIncomeStats()
             val history = supabase.getSessionHistory()
             withContext(Dispatchers.Main) {
-                val currency = NumberFormat.getCurrencyInstance().apply { maximumFractionDigits = 2 }
+                val currency = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
                 dailyIncomeText.text = "Today: ${currency.format(stats.daily)}"
                 weeklyIncomeText.text = "This Week: ${currency.format(stats.weekly)}"
                 monthlyIncomeText.text = "This Month: ${currency.format(stats.monthly)}"
