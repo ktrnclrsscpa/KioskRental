@@ -226,7 +226,6 @@ class MainActivity : AppCompatActivity() {
                     if (result.isValid && result.secondsLeft > 0) {
                         currentPin = pin
                         remainingSeconds = result.secondsLeft
-                        // Record session to history
                         recordSessionToHistory(pin, result.secondsLeft / 60)
                         startSession()
                     } else {
@@ -246,7 +245,10 @@ class MainActivity : AppCompatActivity() {
     
     private fun recordSessionToHistory(pin: String, minutes: Int) {
         CoroutineScope(Dispatchers.IO).launch {
-            supabase.recordSession(pin, minutes, minutes * 1.0)
+            val price = supabase.getPricePerMinute()
+            val amount = minutes * price
+            supabase.recordSession(pin, minutes, amount)
+            supabase.sendTelegramNotification("🎮 *New Rental Session!*%0APIN: $pin%0AMinutes: $minutes%0AAmount: ₱${String.format("%.2f", amount)}")
         }
     }
     
@@ -315,6 +317,11 @@ class MainActivity : AppCompatActivity() {
                                 startCountDownTimer()
                                 val addedMinutes = (newTotalSeconds - lastKnownSeconds) / 60
                                 Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes. New time: ${newTotalSeconds/60} min", Toast.LENGTH_LONG).show()
+                                
+                                // Send Telegram notification for extension
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    supabase.sendTelegramNotification("⏰ *Session Extended!*%0APIN: ${currentPin}%0AAdded: $addedMinutes minutes%0ANew total: ${newTotalSeconds/60} minutes")
+                                }
                             }
                             lastKnownSeconds = newTotalSeconds
                         } else {
