@@ -8,7 +8,6 @@ import android.os.CountDownTimer
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import android.view.MotionEvent
-import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
