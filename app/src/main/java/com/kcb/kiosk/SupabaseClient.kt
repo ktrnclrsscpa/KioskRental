@@ -440,23 +440,28 @@ class SupabaseClient private constructor() {
         } catch (e: Exception) { false }
     }
 
+    // Fixed Telegram notification function using GET request (same as browser test)
     suspend fun sendTelegramNotification(message: String) {
         try {
             val (token, chatId) = getTelegramConfig()
-            if (token.isEmpty() || chatId.isEmpty()) return
+            if (token.isEmpty() || chatId.isEmpty()) {
+                return
+            }
             
-            val url = URL("https://api.telegram.org/bot$token/sendMessage")
+            val encodedMessage = URLEncoder.encode(message, "UTF-8")
+            val url = URL("https://api.telegram.org/bot$token/sendMessage?chat_id=$chatId&text=$encodedMessage&parse_mode=HTML")
+            
             val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "POST"
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.doOutput = true
-            connection.connectTimeout = 5000
-            connection.readTimeout = 5000
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 10000
+            connection.readTimeout = 10000
             
-            val jsonBody = "{\"chat_id\":\"$chatId\",\"text\":\"$message\",\"parse_mode\":\"HTML\"}"
-            connection.outputStream.write(jsonBody.toByteArray())
+            connection.responseCode
             connection.disconnect()
-        } catch (e: Exception) { }
+            
+        } catch (e: Exception) {
+            // Silent fail
+        }
     }
 
     // ==================== DASHBOARD FUNCTIONS ====================
