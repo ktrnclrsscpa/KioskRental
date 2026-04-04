@@ -10,6 +10,7 @@ import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -55,7 +56,7 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var sessionHistoryRecycler: RecyclerView
     
     // Settings panel
-    private lateinit var pricingTypeSpinner: android.widget.Spinner
+    private lateinit var pricingTypeSpinner: Spinner
     private lateinit var priceAmountInput: EditText
     private lateinit var durationInput: EditText
     private lateinit var extendPriceInput: EditText
@@ -286,12 +287,12 @@ class AdminActivity : AppCompatActivity() {
         }
         pinPanel.addView(extendSeparator)
         
-        val extendLabel = TextView(this).apply {
+        val extendTitle = TextView(this).apply {
             text = "⏰ Extend Active PIN"
             textSize = 18f
             setPadding(0, 10, 0, 10)
         }
-        pinPanel.addView(extendLabel)
+        pinPanel.addView(extendTitle)
         
         val extendRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -394,7 +395,7 @@ class AdminActivity : AppCompatActivity() {
         }
         settingsPanel.addView(pricingTypeLabel)
         
-        pricingTypeSpinner = android.widget.Spinner(this).apply {
+        pricingTypeSpinner = Spinner(this).apply {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             adapter = android.widget.ArrayAdapter(this@AdminActivity, android.R.layout.simple_spinner_item, listOf("Fixed Price per Session", "Price per Hour"))
         }
@@ -435,19 +436,19 @@ class AdminActivity : AppCompatActivity() {
         }
         settingsPanel.addView(separator1)
         
-        val extendLabel = TextView(this).apply {
+        val extensionLabel = TextView(this).apply {
             text = "⏰ Extension Settings"
             textSize = 16f
             setPadding(0, 0, 0, 10)
         }
-        settingsPanel.addView(extendLabel)
+        settingsPanel.addView(extensionLabel)
         
-        val extendPriceLabel = TextView(this).apply {
+        val extPriceLabel = TextView(this).apply {
             text = "Extension Price (₱)"
             textSize = 14f
             setPadding(0, 10, 0, 5)
         }
-        settingsPanel.addView(extendPriceLabel)
+        settingsPanel.addView(extPriceLabel)
         
         extendPriceInput = EditText(this).apply {
             hint = "e.g., 10"
@@ -456,12 +457,12 @@ class AdminActivity : AppCompatActivity() {
         }
         settingsPanel.addView(extendPriceInput)
         
-        val extendDurationLabel = TextView(this).apply {
+        val extDurationLabel = TextView(this).apply {
             text = "Extension Duration (minutes)"
             textSize = 14f
             setPadding(0, 10, 0, 5)
         }
-        settingsPanel.addView(extendDurationLabel)
+        settingsPanel.addView(extDurationLabel)
         
         extendDurationInput = EditText(this).apply {
             hint = "e.g., 30"
