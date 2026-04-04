@@ -19,6 +19,9 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
 import java.io.File
+import java.net.URL
+import java.net.HttpURLConnection
+import java.net.URLEncoder
 import java.text.NumberFormat
 import java.util.*
 
@@ -654,10 +657,57 @@ class AdminActivity : AppCompatActivity() {
     }
     
     private fun testTelegram() {
+        testTelegramBtn.isEnabled = false
+        testTelegramBtn.text = "SENDING..."
+        appStatusText.text = "Sending test message..."
+        
         CoroutineScope(Dispatchers.IO).launch {
-            supabase.sendTelegramNotification("✅ Test notification from KCB Rental Kiosk!")
-            withContext(Dispatchers.Main) {
-                Toast.makeText(this@AdminActivity, "Test sent! Check Telegram.", Toast.LENGTH_SHORT).show()
+            try {
+                val (token, chatId) = supabase.getTelegramConfig()
+                if (token.isEmpty() || chatId.isEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        appStatusText.text = "❌ Bot Token or Chat ID is empty!"
+                        appStatusText.setTextColor(android.graphics.Color.RED)
+                        testTelegramBtn.isEnabled = true
+                        testTelegramBtn.text = "📨 TEST"
+                    }
+                    return@launch
+                }
+                
+                // Manual test using direct HTTP
+                val encodedMessage = URLEncoder.encode("✅ Test notification from KCB Rental Kiosk!", "UTF-8")
+                val url = URL("https://api.telegram.org/bot$token/sendMessage?chat_id=$chatId&text=$encodedMessage&parse_mode=HTML")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.connectTimeout = 10000
+                connection.readTimeout = 10000
+                
+                val responseCode = connection.responseCode
+                val responseText = if (responseCode == 200) {
+                    connection.inputStream.bufferedReader().use { it.readText() }
+                } else {
+                    connection.errorStream?.bufferedReader()?.readText() ?: "No error details"
+                }
+                connection.disconnect()
+                
+                withContext(Dispatchers.Main) {
+                    testTelegramBtn.isEnabled = true
+                    testTelegramBtn.text = "📨 TEST"
+                    if (responseCode == 200) {
+                        appStatusText.text = "✓ Test sent! Check Telegram."
+                        appStatusText.setTextColor(android.graphics.Color.GREEN)
+                    } else {
+                        appStatusText.text = "✗ Failed! Response: $responseCode - $responseText"
+                        appStatusText.setTextColor(android.graphics.Color.RED)
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    testTelegramBtn.isEnabled = true
+                    testTelegramBtn.text = "📨 TEST"
+                    appStatusText.text = "✗ Error: ${e.message}"
+                    appStatusText.setTextColor(android.graphics.Color.RED)
+                }
             }
         }
     }
