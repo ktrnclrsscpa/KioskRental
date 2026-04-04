@@ -10,6 +10,11 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
 
+// Data classes defined outside so other files can use them
+data class PinData(val pin: String, val secondsLeft: Int)
+data class SessionRecord(val pin: String, val minutes: Int, val amount: Double, val date: String)
+data class IncomeStats(val daily: Double, val weekly: Double, val monthly: Double, val yearly: Double, val totalSessions: Int)
+
 class SupabaseClient private constructor() {
 
     private val supabaseUrl = "https://qbricrnjchbdyseeuwif.supabase.co"
@@ -279,14 +284,6 @@ class SupabaseClient private constructor() {
         }
     }
 
-    data class IncomeStats(
-        val daily: Double, 
-        val weekly: Double, 
-        val monthly: Double, 
-        val yearly: Double, 
-        val totalSessions: Int
-    )
-
     suspend fun getIncomeStats(): IncomeStats = withContext(Dispatchers.IO) {
         try {
             val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/session_history?order=started_at.desc"))
@@ -334,8 +331,6 @@ class SupabaseClient private constructor() {
             IncomeStats(0.0, 0.0, 0.0, 0.0, 0)
         }
     }
-
-    data class SessionRecord(val pin: String, val minutes: Int, val amount: Double, val date: String)
 
     suspend fun getSessionHistory(): List<SessionRecord> = withContext(Dispatchers.IO) {
         try {
@@ -553,5 +548,3 @@ class SupabaseClient private constructor() {
         }
     }
 }
-
-data class PinData(val pin: String, val secondsLeft: Int)
