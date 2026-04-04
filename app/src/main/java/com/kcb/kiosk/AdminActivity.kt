@@ -388,152 +388,180 @@ class AdminActivity : AppCompatActivity() {
             visibility = View.GONE
         }
         
+        val settingsScrollView = ScrollView(this)
+        val settingsInner = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(20, 20, 20, 20)
+        }
+        
+        // Pricing Type
         val pricingTypeLabel = TextView(this).apply {
             text = "💰 Pricing Type"
             textSize = 16f
             setPadding(0, 20, 0, 10)
         }
-        settingsPanel.addView(pricingTypeLabel)
+        settingsInner.addView(pricingTypeLabel)
         
         pricingTypeSpinner = Spinner(this).apply {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             adapter = android.widget.ArrayAdapter(this@AdminActivity, android.R.layout.simple_spinner_item, listOf("Fixed Price per Session", "Price per Hour"))
         }
-        settingsPanel.addView(pricingTypeSpinner)
+        settingsInner.addView(pricingTypeSpinner)
         
+        // Price Amount
         val priceAmountLabel = TextView(this).apply {
             text = "Price Amount (₱)"
             textSize = 14f
             setPadding(0, 10, 0, 5)
         }
-        settingsPanel.addView(priceAmountLabel)
+        settingsInner.addView(priceAmountLabel)
         
         priceAmountInput = EditText(this).apply {
             hint = "e.g., 15"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
             setPadding(10, 10, 10, 10)
         }
-        settingsPanel.addView(priceAmountInput)
+        settingsInner.addView(priceAmountInput)
         
+        // Duration
         val durationLabel = TextView(this).apply {
             text = "Duration (minutes)"
             textSize = 14f
             setPadding(0, 10, 0, 5)
         }
-        settingsPanel.addView(durationLabel)
+        settingsInner.addView(durationLabel)
         
         durationInput = EditText(this).apply {
             hint = "e.g., 60 for 1 hour"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
             setPadding(10, 10, 10, 10)
         }
-        settingsPanel.addView(durationInput)
+        settingsInner.addView(durationInput)
         
         val separator1 = View(this).apply {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 2)
             setBackgroundColor(ContextCompat.getColor(this@AdminActivity, android.R.color.darker_gray))
             setPadding(0, 20, 0, 20)
         }
-        settingsPanel.addView(separator1)
+        settingsInner.addView(separator1)
         
+        // Extension Settings
         val extensionLabel = TextView(this).apply {
             text = "⏰ Extension Settings"
             textSize = 16f
             setPadding(0, 0, 0, 10)
         }
-        settingsPanel.addView(extensionLabel)
+        settingsInner.addView(extensionLabel)
         
         val extPriceLabel = TextView(this).apply {
             text = "Extension Price (₱)"
             textSize = 14f
             setPadding(0, 10, 0, 5)
         }
-        settingsPanel.addView(extPriceLabel)
+        settingsInner.addView(extPriceLabel)
         
         extendPriceInput = EditText(this).apply {
             hint = "e.g., 10"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
             setPadding(10, 10, 10, 10)
         }
-        settingsPanel.addView(extendPriceInput)
+        settingsInner.addView(extendPriceInput)
         
         val extDurationLabel = TextView(this).apply {
             text = "Extension Duration (minutes)"
             textSize = 14f
             setPadding(0, 10, 0, 5)
         }
-        settingsPanel.addView(extDurationLabel)
+        settingsInner.addView(extDurationLabel)
         
         extendDurationInput = EditText(this).apply {
             hint = "e.g., 30"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
             setPadding(10, 10, 10, 10)
         }
-        settingsPanel.addView(extendDurationInput)
+        settingsInner.addView(extendDurationInput)
         
         savePricingBtn = Button(this).apply {
-            text = "💾 SAVE PRICING SETTINGS"
-            setPadding(0, 20, 0, 20)
+            text = "💾 SAVE PRICING"
+            setPadding(0, 15, 0, 15)
             setOnClickListener { savePricingConfig() }
         }
-        settingsPanel.addView(savePricingBtn)
+        settingsInner.addView(savePricingBtn)
         
         val separator2 = View(this).apply {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 2)
             setBackgroundColor(ContextCompat.getColor(this@AdminActivity, android.R.color.darker_gray))
             setPadding(0, 20, 0, 20)
         }
-        settingsPanel.addView(separator2)
+        settingsInner.addView(separator2)
         
+        // Telegram Settings
         val telegramLabel = TextView(this).apply {
             text = "🤖 Telegram Notifications"
             textSize = 16f
             setPadding(0, 0, 0, 10)
         }
-        settingsPanel.addView(telegramLabel)
+        settingsInner.addView(telegramLabel)
         
         telegramTokenInput = EditText(this).apply {
             hint = "Bot Token"
             setPadding(10, 10, 10, 10)
         }
-        settingsPanel.addView(telegramTokenInput)
+        settingsInner.addView(telegramTokenInput)
         
         telegramChatIdInput = EditText(this).apply {
             hint = "Chat ID"
             setPadding(10, 10, 10, 10)
         }
-        settingsPanel.addView(telegramChatIdInput)
+        settingsInner.addView(telegramChatIdInput)
         
-        val telegramRow = LinearLayout(this).apply {
+        val telegramButtonRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 10, 0, 10)
         }
+        
         saveTelegramBtn = Button(this).apply {
-            text = "💾 SAVE TELEGRAM"
+            text = "💾 SAVE"
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setPadding(10, 15, 10, 15)
             setOnClickListener { saveTelegramConfig() }
         }
-        telegramRow.addView(saveTelegramBtn)
+        telegramButtonRow.addView(saveTelegramBtn)
         
         testTelegramBtn = Button(this).apply {
-            text = "📨 TEST NOTIFICATION"
+            text = "📨 TEST"
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setPadding(10, 15, 10, 15)
             setOnClickListener { testTelegram() }
         }
-        telegramRow.addView(testTelegramBtn)
-        settingsPanel.addView(telegramRow)
+        telegramButtonRow.addView(testTelegramBtn)
         
+        settingsInner.addView(telegramButtonRow)
+        
+        val separator3 = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 2)
+            setBackgroundColor(ContextCompat.getColor(this@AdminActivity, android.R.color.darker_gray))
+            setPadding(0, 20, 0, 20)
+        }
+        settingsInner.addView(separator3)
+        
+        // Export Report
         val exportLabel = TextView(this).apply {
             text = "📊 Export Report"
             textSize = 16f
-            setPadding(0, 20, 0, 10)
+            setPadding(0, 0, 0, 10)
         }
-        settingsPanel.addView(exportLabel)
+        settingsInner.addView(exportLabel)
         
         exportReportBtn = Button(this).apply {
-            text = "📥 EXPORT CSV REPORT"
+            text = "📥 EXPORT CSV"
+            setPadding(10, 15, 10, 15)
             setOnClickListener { exportReport() }
         }
-        settingsPanel.addView(exportReportBtn)
+        settingsInner.addView(exportReportBtn)
+        
+        settingsScrollView.addView(settingsInner)
+        settingsPanel.addView(settingsScrollView)
         
         mainLayout.addView(settingsPanel)
         
@@ -608,7 +636,7 @@ class AdminActivity : AppCompatActivity() {
             val success = supabase.updatePricingConfig(pricingType, priceAmount, durationMinutes, extendPrice, extendDuration)
             withContext(Dispatchers.Main) {
                 savePricingBtn.isEnabled = true
-                savePricingBtn.text = "💾 SAVE PRICING SETTINGS"
+                savePricingBtn.text = "💾 SAVE PRICING"
                 Toast.makeText(this@AdminActivity, if (success) "Pricing saved!" else "Failed to save", Toast.LENGTH_SHORT).show()
             }
         }
@@ -620,7 +648,7 @@ class AdminActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             val success = supabase.updateTelegramConfig(token, chatId)
             withContext(Dispatchers.Main) {
-                Toast.makeText(this@AdminActivity, if (success) "Telegram config saved!" else "Failed to save", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@AdminActivity, if (success) "Telegram saved!" else "Failed to save", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -629,7 +657,7 @@ class AdminActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             supabase.sendTelegramNotification("✅ Test notification from KCB Rental Kiosk!")
             withContext(Dispatchers.Main) {
-                Toast.makeText(this@AdminActivity, "Test notification sent!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@AdminActivity, "Test sent! Check Telegram.", Toast.LENGTH_SHORT).show()
             }
         }
     }
