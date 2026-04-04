@@ -55,8 +55,12 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var sessionHistoryRecycler: RecyclerView
     
     // Settings panel
-    private lateinit var priceInput: EditText
-    private lateinit var savePriceBtn: Button
+    private lateinit var pricingTypeSpinner: android.widget.Spinner
+    private lateinit var priceAmountInput: EditText
+    private lateinit var durationInput: EditText
+    private lateinit var extendPriceInput: EditText
+    private lateinit var extendDurationInput: EditText
+    private lateinit var savePricingBtn: Button
     private lateinit var telegramTokenInput: EditText
     private lateinit var telegramChatIdInput: EditText
     private lateinit var saveTelegramBtn: Button
@@ -104,7 +108,6 @@ class AdminActivity : AppCompatActivity() {
             setPadding(30, 50, 30, 30)
         }
         
-        // Title row
         val titleRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, 0, 0, 20)
@@ -126,7 +129,6 @@ class AdminActivity : AppCompatActivity() {
         
         mainLayout.addView(titleRow)
         
-        // Tab buttons
         val tabLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, 0, 0, 20)
@@ -385,35 +387,107 @@ class AdminActivity : AppCompatActivity() {
             visibility = View.GONE
         }
         
-        val priceLabel = TextView(this).apply {
-            text = "💰 Price per Minute (₱)"
+        val pricingTypeLabel = TextView(this).apply {
+            text = "💰 Pricing Type"
             textSize = 16f
             setPadding(0, 20, 0, 10)
         }
-        settingsPanel.addView(priceLabel)
+        settingsPanel.addView(pricingTypeLabel)
         
-        val priceRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
+        pricingTypeSpinner = android.widget.Spinner(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            adapter = android.widget.ArrayAdapter(this@AdminActivity, android.R.layout.simple_spinner_item, listOf("Fixed Price per Session", "Price per Hour"))
         }
-        priceInput = EditText(this).apply {
-            hint = "Enter price per minute"
+        settingsPanel.addView(pricingTypeSpinner)
+        
+        val priceAmountLabel = TextView(this).apply {
+            text = "Price Amount (₱)"
+            textSize = 14f
+            setPadding(0, 10, 0, 5)
+        }
+        settingsPanel.addView(priceAmountLabel)
+        
+        priceAmountInput = EditText(this).apply {
+            hint = "e.g., 15"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             setPadding(10, 10, 10, 10)
         }
-        priceRow.addView(priceInput)
+        settingsPanel.addView(priceAmountInput)
         
-        savePriceBtn = Button(this).apply {
-            text = "💾 SAVE PRICE"
-            setOnClickListener { savePricePerMinute() }
+        val durationLabel = TextView(this).apply {
+            text = "Duration (minutes)"
+            textSize = 14f
+            setPadding(0, 10, 0, 5)
         }
-        priceRow.addView(savePriceBtn)
-        settingsPanel.addView(priceRow)
+        settingsPanel.addView(durationLabel)
+        
+        durationInput = EditText(this).apply {
+            hint = "e.g., 60 for 1 hour"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setPadding(10, 10, 10, 10)
+        }
+        settingsPanel.addView(durationInput)
+        
+        val separator1 = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 2)
+            setBackgroundColor(ContextCompat.getColor(this@AdminActivity, android.R.color.darker_gray))
+            setPadding(0, 20, 0, 20)
+        }
+        settingsPanel.addView(separator1)
+        
+        val extendLabel = TextView(this).apply {
+            text = "⏰ Extension Settings"
+            textSize = 16f
+            setPadding(0, 0, 0, 10)
+        }
+        settingsPanel.addView(extendLabel)
+        
+        val extendPriceLabel = TextView(this).apply {
+            text = "Extension Price (₱)"
+            textSize = 14f
+            setPadding(0, 10, 0, 5)
+        }
+        settingsPanel.addView(extendPriceLabel)
+        
+        extendPriceInput = EditText(this).apply {
+            hint = "e.g., 10"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setPadding(10, 10, 10, 10)
+        }
+        settingsPanel.addView(extendPriceInput)
+        
+        val extendDurationLabel = TextView(this).apply {
+            text = "Extension Duration (minutes)"
+            textSize = 14f
+            setPadding(0, 10, 0, 5)
+        }
+        settingsPanel.addView(extendDurationLabel)
+        
+        extendDurationInput = EditText(this).apply {
+            hint = "e.g., 30"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setPadding(10, 10, 10, 10)
+        }
+        settingsPanel.addView(extendDurationInput)
+        
+        savePricingBtn = Button(this).apply {
+            text = "💾 SAVE PRICING SETTINGS"
+            setPadding(0, 20, 0, 20)
+            setOnClickListener { savePricingConfig() }
+        }
+        settingsPanel.addView(savePricingBtn)
+        
+        val separator2 = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 2)
+            setBackgroundColor(ContextCompat.getColor(this@AdminActivity, android.R.color.darker_gray))
+            setPadding(0, 20, 0, 20)
+        }
+        settingsPanel.addView(separator2)
         
         val telegramLabel = TextView(this).apply {
             text = "🤖 Telegram Notifications"
             textSize = 16f
-            setPadding(0, 20, 0, 10)
+            setPadding(0, 0, 0, 10)
         }
         settingsPanel.addView(telegramLabel)
         
@@ -506,26 +580,35 @@ class AdminActivity : AppCompatActivity() {
     
     private fun loadSettings() {
         CoroutineScope(Dispatchers.IO).launch {
-            val price = supabase.getPricePerMinute()
+            val config = supabase.getPricingConfig()
             val (token, chatId) = supabase.getTelegramConfig()
             withContext(Dispatchers.Main) {
-                priceInput.setText(price.toString())
+                pricingTypeSpinner.setSelection(if (config.pricingType == "fixed") 0 else 1)
+                priceAmountInput.setText(config.priceAmount.toString())
+                durationInput.setText(config.durationMinutes.toString())
+                extendPriceInput.setText(config.extendPrice.toString())
+                extendDurationInput.setText(config.extendDuration.toString())
                 telegramTokenInput.setText(token)
                 telegramChatIdInput.setText(chatId)
             }
         }
     }
     
-    private fun savePricePerMinute() {
-        val price = priceInput.text.toString().toDoubleOrNull()
-        if (price == null || price <= 0) {
-            Toast.makeText(this, "Enter valid price", Toast.LENGTH_SHORT).show()
-            return
-        }
+    private fun savePricingConfig() {
+        val pricingType = if (pricingTypeSpinner.selectedItemPosition == 0) "fixed" else "hourly"
+        val priceAmount = priceAmountInput.text.toString().toDoubleOrNull() ?: 15.0
+        val durationMinutes = durationInput.text.toString().toIntOrNull() ?: 60
+        val extendPrice = extendPriceInput.text.toString().toDoubleOrNull() ?: 10.0
+        val extendDuration = extendDurationInput.text.toString().toIntOrNull() ?: 30
+        
+        savePricingBtn.isEnabled = false
+        savePricingBtn.text = "SAVING..."
         CoroutineScope(Dispatchers.IO).launch {
-            val success = supabase.updatePricePerMinute(price)
+            val success = supabase.updatePricingConfig(pricingType, priceAmount, durationMinutes, extendPrice, extendDuration)
             withContext(Dispatchers.Main) {
-                Toast.makeText(this@AdminActivity, if (success) "Price saved!" else "Failed to save", Toast.LENGTH_SHORT).show()
+                savePricingBtn.isEnabled = true
+                savePricingBtn.text = "💾 SAVE PRICING SETTINGS"
+                Toast.makeText(this@AdminActivity, if (success) "Pricing saved!" else "Failed to save", Toast.LENGTH_SHORT).show()
             }
         }
     }
