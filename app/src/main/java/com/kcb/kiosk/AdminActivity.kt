@@ -232,7 +232,7 @@ class AdminActivity : AppCompatActivity() {
         
         mainLayout.addView(dashboardPanel)
         
-        // ========== PINS PANEL (FIXED LAYOUT - NO CUT OFF) ==========
+        // ========== PINS PANEL ==========
         pinPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -245,7 +245,6 @@ class AdminActivity : AppCompatActivity() {
         }
         pinPanel.addView(genLabel)
         
-        // PIN input - full width
         generatePinInput = EditText(this).apply {
             hint = "PIN (leave blank for random)"
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
@@ -254,7 +253,6 @@ class AdminActivity : AppCompatActivity() {
         }
         pinPanel.addView(generatePinInput)
         
-        // Minutes input
         generateMinutesInput = EditText(this).apply {
             hint = "Minutes (e.g., 60)"
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
@@ -263,7 +261,6 @@ class AdminActivity : AppCompatActivity() {
         }
         pinPanel.addView(generateMinutesInput)
         
-        // Amount input
         generateAmountInput = EditText(this).apply {
             hint = "Amount in ₱ (e.g., 15.00)"
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
