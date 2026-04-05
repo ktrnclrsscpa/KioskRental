@@ -7,7 +7,6 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.View
-import android.view.ViewGroup
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -16,7 +15,6 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
@@ -136,20 +134,6 @@ class AdminActivity : AppCompatActivity() {
         return card
     }
     
-    private fun createActionButton(text: String, icon: String, color: String, onClick: () -> Unit): Button {
-        return Button(this).apply {
-            this.text = "$icon $text"
-            textSize = 14f
-            setPadding(15, 12, 15, 12)
-            setBackgroundColor(Color.parseColor(color))
-            setTextColor(Color.WHITE)
-            setOnClickListener { onClick() }
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                setMargins(0, 0, 0, 10)
-            }
-        }
-    }
-    
     private fun createSection(title: String, icon: String): LinearLayout {
         val section = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -206,8 +190,8 @@ class AdminActivity : AppCompatActivity() {
         }
         
         val title = TextView(this).apply {
-            text = "KCB RENTAL"
-            textSize = 28f
+            text = "KCB RENTAL ADMIN"
+            textSize = 24f
             setTextColor(Color.parseColor("#2C3E50"))
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             typeface = android.graphics.Typeface.DEFAULT_BOLD
@@ -215,7 +199,7 @@ class AdminActivity : AppCompatActivity() {
         header.addView(title)
         
         val changePwdBtn = Button(this).apply {
-            text = "🔐 Change Password"
+            text = "Change Password"
             textSize = 12f
             setBackgroundColor(Color.TRANSPARENT)
             setTextColor(Color.parseColor("#3498DB"))
@@ -231,16 +215,21 @@ class AdminActivity : AppCompatActivity() {
             setPadding(0, 0, 0, 25)
         }
         
-        totalIncomeCard = TextView(this).apply {
-            text = "₱0"
-            textSize = 20f
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-        }
+        totalIncomeCard = TextView(this)
+        totalSessionsCard = TextView(this)
+        activePinsCard = TextView(this)
+        todayIncomeCard = TextView(this)
         
         val statsCard1 = createStatCard("Total Income", "₱0", "💰", "#2ECC71")
         val statsCard2 = createStatCard("Total Sessions", "0", "📊", "#3498DB")
         val statsCard3 = createStatCard("Active PINs", "0", "🔑", "#E67E22")
         val statsCard4 = createStatCard("Today's Sales", "₱0", "📈", "#9B59B6")
+        
+        // Store references to update later
+        totalIncomeCard = (statsCard1.getChildAt(1) as TextView)
+        totalSessionsCard = (statsCard2.getChildAt(1) as TextView)
+        activePinsCard = (statsCard3.getChildAt(1) as TextView)
+        todayIncomeCard = (statsCard4.getChildAt(1) as TextView)
         
         statsRow.addView(statsCard1)
         statsRow.addView(statsCard2)
@@ -248,36 +237,6 @@ class AdminActivity : AppCompatActivity() {
         statsRow.addView(statsCard4)
         
         mainContainer.addView(statsRow)
-        
-        // Quick Actions Section
-        val quickActionsSection = createSection("Quick Actions", "⚡")
-        val quickActionsRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, 0, 0, 10)
-        }
-        
-        val quickGenBtn = Button(this).apply {
-            text = "➕ New PIN"
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                setMargins(0, 0, 10, 0)
-            }
-            setBackgroundColor(Color.parseColor("#2ECC71"))
-            setTextColor(Color.WHITE)
-            setOnClickListener { showGeneratePinDialog() }
-        }
-        quickActionsRow.addView(quickGenBtn)
-        
-        val quickExtendBtn = Button(this).apply {
-            text = "⏰ Extend"
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            setBackgroundColor(Color.parseColor("#E67E22"))
-            setTextColor(Color.WHITE)
-            setOnClickListener { showExtendPinDialog() }
-        }
-        quickActionsRow.addView(quickExtendBtn)
-        
-        quickActionsSection.addView(quickActionsRow)
-        mainContainer.addView(quickActionsSection)
         
         // Recent Sessions Section
         val sessionsSection = createSection("Recent Sessions", "📜")
@@ -289,10 +248,9 @@ class AdminActivity : AppCompatActivity() {
         sessionsSection.addView(sessionHistoryRecycler)
         mainContainer.addView(sessionsSection)
         
-        // PIN Management Section (Hidden by default, shown via dialog)
+        // PIN Management Section
         val pinManagementSection = createSection("PIN Management", "🔑")
         
-        // Generate PIN
         generatePinInput = EditText(this).apply {
             hint = "PIN (leave blank for random)"
             setPadding(15, 12, 15, 12)
@@ -325,7 +283,14 @@ class AdminActivity : AppCompatActivity() {
         }
         pinManagementSection.addView(generateAmountInput)
         
-        generateBtn = createActionButton("GENERATE PIN", "🔐", "#2ECC71") { generatePin() }
+        generateBtn = Button(this).apply {
+            text = "🔐 GENERATE PIN"
+            textSize = 14f
+            setPadding(15, 12, 15, 12)
+            setBackgroundColor(Color.parseColor("#2ECC71"))
+            setTextColor(Color.WHITE)
+            setOnClickListener { generatePin() }
+        }
         pinManagementSection.addView(generateBtn)
         
         val spacer = View(this).apply {
@@ -366,19 +331,26 @@ class AdminActivity : AppCompatActivity() {
         }
         pinManagementSection.addView(extendAmountInput)
         
-        extendBtn = createActionButton("EXTEND TIME", "⏰", "#E67E22") {
-            val pin = extendPinInput.text.toString().trim()
-            val minutes = extendMinutesInput.text.toString().toIntOrNull()
-            val amount = extendAmountInput.text.toString().toDoubleOrNull()
-            if (pin.isEmpty() || minutes == null || minutes <= 0) {
-                Toast.makeText(this@AdminActivity, "Enter PIN and valid minutes", Toast.LENGTH_SHORT).show()
-                return@createActionButton
+        extendBtn = Button(this).apply {
+            text = "⏰ EXTEND TIME"
+            textSize = 14f
+            setPadding(15, 12, 15, 12)
+            setBackgroundColor(Color.parseColor("#E67E22"))
+            setTextColor(Color.WHITE)
+            setOnClickListener {
+                val pin = extendPinInput.text.toString().trim()
+                val minutes = extendMinutesInput.text.toString().toIntOrNull()
+                val amount = extendAmountInput.text.toString().toDoubleOrNull()
+                if (pin.isEmpty() || minutes == null || minutes <= 0) {
+                    Toast.makeText(this@AdminActivity, "Enter PIN and valid minutes", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                if (amount == null || amount <= 0) {
+                    Toast.makeText(this@AdminActivity, "Enter valid amount (₱)", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                extendTime(pin, minutes, amount)
             }
-            if (amount == null || amount <= 0) {
-                Toast.makeText(this@AdminActivity, "Enter valid amount (₱)", Toast.LENGTH_SHORT).show()
-                return@createActionButton
-            }
-            extendTime(pin, minutes, amount)
         }
         pinManagementSection.addView(extendBtn)
         
@@ -405,7 +377,14 @@ class AdminActivity : AppCompatActivity() {
         appScrollView.addView(appContainer)
         whitelistSection.addView(appScrollView)
         
-        saveAppsBtn = createActionButton("SAVE WHITELIST", "💾", "#3498DB") { saveWhitelistLocal() }
+        saveAppsBtn = Button(this).apply {
+            text = "💾 SAVE WHITELIST"
+            textSize = 14f
+            setPadding(15, 12, 15, 12)
+            setBackgroundColor(Color.parseColor("#3498DB"))
+            setTextColor(Color.WHITE)
+            setOnClickListener { saveWhitelistLocal() }
+        }
         whitelistSection.addView(saveAppsBtn)
         
         mainContainer.addView(whitelistSection)
@@ -460,7 +439,14 @@ class AdminActivity : AppCompatActivity() {
         
         settingsSection.addView(telegramRow)
         
-        exportReportBtn = createActionButton("EXPORT CSV REPORT", "📥", "#9B59B6") { exportReport() }
+        exportReportBtn = Button(this).apply {
+            text = "📥 EXPORT CSV REPORT"
+            textSize = 14f
+            setPadding(15, 12, 15, 12)
+            setBackgroundColor(Color.parseColor("#9B59B6"))
+            setTextColor(Color.WHITE)
+            setOnClickListener { exportReport() }
+        }
         settingsSection.addView(exportReportBtn)
         
         mainContainer.addView(settingsSection)
@@ -473,122 +459,6 @@ class AdminActivity : AppCompatActivity() {
         loadInstalledApps()
         loadCurrentWhitelistLocal()
         loadTelegramSettings()
-    }
-    
-    private fun showGeneratePinDialog() {
-        val dialogView = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(30, 20, 30, 20)
-        }
-        
-        val pinInput = EditText(this).apply {
-            hint = "PIN (leave blank for random)"
-            setPadding(15, 12, 15, 12)
-            background = createEditTextBackground()
-        }
-        dialogView.addView(pinInput)
-        
-        val minutesInput = EditText(this).apply {
-            hint = "Minutes"
-            setPadding(15, 12, 15, 12)
-            background = createEditTextBackground()
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-        }
-        dialogView.addView(minutesInput)
-        
-        val amountInput = EditText(this).apply {
-            hint = "Amount (₱)"
-            setPadding(15, 12, 15, 12)
-            background = createEditTextBackground()
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-        }
-        dialogView.addView(amountInput)
-        
-        AlertDialog.Builder(this)
-            .setTitle("Generate New PIN")
-            .setView(dialogView)
-            .setPositiveButton("Generate") { _, _ ->
-                val minutes = minutesInput.text.toString().toIntOrNull()
-                val amount = amountInput.text.toString().toDoubleOrNull()
-                val customPin = pinInput.text.toString().trim()
-                
-                if (minutes == null || minutes <= 0) {
-                    Toast.makeText(this, "Enter valid minutes", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                if (amount == null || amount <= 0) {
-                    Toast.makeText(this, "Enter valid amount", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                
-                val pin = if (customPin.isNotEmpty()) customPin else null
-                
-                CoroutineScope(Dispatchers.IO).launch {
-                    val result = supabase.generatePin(pin, minutes * 60, amount)
-                    withContext(Dispatchers.Main) {
-                        if (result != null) {
-                            Toast.makeText(this@AdminActivity, "✅ PIN: $result ($minutes min - ₱$amount)", Toast.LENGTH_LONG).show()
-                            loadPinsCount()
-                        } else {
-                            Toast.makeText(this@AdminActivity, "Failed to generate PIN", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-    
-    private fun showExtendPinDialog() {
-        val dialogView = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(30, 20, 30, 20)
-        }
-        
-        val pinInput = EditText(this).apply {
-            hint = "PIN to extend"
-            setPadding(15, 12, 15, 12)
-            background = createEditTextBackground()
-        }
-        dialogView.addView(pinInput)
-        
-        val minutesInput = EditText(this).apply {
-            hint = "Minutes to add"
-            setPadding(15, 12, 15, 12)
-            background = createEditTextBackground()
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-        }
-        dialogView.addView(minutesInput)
-        
-        val amountInput = EditText(this).apply {
-            hint = "Amount (₱)"
-            setPadding(15, 12, 15, 12)
-            background = createEditTextBackground()
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-        }
-        dialogView.addView(amountInput)
-        
-        AlertDialog.Builder(this)
-            .setTitle("Extend PIN Time")
-            .setView(dialogView)
-            .setPositiveButton("Extend") { _, _ ->
-                val pin = pinInput.text.toString().trim()
-                val minutes = minutesInput.text.toString().toIntOrNull()
-                val amount = amountInput.text.toString().toDoubleOrNull()
-                
-                if (pin.isEmpty() || minutes == null || minutes <= 0) {
-                    Toast.makeText(this, "Enter PIN and valid minutes", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                if (amount == null || amount <= 0) {
-                    Toast.makeText(this, "Enter valid amount", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                
-                extendTime(pin, minutes, amount)
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
     }
     
     private fun loadTelegramSettings() {
