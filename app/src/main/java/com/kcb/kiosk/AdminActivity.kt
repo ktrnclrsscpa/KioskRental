@@ -8,18 +8,15 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.View
-import android.view.ViewGroup
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.FrameLayout
-import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
@@ -32,7 +29,7 @@ import java.util.*
 class AdminActivity : AppCompatActivity() {
     private lateinit var supabase: SupabaseClient
     
-    private lateinit var mainContainer: LinearLayout
+    private lateinit var rootLayout: LinearLayout
     private lateinit var contentContainer: LinearLayout
     
     // Stats Cards
@@ -231,8 +228,15 @@ class AdminActivity : AppCompatActivity() {
     private fun initAdminPanel() {
         supabase = SupabaseClient.getInstance()
         
+        // Remove any existing views first
+        if (rootLayout != null) {
+            try {
+                (rootLayout.parent as? android.view.ViewGroup)?.removeView(rootLayout)
+            } catch (e: Exception) { }
+        }
+        
         // Main container with horizontal layout (sidebar + content)
-        val rootLayout = LinearLayout(this).apply {
+        rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -262,7 +266,7 @@ class AdminActivity : AppCompatActivity() {
         
         val menuItems = listOf(
             Triple("📊", "Dashboard", "dashboard"),
-            Triple("💰", "PIN Management", "pin"),
+            Triple("🔑", "PIN Management", "pin"),
             Triple("📱", "App Whitelist", "apps"),
             Triple("⚙️", "Settings", "settings")
         )
@@ -278,14 +282,10 @@ class AdminActivity : AppCompatActivity() {
                 ).apply {
                     setMargins(0, 0, 0, 5)
                 }
-                background = GradientDrawable().apply {
-                    cornerRadius = 10f
-                }
                 setOnClickListener {
                     currentSection = id
                     updateContent()
                 }
-                setTag("menu_$id")
             }
             
             val iconText = TextView(this).apply {
@@ -306,7 +306,7 @@ class AdminActivity : AppCompatActivity() {
             sidebar.addView(menuItem)
         }
         
-        // Logout/Change Password
+        // Spacer
         val spacer = View(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -316,29 +316,30 @@ class AdminActivity : AppCompatActivity() {
         }
         sidebar.addView(spacer)
         
-        val logoutItem = LinearLayout(this).apply {
+        // Change Password at bottom
+        val changePwdItem = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(12, 14, 12, 14)
             gravity = android.view.Gravity.CENTER_VERTICAL
             setOnClickListener { showChangePasswordDialog() }
         }
         
-        val logoutIcon = TextView(this).apply {
+        val changePwdIcon = TextView(this).apply {
             text = "🔐"
             textSize = 18f
             setTextColor(Color.parseColor("#A0B0C0"))
             setPadding(0, 0, 12, 0)
         }
-        logoutItem.addView(logoutIcon)
+        changePwdItem.addView(changePwdIcon)
         
-        val logoutText = TextView(this).apply {
+        val changePwdText = TextView(this).apply {
             text = "Change Password"
             textSize = 14f
             setTextColor(Color.parseColor("#A0B0C0"))
         }
-        logoutItem.addView(logoutText)
+        changePwdItem.addView(changePwdText)
         
-        sidebar.addView(logoutItem)
+        sidebar.addView(changePwdItem)
         
         // ========== CONTENT AREA ==========
         val scrollView = ScrollView(this)
@@ -505,7 +506,7 @@ class AdminActivity : AppCompatActivity() {
         }
         whitelistCard.addView(appStatusText)
         
-        // Fix: Use FrameLayout with fixed height and scroll
+        // Fixed height scroll container for app list
         val scrollContainer = FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
