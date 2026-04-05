@@ -28,6 +28,11 @@ class SupabaseClient private constructor() {
         return "$urlString${separator}apikey=$apiKey"
     }
 
+    private fun getCurrentDateTime(): String {
+        val dateFormat = SimpleDateFormat("MM/dd/yyyy HH:mm:ss", Locale.US)
+        return dateFormat.format(Date())
+    }
+
     // ==================== CREDITS (PINs with amount) ====================
     
     suspend fun generatePin(customPin: String?, seconds: Int, amount: Double): String? = withContext(Dispatchers.IO) {
@@ -163,7 +168,7 @@ class SupabaseClient private constructor() {
         }
     }
 
-    // ==================== TELEGRAM ====================
+    // ==================== TELEGRAM (with date/time) ====================
     
     suspend fun getTelegramConfig(): Pair<String, String> = withContext(Dispatchers.IO) {
         try {
@@ -244,7 +249,11 @@ class SupabaseClient private constructor() {
         try {
             val (token, chatId) = getTelegramConfig()
             if (token.isEmpty() || chatId.isEmpty()) return@withContext false
-            val cleanMessage = message.replace("*", "").replace("%0A", "\n")
+            
+            val dateTime = getCurrentDateTime()
+            val messageWithTime = "$message%0A📅 $dateTime"
+            
+            val cleanMessage = messageWithTime.replace("*", "").replace("%0A", "\n")
             val encodedMessage = URLEncoder.encode(cleanMessage, "UTF-8")
             val urlString = "https://api.telegram.org/bot$token/sendMessage?chat_id=$chatId&text=$encodedMessage"
             val url = URL(urlString)
@@ -304,7 +313,7 @@ class SupabaseClient private constructor() {
             connection.readTimeout = 5000
             
             val jsonBody = JSONObject().apply {
-                put("pin", pin)
+                put("pin", "${pin}_EXT")
                 put("minutes", minutes)
                 put("amount", amount)
                 put("status", "extension")
@@ -386,7 +395,7 @@ class SupabaseClient private constructor() {
                 
                 for (i in 0 until jsonArray.length()) {
                     val obj = jsonArray.getJSONObject(i)
-                    val pin = obj.getString("pin")
+                    var pin = obj.getString("pin")
                     val minutes = obj.getInt("minutes")
                     val amount = obj.getDouble("amount")
                     val startedAt = obj.getString("started_at")
@@ -416,7 +425,6 @@ class SupabaseClient private constructor() {
     )
 
     suspend fun getPricingConfig(): PricingConfig = withContext(Dispatchers.IO) {
-        // Return default values since pricing is now manual
         PricingConfig("fixed", 15.0, 60, 10.0, 30)
     }
 
@@ -427,7 +435,6 @@ class SupabaseClient private constructor() {
         extendPrice: Double,
         extendDuration: Int
     ): Boolean = withContext(Dispatchers.IO) {
-        // Just return true since pricing is now manual
         true
     }
 
