@@ -405,6 +405,32 @@ class SupabaseClient private constructor() {
         }
     }
 
+    // ==================== PRICING CONFIG (for compatibility) ====================
+    
+    data class PricingConfig(
+        val pricingType: String,
+        val priceAmount: Double,
+        val durationMinutes: Int,
+        val extendPrice: Double,
+        val extendDuration: Int
+    )
+
+    suspend fun getPricingConfig(): PricingConfig = withContext(Dispatchers.IO) {
+        // Return default values since pricing is now manual
+        PricingConfig("fixed", 15.0, 60, 10.0, 30)
+    }
+
+    suspend fun updatePricingConfig(
+        pricingType: String,
+        priceAmount: Double,
+        durationMinutes: Int,
+        extendPrice: Double,
+        extendDuration: Int
+    ): Boolean = withContext(Dispatchers.IO) {
+        // Just return true since pricing is now manual
+        true
+    }
+
     companion object {
         private var instance: SupabaseClient? = null
         fun getInstance(): SupabaseClient {
