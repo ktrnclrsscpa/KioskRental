@@ -276,22 +276,10 @@ class MainActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val minutes = remainingSeconds / 60
-                val recorded = supabase.recordSession(currentPin!!, minutes, paidAmount)
+                supabase.recordSession(currentPin!!, minutes, paidAmount)
                 val message = "🎮 *New Rental Session!*%0APIN: ${currentPin}%0ADuration: ${minutes} minutes%0AAmount: ₱${String.format("%.2f", paidAmount)}"
-                val sent = supabase.sendTelegramNotification(message)
-                
-                withContext(Dispatchers.Main) {
-                    if (sent && recorded) {
-                        Toast.makeText(this@MainActivity, "✅ Session started!", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(this@MainActivity, "⚠️ Session started", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity, "⚠️ Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-            }
+                supabase.sendTelegramNotification(message)
+            } catch (e: Exception) { }
         }
     }
     
@@ -325,27 +313,25 @@ class MainActivity : AppCompatActivity() {
     private fun startExtendListener() {
         extendCheckJob?.cancel()
         extendCheckJob = CoroutineScope(Dispatchers.IO).launch {
+            var lastKnownSeconds = remainingSeconds
             while (isActive && currentPin != null) {
-                delay(2000)
+                delay(3000)
                 try {
                     val result = supabase.validatePin(currentPin!!)
                     if (result.isValid && result.secondsLeft > 0) {
-                        val databaseSeconds = result.secondsLeft
-                        
-                        if (databaseSeconds != remainingSeconds) {
-                            val addedSeconds = databaseSeconds - remainingSeconds
-                            val addedMinutes = addedSeconds / 60
-                            
+                        if (result.secondsLeft != lastKnownSeconds) {
+                            val newTotalSeconds = result.secondsLeft
                             withContext(Dispatchers.Main) {
                                 countDownTimer?.cancel()
-                                remainingSeconds = databaseSeconds
+                                remainingSeconds = newTotalSeconds
                                 startCountDownTimer()
-                                
+                                val addedMinutes = (newTotalSeconds - lastKnownSeconds) / 60
                                 if (addedMinutes > 0) {
                                     Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes", Toast.LENGTH_LONG).show()
                                     sendExtensionNotification(addedMinutes)
                                 }
                             }
+                            lastKnownSeconds = newTotalSeconds
                         }
                     } else if (result.secondsLeft <= 0) {
                         withContext(Dispatchers.Main) {
@@ -361,18 +347,7 @@ class MainActivity : AppCompatActivity() {
     private fun sendExtensionNotification(addedMinutes: Int) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Calculate extension amount (customize as needed)
-                val extensionAmount = when {
-                    addedMinutes <= 5 -> 5.0
-                    addedMinutes <= 15 -> 10.0
-                    addedMinutes <= 30 -> 15.0
-                    else -> 20.0
-                }
-                
-                // Record extension in session history
-                supabase.recordSession("${currentPin}_EXT", addedMinutes, extensionAmount)
-                
-                // Send Telegram notification without amount
+                // Only send Telegram notification - NO dashboard recording for extensions
                 supabase.sendTelegramNotification("⏰ *Session Extended!*%0APIN: ${currentPin}%0AAdded: $addedMinutes minutes")
             } catch (e: Exception) { }
         }
