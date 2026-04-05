@@ -10,7 +10,6 @@ import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -40,6 +39,7 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var refreshPinsBtn: Button
     private lateinit var extendPinInput: EditText
     private lateinit var extendMinutesInput: EditText
+    private lateinit var extendAmountInput: EditText
     private lateinit var extendBtn: Button
     
     private lateinit var appContainer: LinearLayout
@@ -54,12 +54,6 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var totalSessionsText: TextView
     private lateinit var sessionHistoryRecycler: RecyclerView
     
-    private lateinit var pricingTypeSpinner: Spinner
-    private lateinit var priceAmountInput: EditText
-    private lateinit var durationInput: EditText
-    private lateinit var extendPriceInput: EditText
-    private lateinit var extendDurationInput: EditText
-    private lateinit var savePricingBtn: Button
     private lateinit var telegramTokenInput: EditText
     private lateinit var telegramChatIdInput: EditText
     private lateinit var saveTelegramBtn: Button
@@ -311,16 +305,29 @@ class AdminActivity : AppCompatActivity() {
         }
         pinPanel.addView(extendMinutesInput)
         
+        extendAmountInput = EditText(this).apply {
+            hint = "Amount in ₱ (e.g., 5.00)"
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            setPadding(10, 10, 10, 10)
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+        }
+        pinPanel.addView(extendAmountInput)
+        
         extendBtn = Button(this).apply {
             text = "⏰ EXTEND TIME"
             setOnClickListener {
                 val pin = extendPinInput.text.toString().trim()
                 val minutes = extendMinutesInput.text.toString().toIntOrNull()
+                val amount = extendAmountInput.text.toString().toDoubleOrNull()
                 if (pin.isEmpty() || minutes == null || minutes <= 0) {
                     Toast.makeText(this@AdminActivity, "Enter PIN and valid minutes", Toast.LENGTH_SHORT).show()
                     return@setOnClickListener
                 }
-                extendTime(pin, minutes)
+                if (amount == null || amount <= 0) {
+                    Toast.makeText(this@AdminActivity, "Enter valid amount (₱)", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                extendTime(pin, minutes, amount)
             }
         }
         pinPanel.addView(extendBtn)
@@ -377,7 +384,7 @@ class AdminActivity : AppCompatActivity() {
         
         mainLayout.addView(appPanel)
         
-        // ========== SETTINGS PANEL ==========
+        // ========== SETTINGS PANEL (Telegram only) ==========
         settingsPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -389,107 +396,10 @@ class AdminActivity : AppCompatActivity() {
             setPadding(20, 20, 20, 20)
         }
         
-        val pricingTypeLabel = TextView(this).apply {
-            text = "💰 Pricing Type"
-            textSize = 16f
-            setPadding(0, 20, 0, 10)
-        }
-        settingsInner.addView(pricingTypeLabel)
-        
-        pricingTypeSpinner = Spinner(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-            adapter = android.widget.ArrayAdapter(this@AdminActivity, android.R.layout.simple_spinner_item, listOf("Fixed Price per Session", "Price per Hour"))
-        }
-        settingsInner.addView(pricingTypeSpinner)
-        
-        val priceAmountLabel = TextView(this).apply {
-            text = "Price Amount (₱)"
-            textSize = 14f
-            setPadding(0, 10, 0, 5)
-        }
-        settingsInner.addView(priceAmountLabel)
-        
-        priceAmountInput = EditText(this).apply {
-            hint = "e.g., 15"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-            setPadding(10, 10, 10, 10)
-        }
-        settingsInner.addView(priceAmountInput)
-        
-        val durationLabel = TextView(this).apply {
-            text = "Duration (minutes)"
-            textSize = 14f
-            setPadding(0, 10, 0, 5)
-        }
-        settingsInner.addView(durationLabel)
-        
-        durationInput = EditText(this).apply {
-            hint = "e.g., 60 for 1 hour"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            setPadding(10, 10, 10, 10)
-        }
-        settingsInner.addView(durationInput)
-        
-        val separator1 = View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 2)
-            setBackgroundColor(ContextCompat.getColor(this@AdminActivity, android.R.color.darker_gray))
-            setPadding(0, 20, 0, 20)
-        }
-        settingsInner.addView(separator1)
-        
-        val extensionLabel = TextView(this).apply {
-            text = "⏰ Extension Settings"
-            textSize = 16f
-            setPadding(0, 0, 0, 10)
-        }
-        settingsInner.addView(extensionLabel)
-        
-        val extPriceLabel = TextView(this).apply {
-            text = "Extension Price (₱)"
-            textSize = 14f
-            setPadding(0, 10, 0, 5)
-        }
-        settingsInner.addView(extPriceLabel)
-        
-        extendPriceInput = EditText(this).apply {
-            hint = "e.g., 10"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-            setPadding(10, 10, 10, 10)
-        }
-        settingsInner.addView(extendPriceInput)
-        
-        val extDurationLabel = TextView(this).apply {
-            text = "Extension Duration (minutes)"
-            textSize = 14f
-            setPadding(0, 10, 0, 5)
-        }
-        settingsInner.addView(extDurationLabel)
-        
-        extendDurationInput = EditText(this).apply {
-            hint = "e.g., 30"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            setPadding(10, 10, 10, 10)
-        }
-        settingsInner.addView(extendDurationInput)
-        
-        savePricingBtn = Button(this).apply {
-            text = "💾 SAVE PRICING"
-            setPadding(0, 15, 0, 15)
-            setOnClickListener { savePricingConfig() }
-        }
-        settingsInner.addView(savePricingBtn)
-        
-        val separator2 = View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 2)
-            setBackgroundColor(ContextCompat.getColor(this@AdminActivity, android.R.color.darker_gray))
-            setPadding(0, 20, 0, 20)
-        }
-        settingsInner.addView(separator2)
-        
         val telegramLabel = TextView(this).apply {
             text = "🤖 Telegram Notifications"
             textSize = 16f
-            setPadding(0, 0, 0, 10)
+            setPadding(0, 20, 0, 10)
         }
         settingsInner.addView(telegramLabel)
         
@@ -528,12 +438,12 @@ class AdminActivity : AppCompatActivity() {
         
         settingsInner.addView(telegramButtonRow)
         
-        val separator3 = View(this).apply {
+        val separator = View(this).apply {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 2)
             setBackgroundColor(ContextCompat.getColor(this@AdminActivity, android.R.color.darker_gray))
             setPadding(0, 20, 0, 20)
         }
-        settingsInner.addView(separator3)
+        settingsInner.addView(separator)
         
         val exportLabel = TextView(this).apply {
             text = "📊 Export Report"
@@ -560,7 +470,7 @@ class AdminActivity : AppCompatActivity() {
         loadPins()
         loadInstalledApps()
         loadCurrentWhitelistLocal()
-        loadSettings()
+        loadTelegramSettings()
     }
     
     private fun showDashboardPanel() {
@@ -593,40 +503,15 @@ class AdminActivity : AppCompatActivity() {
         pinPanel.visibility = View.GONE
         appPanel.visibility = View.GONE
         settingsPanel.visibility = View.VISIBLE
-        loadSettings()
+        loadTelegramSettings()
     }
     
-    private fun loadSettings() {
+    private fun loadTelegramSettings() {
         CoroutineScope(Dispatchers.IO).launch {
-            val config = supabase.getPricingConfig()
             val (token, chatId) = supabase.getTelegramConfig()
             withContext(Dispatchers.Main) {
-                pricingTypeSpinner.setSelection(if (config.pricingType == "fixed") 0 else 1)
-                priceAmountInput.setText(config.priceAmount.toString())
-                durationInput.setText(config.durationMinutes.toString())
-                extendPriceInput.setText(config.extendPrice.toString())
-                extendDurationInput.setText(config.extendDuration.toString())
                 telegramTokenInput.setText(token)
                 telegramChatIdInput.setText(chatId)
-            }
-        }
-    }
-    
-    private fun savePricingConfig() {
-        val pricingType = if (pricingTypeSpinner.selectedItemPosition == 0) "fixed" else "hourly"
-        val priceAmount = priceAmountInput.text.toString().toDoubleOrNull() ?: 15.0
-        val durationMinutes = durationInput.text.toString().toIntOrNull() ?: 60
-        val extendPrice = extendPriceInput.text.toString().toDoubleOrNull() ?: 10.0
-        val extendDuration = extendDurationInput.text.toString().toIntOrNull() ?: 30
-        
-        savePricingBtn.isEnabled = false
-        savePricingBtn.text = "SAVING..."
-        CoroutineScope(Dispatchers.IO).launch {
-            val success = supabase.updatePricingConfig(pricingType, priceAmount, durationMinutes, extendPrice, extendDuration)
-            withContext(Dispatchers.Main) {
-                savePricingBtn.isEnabled = true
-                savePricingBtn.text = "💾 SAVE PRICING"
-                Toast.makeText(this@AdminActivity, if (success) "Pricing saved!" else "Failed to save", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -727,18 +612,8 @@ class AdminActivity : AppCompatActivity() {
                     
                     if (result != null) {
                         val message = "💰 *New PIN Generated!*%0APIN: $result%0ADuration: $minutes minutes%0AAmount: ₱${String.format("%.2f", amount)}"
-                        val sent = supabase.sendTelegramNotification(message)
-                        
-                        if (sent) {
-                            appStatusText.text = "✓ PIN: $result | Telegram sent!"
-                            appStatusText.setTextColor(android.graphics.Color.GREEN)
-                            Toast.makeText(this@AdminActivity, "✅ PIN: $result | Telegram sent!", Toast.LENGTH_LONG).show()
-                        } else {
-                            appStatusText.text = "⚠️ PIN: $result | Telegram FAILED - check settings"
-                            appStatusText.setTextColor(android.graphics.Color.YELLOW)
-                            Toast.makeText(this@AdminActivity, "⚠️ PIN generated but Telegram FAILED", Toast.LENGTH_LONG).show()
-                        }
-                        
+                        supabase.sendTelegramNotification(message)
+                        Toast.makeText(this@AdminActivity, "✅ PIN: $result ($minutes min - ₱$amount)", Toast.LENGTH_LONG).show()
                         generatePinInput.text.clear()
                         generateMinutesInput.text.clear()
                         generateAmountInput.text.clear()
@@ -757,21 +632,29 @@ class AdminActivity : AppCompatActivity() {
         }
     }
     
-    private fun extendTime(pin: String, minutes: Int) {
+    private fun extendTime(pin: String, minutes: Int, amount: Double) {
         extendBtn.isEnabled = false
         extendBtn.text = "EXTENDING..."
         
         CoroutineScope(Dispatchers.IO).launch {
             val success = supabase.extendTime(pin, minutes)
-            withContext(Dispatchers.Main) {
-                extendBtn.isEnabled = true
-                extendBtn.text = "⏰ EXTEND TIME"
-                if (success) {
-                    Toast.makeText(this@AdminActivity, "Added $minutes minutes to PIN $pin", Toast.LENGTH_LONG).show()
+            if (success) {
+                supabase.recordExtension(pin, minutes, amount)
+                supabase.sendTelegramNotification("⏰ *Session Extended!*%0APIN: $pin%0AAdded: $minutes minutes%0AAdditional Payment: ₱${String.format("%.2f", amount)}")
+                
+                withContext(Dispatchers.Main) {
+                    extendBtn.isEnabled = true
+                    extendBtn.text = "⏰ EXTEND TIME"
+                    Toast.makeText(this@AdminActivity, "Added $minutes minutes (₱$amount) to PIN $pin", Toast.LENGTH_LONG).show()
                     loadPins()
                     extendPinInput.text.clear()
                     extendMinutesInput.text.clear()
-                } else {
+                    extendAmountInput.text.clear()
+                }
+            } else {
+                withContext(Dispatchers.Main) {
+                    extendBtn.isEnabled = true
+                    extendBtn.text = "⏰ EXTEND TIME"
                     Toast.makeText(this@AdminActivity, "Failed to extend", Toast.LENGTH_SHORT).show()
                 }
             }
