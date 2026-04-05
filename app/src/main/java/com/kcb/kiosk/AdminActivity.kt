@@ -7,7 +7,6 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.View
-import android.view.ViewGroup
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -155,16 +154,16 @@ class AdminActivity : AppCompatActivity() {
         }
         header.addView(titleText)
         
-        val divider = View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1).apply {
-                setMargins(0, 10, 0, 0)
-            }
-            setBackgroundColor(Color.parseColor("#E0E0E0"))
-        }
-        
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(header)
+            
+            val divider = View(this@AdminActivity).apply {
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1).apply {
+                    setMargins(0, 10, 0, 0)
+                }
+                setBackgroundColor(Color.parseColor("#E0E0E0"))
+            }
             addView(divider)
         }
         
@@ -467,7 +466,11 @@ class AdminActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             val success = supabase.updateTelegramConfig(token, chatId)
             withContext(Dispatchers.Main) {
-                Toast.makeText(this@AdminActivity, if (success) "Telegram saved!", Toast.LENGTH_SHORT).show()
+                if (success) {
+                    Toast.makeText(this@AdminActivity, "Telegram saved!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@AdminActivity, "Failed to save", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
