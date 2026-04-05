@@ -9,7 +9,7 @@
         android:allowBackup="true"
         android:label="KCB Rental"
         android:supportsRtl="true"
-        android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
         
         <activity
             android:name=".MainActivity"
