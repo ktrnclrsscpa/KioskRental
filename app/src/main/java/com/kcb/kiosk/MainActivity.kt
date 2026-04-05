@@ -34,7 +34,7 @@ class MainActivity : AppCompatActivity() {
     private var gridReady = false
     private var remainingSeconds = 0
     private var extendCheckJob: Job? = null
-    private var paidAmount = 0.0   // <-- ADD THIS
+    private var paidAmount = 0.0  // Store the exact amount from the PIN
     
     private lateinit var tts: TextToSpeech
     
@@ -232,7 +232,7 @@ class MainActivity : AppCompatActivity() {
                     if (result.isValid && result.secondsLeft > 0) {
                         currentPin = pin
                         remainingSeconds = result.secondsLeft
-                        paidAmount = result.amount   // store the exact amount from the PIN
+                        paidAmount = result.amount  // Store the exact amount from the PIN
                         startSession()
                     } else {
                         Toast.makeText(this@MainActivity, "Invalid or expired PIN", Toast.LENGTH_LONG).show()
@@ -265,7 +265,7 @@ class MainActivity : AppCompatActivity() {
             startCountDownTimer()
             startExtendListener()
             
-            // Send Telegram notification for new session
+            // Send Telegram notification and record session
             sendNewSessionNotification()
             
         } catch (e: Exception) {
@@ -279,12 +279,22 @@ class MainActivity : AppCompatActivity() {
             try {
                 val minutes = remainingSeconds / 60
                 // Record session with the actual paid amount from the PIN
-                supabase.recordSession(currentPin!!, minutes, paidAmount)
+                val recorded = supabase.recordSession(currentPin!!, minutes, paidAmount)
                 // Send Telegram notification
                 val message = "🎮 *New Rental Session!*%0APIN: ${currentPin}%0ADuration: ${minutes} minutes%0AAmount: ₱${String.format("%.2f", paidAmount)}"
-                supabase.sendTelegramNotification(message)
+                val sent = supabase.sendTelegramNotification(message)
+                
+                withContext(Dispatchers.Main) {
+                    if (sent && recorded) {
+                        Toast.makeText(this@MainActivity, "✅ Session started! Telegram sent.", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this@MainActivity, "⚠️ Session started but Telegram failed.", Toast.LENGTH_SHORT).show()
+                    }
+                }
             } catch (e: Exception) {
-                // Silent fail – don't interrupt the session
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "⚠️ Session started but error: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -379,14 +389,12 @@ class MainActivity : AppCompatActivity() {
         try {
             windowManager = getSystemService(WINDOW_SERVICE) as android.view.WindowManager
             
-            // Create container for timer with drag handle
             floatingTimerContainer = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 setBackgroundColor(android.graphics.Color.parseColor("#CC000000"))
                 setPadding(12, 8, 12, 8)
                 gravity = android.view.Gravity.CENTER
                 
-                // Drag handle (three dots)
                 val dragHandle = TextView(this@MainActivity).apply {
                     text = "⋮⋮"
                     textSize = 18f
@@ -395,7 +403,6 @@ class MainActivity : AppCompatActivity() {
                 }
                 addView(dragHandle)
                 
-                // Timer text
                 floatingTimer = TextView(this@MainActivity).apply {
                     text = timerText.text
                     textSize = 18f
@@ -405,7 +412,6 @@ class MainActivity : AppCompatActivity() {
                 }
                 addView(floatingTimer)
                 
-                // Make it movable
                 setOnTouchListener { _, event ->
                     when (event.action) {
                         MotionEvent.ACTION_DOWN -> {
