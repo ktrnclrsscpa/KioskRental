@@ -27,13 +27,11 @@ import java.util.*
 class AdminActivity : AppCompatActivity() {
     private lateinit var supabase: SupabaseClient
     
-    // Panels
     private lateinit var dashboardPanel: LinearLayout
     private lateinit var pinPanel: LinearLayout
     private lateinit var appPanel: LinearLayout
     private lateinit var settingsPanel: LinearLayout
     
-    // PINS panel
     private lateinit var pinListText: TextView
     private lateinit var generatePinInput: EditText
     private lateinit var generateMinutesInput: EditText
@@ -44,13 +42,11 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var extendMinutesInput: EditText
     private lateinit var extendBtn: Button
     
-    // APPS panel
     private lateinit var appContainer: LinearLayout
     private lateinit var saveAppsBtn: Button
     private lateinit var appStatusText: TextView
     private val checkBoxes = mutableListOf<Pair<CheckBox, String>>()
     
-    // Dashboard panel
     private lateinit var dailyIncomeText: TextView
     private lateinit var weeklyIncomeText: TextView
     private lateinit var monthlyIncomeText: TextView
@@ -58,7 +54,6 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var totalSessionsText: TextView
     private lateinit var sessionHistoryRecycler: RecyclerView
     
-    // Settings panel
     private lateinit var pricingTypeSpinner: Spinner
     private lateinit var priceAmountInput: EditText
     private lateinit var durationInput: EditText
@@ -237,7 +232,7 @@ class AdminActivity : AppCompatActivity() {
         
         mainLayout.addView(dashboardPanel)
         
-        // ========== PINS PANEL ==========
+        // ========== PINS PANEL (FIXED LAYOUT - NO CUT OFF) ==========
         pinPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -250,35 +245,32 @@ class AdminActivity : AppCompatActivity() {
         }
         pinPanel.addView(genLabel)
         
-        val pinRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-        
+        // PIN input - full width
         generatePinInput = EditText(this).apply {
             hint = "PIN (leave blank for random)"
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             setPadding(10, 10, 10, 10)
             maxLines = 1
         }
-        pinRow.addView(generatePinInput)
+        pinPanel.addView(generatePinInput)
         
+        // Minutes input
         generateMinutesInput = EditText(this).apply {
-            hint = "Minutes"
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.33f)
+            hint = "Minutes (e.g., 60)"
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             setPadding(10, 10, 10, 10)
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
         }
-        pinRow.addView(generateMinutesInput)
+        pinPanel.addView(generateMinutesInput)
         
+        // Amount input
         generateAmountInput = EditText(this).apply {
-            hint = "Amount (₱)"
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.33f)
+            hint = "Amount in ₱ (e.g., 15.00)"
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             setPadding(10, 10, 10, 10)
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
         }
-        pinRow.addView(generateAmountInput)
-        
-        pinPanel.addView(pinRow)
+        pinPanel.addView(generateAmountInput)
         
         generateBtn = Button(this).apply {
             text = "GENERATE PIN"
@@ -306,27 +298,21 @@ class AdminActivity : AppCompatActivity() {
         }
         pinPanel.addView(extendTitle)
         
-        val extendRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, 0, 0, 10)
-        }
-        
         extendPinInput = EditText(this).apply {
             hint = "PIN to extend"
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             setPadding(10, 10, 10, 10)
             maxLines = 1
         }
-        extendRow.addView(extendPinInput)
+        pinPanel.addView(extendPinInput)
         
         extendMinutesInput = EditText(this).apply {
             hint = "Minutes to add"
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.5f)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             setPadding(10, 10, 10, 10)
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
         }
-        extendRow.addView(extendMinutesInput)
-        pinPanel.addView(extendRow)
+        pinPanel.addView(extendMinutesInput)
         
         extendBtn = Button(this).apply {
             text = "⏰ EXTEND TIME"
@@ -406,7 +392,6 @@ class AdminActivity : AppCompatActivity() {
             setPadding(20, 20, 20, 20)
         }
         
-        // Pricing Type
         val pricingTypeLabel = TextView(this).apply {
             text = "💰 Pricing Type"
             textSize = 16f
@@ -420,7 +405,6 @@ class AdminActivity : AppCompatActivity() {
         }
         settingsInner.addView(pricingTypeSpinner)
         
-        // Price Amount
         val priceAmountLabel = TextView(this).apply {
             text = "Price Amount (₱)"
             textSize = 14f
@@ -435,7 +419,6 @@ class AdminActivity : AppCompatActivity() {
         }
         settingsInner.addView(priceAmountInput)
         
-        // Duration
         val durationLabel = TextView(this).apply {
             text = "Duration (minutes)"
             textSize = 14f
@@ -457,7 +440,6 @@ class AdminActivity : AppCompatActivity() {
         }
         settingsInner.addView(separator1)
         
-        // Extension Settings
         val extensionLabel = TextView(this).apply {
             text = "⏰ Extension Settings"
             textSize = 16f
@@ -507,7 +489,6 @@ class AdminActivity : AppCompatActivity() {
         }
         settingsInner.addView(separator2)
         
-        // Telegram Settings
         val telegramLabel = TextView(this).apply {
             text = "🤖 Telegram Notifications"
             textSize = 16f
@@ -557,7 +538,6 @@ class AdminActivity : AppCompatActivity() {
         }
         settingsInner.addView(separator3)
         
-        // Export Report
         val exportLabel = TextView(this).apply {
             text = "📊 Export Report"
             textSize = 16f
@@ -741,21 +721,40 @@ class AdminActivity : AppCompatActivity() {
         generateBtn.text = "GENERATING..."
 
         CoroutineScope(Dispatchers.IO).launch {
-            val result = supabase.generatePin(pin, minutes * 60, amount)
-            withContext(Dispatchers.Main) {
-                generateBtn.isEnabled = true
-                generateBtn.text = "GENERATE PIN"
-                if (result != null) {
-                    // Send Telegram notification for new PIN
-                    val message = "💰 *New PIN Generated!*%0APIN: $result%0ADuration: $minutes minutes%0AAmount: ₱${String.format("%.2f", amount)}"
-                    supabase.sendTelegramNotification(message)
-                    Toast.makeText(this@AdminActivity, "PIN: $result ($minutes min - ₱$amount)", Toast.LENGTH_LONG).show()
-                    generatePinInput.text.clear()
-                    generateMinutesInput.text.clear()
-                    generateAmountInput.text.clear()
-                    loadPins()
-                } else {
-                    Toast.makeText(this@AdminActivity, "Failed to generate PIN", Toast.LENGTH_SHORT).show()
+            try {
+                val result = supabase.generatePin(pin, minutes * 60, amount)
+                
+                withContext(Dispatchers.Main) {
+                    generateBtn.isEnabled = true
+                    generateBtn.text = "GENERATE PIN"
+                    
+                    if (result != null) {
+                        val message = "💰 *New PIN Generated!*%0APIN: $result%0ADuration: $minutes minutes%0AAmount: ₱${String.format("%.2f", amount)}"
+                        val sent = supabase.sendTelegramNotification(message)
+                        
+                        if (sent) {
+                            appStatusText.text = "✓ PIN: $result | Telegram sent!"
+                            appStatusText.setTextColor(android.graphics.Color.GREEN)
+                            Toast.makeText(this@AdminActivity, "✅ PIN: $result | Telegram sent!", Toast.LENGTH_LONG).show()
+                        } else {
+                            appStatusText.text = "⚠️ PIN: $result | Telegram FAILED - check settings"
+                            appStatusText.setTextColor(android.graphics.Color.YELLOW)
+                            Toast.makeText(this@AdminActivity, "⚠️ PIN generated but Telegram FAILED", Toast.LENGTH_LONG).show()
+                        }
+                        
+                        generatePinInput.text.clear()
+                        generateMinutesInput.text.clear()
+                        generateAmountInput.text.clear()
+                        loadPins()
+                    } else {
+                        Toast.makeText(this@AdminActivity, "Failed to generate PIN", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    generateBtn.isEnabled = true
+                    generateBtn.text = "GENERATE PIN"
+                    Toast.makeText(this@AdminActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }
