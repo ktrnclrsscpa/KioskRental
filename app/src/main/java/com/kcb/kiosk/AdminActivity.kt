@@ -29,7 +29,6 @@ import java.util.*
 class AdminActivity : AppCompatActivity() {
     private lateinit var supabase: SupabaseClient
     
-    private lateinit var rootLayout: LinearLayout
     private lateinit var contentContainer: LinearLayout
     
     // Stats Cards
@@ -228,15 +227,7 @@ class AdminActivity : AppCompatActivity() {
     private fun initAdminPanel() {
         supabase = SupabaseClient.getInstance()
         
-        // Remove any existing views first
-        if (rootLayout != null) {
-            try {
-                (rootLayout.parent as? android.view.ViewGroup)?.removeView(rootLayout)
-            } catch (e: Exception) { }
-        }
-        
-        // Main container with horizontal layout (sidebar + content)
-        rootLayout = LinearLayout(this).apply {
+        val rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -378,7 +369,6 @@ class AdminActivity : AppCompatActivity() {
     }
     
     private fun showDashboardContent() {
-        // Stats Row
         val statsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, 0, 0, 20)
@@ -401,7 +391,6 @@ class AdminActivity : AppCompatActivity() {
         
         contentContainer.addView(statsRow)
         
-        // Recent Sessions
         val sessionsSection = createSection("Recent Sessions")
         
         sessionHistoryRecycler = RecyclerView(this).apply {
@@ -412,7 +401,6 @@ class AdminActivity : AppCompatActivity() {
         
         contentContainer.addView(createWhiteCard(sessionsSection))
         
-        // Reload data
         loadDashboardStats()
     }
     
@@ -420,9 +408,7 @@ class AdminActivity : AppCompatActivity() {
         // Generate PIN Section
         val generateSection = createSection("Generate New PIN")
         
-        val generateCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
+        val generateCard = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         
         generatePinInput = createInputField("PIN (leave blank for random)")
         generateCard.addView(generatePinInput)
@@ -443,9 +429,7 @@ class AdminActivity : AppCompatActivity() {
         // Extend PIN Section
         val extendSection = createSection("Extend Active PIN")
         
-        val extendCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
+        val extendCard = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         
         extendPinInput = createInputField("PIN to extend")
         extendCard.addView(extendPinInput)
@@ -487,16 +471,13 @@ class AdminActivity : AppCompatActivity() {
         pinsSection.addView(pinsText)
         contentContainer.addView(createWhiteCard(pinsSection))
         
-        // Load pins
         loadPinsList(pinsText)
     }
     
     private fun showAppWhitelistContent() {
         val whitelistSection = createSection("App Whitelist")
         
-        val whitelistCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
+        val whitelistCard = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         
         appStatusText = TextView(this).apply {
             text = "Loading apps..."
@@ -506,12 +487,8 @@ class AdminActivity : AppCompatActivity() {
         }
         whitelistCard.addView(appStatusText)
         
-        // Fixed height scroll container for app list
         val scrollContainer = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                400
-            )
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 400)
         }
         
         val scrollView = ScrollView(this)
@@ -535,9 +512,7 @@ class AdminActivity : AppCompatActivity() {
     private fun showSettingsContent() {
         val settingsSection = createSection("Settings")
         
-        val settingsCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
+        val settingsCard = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         
         val telegramLabel = TextView(this).apply {
             text = "Telegram Bot Configuration"
