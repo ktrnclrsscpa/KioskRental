@@ -1,21 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
-
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.MAIN" />
-        </intent>
-    </queries>
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
 
     <application
         android:allowBackup="true"
-        android:label="@string/app_name"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="KCB Rental"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.KioskRental">
+        android:theme="@style/Theme.KioskRental"
+        tools:targetApi="31">
+        
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -25,10 +27,10 @@
             </intent-filter>
         </activity>
         
+        <!-- ADD THIS AdminActivity -->
         <activity
             android:name=".AdminActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
+            android:exported="false" />
         
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -37,7 +39,9 @@
             android:grantUriPermissions="true">
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/fileprovider" />
+                android:resource="@xml/file_paths" />
         </provider>
+        
     </application>
+
 </manifest>
