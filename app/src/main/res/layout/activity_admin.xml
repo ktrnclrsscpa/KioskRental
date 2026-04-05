@@ -1,0 +1,371 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="#F5F7FA">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🔐 KCB RENTAL ADMIN"
+        android:textSize="24sp"
+        android:textColor="#2C3E50"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="30dp" />
+
+    <TextView
+        android:id="@+id/totalIncomeText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Total Income: ₱0"
+        android:textSize="16sp"
+        android:padding="10dp"
+        android:background="@drawable/card_background"
+        android:layout_marginBottom="10dp" />
+
+    <TextView
+        android:id="@+id/totalSessionsText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Total Sessions: 0"
+        android:textSize="16sp"
+        android:padding="10dp"
+        android:background="@drawable/card_background"
+        android:layout_marginBottom="10dp" />
+
+    <TextView
+        android:id="@+id/todayIncomeText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Today's Sales: ₱0"
+        android:textSize="16sp"
+        android:padding="10dp"
+        android:background="@drawable/card_background"
+        android:layout_marginBottom="20dp" />
+
+    <Button
+        android:id="@+id/refreshStatsBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="REFRESH STATS"
+        android:backgroundTint="#3498DB"
+        android:layout_marginBottom="20dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="📌 Generate New PIN"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="10dp" />
+
+    <EditText
+        android:id="@+id/generatePinInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="PIN (leave blank for random)"
+        android:padding="14dp"
+        android:background="@drawable/edittext_background"
+        android:layout_marginBottom="10dp" />
+
+    <EditText
+        android:id="@+id/generateMinutesInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Minutes"
+        android:inputType="number"
+        android:padding="14dp"
+        android:background="@drawable/edittext_background"
+        android:layout_marginBottom="10dp" />
+
+    <EditText
+        android:id="@+id/generateAmountInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Amount (₱)"
+        android:inputType="numberDecimal"
+        android:padding="14dp"
+        android:background="@drawable/edittext_background"
+        android:layout_marginBottom="10dp" />
+
+    <Button
+        android:id="@+id/generateBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="GENERATE PIN"
+        android:backgroundTint="#2ECC71"
+        android:layout_marginBottom="20dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="⏰ Extend Active PIN"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="10dp" />
+
+    <EditText
+        android:id="@+id/extendPinInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="PIN to extend"
+        android:padding="14dp"
+        android:background="@drawable/edittext_background"
+        android:layout_marginBottom="10dp" />
+
+    <EditText
+        android:id="@+id/extendMinutesInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Minutes to add"
+        android:inputType="number"
+        android:padding="14dp"
+        android:background="@drawable/edittext_background"
+        android:layout_marginBottom="10dp" />
+
+    <EditText
+        android:id="@+id/extendAmountInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Amount (₱)"
+        android:inputType="numberDecimal"
+        android:padding="14dp"
+        android:background="@drawable/edittext_background"
+        android:layout_marginBottom="10dp" />
+
+    <Button
+        android:id="@+id/extendBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="EXTEND TIME"
+        android:backgroundTint="#E67E22"
+        android:layout_marginBottom="20dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🔑 Active PINs"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="10dp" />
+
+    <TextView
+        android:id="@+id/pinsText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Loading..."
+        android:padding="14dp"
+        android:background="@drawable/edittext_background"
+        android:layout_marginBottom="10dp" />
+
+    <Button
+        android:id="@+id/refreshPinsBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="REFRESH PIN LIST"
+        android:backgroundTint="#3498DB"
+        android:layout_marginBottom="20dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="⚙️ Telegram Settings"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="10dp" />
+
+    <EditText
+        android:id="@+id/telegramTokenInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Bot Token"
+        android:padding="14dp"
+        android:background="@drawable/edittext_background"
+        android:layout_marginBottom="10dp" />
+
+    <EditText
+        android:id="@+id/telegramChatIdInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Chat ID"
+        android:padding="14dp"
+        android:background="@drawable/edittext_background"
+        android:layout_marginBottom="10dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="10dp">
+
+        <Button
+            android:id="@+id/saveTelegramBtn"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="SAVE"
+            android:backgroundTint="#2ECC71"
+            android:layout_marginEnd="5dp" />
+
+        <Button
+            android:id="@+id/testTelegramBtn"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="TEST"
+            android:backgroundTint="#E67E22" />
+
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/exportReportBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="EXPORT CSV REPORT"
+        android:backgroundTint="#9B59B6"
+        android:layout_marginBottom="10dp" />
+
+    <Button
+        android:id="@+id/changePwdBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Change Password"
+        android:backgroundTint="#3498DB" />
+
+</LinearLayout>￼Enter<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="#F5F7FA">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🔐 KCB RENTAL ADMIN"
+        android:textSize="24sp"
+        android:textColor="#2C3E50"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="30dp" />
+
+    <TextView
+        android:id="@+id/totalIncomeText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Total Income: ₱0"
+        android:textSize="16sp"
+        android:padding="10dp"
+        android:background="@drawable/card_background"
+        android:layout_marginBottom="10dp" />
+
+    <TextView
+        android:id="@+id/totalSessionsText"
+        android:layout_width="match_parent"
+  android:layout_height="wrap_content"
+        android:text="Total Sessions: 0"
+        android:textSize="16sp"
+        android:padding="10dp"
+        android:background="@drawable/card_background"
+        android:layout_marginBottom="10dp" />
+
+    <TextView
+        android:id="@+id/todayIncomeText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Today's Sales: ₱0"
+        android:textSize="16sp"
+        android:padding="10dp"
+        android:background="@drawable/card_background"
+        android:layout_marginBottom="20dp" />
+
+    <Button
+        android:id="@+id/refreshStatsBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="REFRESH STATS"
+        android:backgroundTint="#3498DB"
+        android:layout_marginBottom="20dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="📌 Generate New PIN"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="10dp" />
+
+    <EditText
+        android:id="@+id/generatePinInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="PIN (leave blank for random)"
+        android:padding="14dp"
+        android:background="@drawable/edittext_background"
+        android:layout_marginBottom="10dp" />
+
+    <EditText
+        android:id="@+id/generateMinutesInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Minutes"
+        android:inputType="number"
+        android:padding="14dp"
+        android:background="@drawable/edittext_background"
+        android:layout_marginBottom="10dp" />
+
+    <EditText
+        android:id="@+id/generateAmountInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Amount (₱)"
+        android:inputType="numberDecimal"
+        android:padding="14dp"
+        android:background="@drawable/edittext_background"
+        android:layout_marginBottom="10dp" />
+
+    <Button
+        android:id="@+id/generateBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="GENERATE PIN"
+        android:backgroundTint="#2ECC71"
+        android:layout_marginBottom="20dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="⏰ Extend Active PIN"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="10dp" />
+
+    <EditText
+        android:id="@+id/extendPinInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="PIN to extend"
+        android:padding="14dp"
+        android:background="@drawable/edittext_background"
+        android:layout_marginBottom="10dp" />
+
+    <EditText
+        android:id="@+id/extendMinutesInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Minutes to add"
+        android:inputType="number"
+        android:padding="14dp"
+        android:background="@drawable/edittext_background"
+        android:layout_marginBottom="10dp" />
+
+    <EditText
+        android:id="@+id/extendAmountInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Amount (₱)"
+        android:inputType="numberDecimal"
