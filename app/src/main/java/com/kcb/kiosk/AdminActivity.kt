@@ -4,17 +4,22 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
@@ -27,8 +32,8 @@ import java.util.*
 class AdminActivity : AppCompatActivity() {
     private lateinit var supabase: SupabaseClient
     
-    private lateinit var scrollView: ScrollView
     private lateinit var mainContainer: LinearLayout
+    private lateinit var contentContainer: LinearLayout
     
     // Stats Cards
     private lateinit var totalIncomeCard: TextView
@@ -63,6 +68,9 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var exportReportBtn: Button
     
     private val prefs by lazy { getSharedPreferences("kiosk_prefs", Context.MODE_PRIVATE) }
+    
+    // Navigation state
+    private var currentSection = "dashboard"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -98,87 +106,78 @@ class AdminActivity : AppCompatActivity() {
     private fun createStatCard(title: String, value: String, icon: String, color: String): LinearLayout {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(20, 20, 20, 20)
+            setPadding(16, 16, 16, 16)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                setMargins(0, 0, 15, 0)
+                setMargins(0, 0, 12, 0)
             }
             background = GradientDrawable().apply {
                 setColor(Color.parseColor(color))
-                cornerRadius = 16f
+                cornerRadius = 12f
             }
+        }
+        
+        val topRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
         }
         
         val iconText = TextView(this).apply {
             text = icon
-            textSize = 28f
-            setPadding(0, 0, 0, 10)
+            textSize = 20f
         }
-        card.addView(iconText)
+        topRow.addView(iconText)
         
         val valueText = TextView(this).apply {
             text = value
-            textSize = 22f
+            textSize = 18f
             setTextColor(Color.WHITE)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            typeface = Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                setMargins(8, 0, 0, 0)
+            }
         }
-        card.addView(valueText)
+        topRow.addView(valueText)
+        
+        card.addView(topRow)
         
         val titleText = TextView(this).apply {
             text = title
-            textSize = 11f
+            textSize = 10f
             setTextColor(Color.parseColor("#E0E0E0"))
+            setPadding(0, 8, 0, 0)
         }
         card.addView(titleText)
         
         return card
     }
     
-    private fun createSectionHeader(title: String, icon: String): LinearLayout {
-        val header = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, 20, 0, 15)
+    private fun createSection(title: String): LinearLayout {
+        val section = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, 0, 0, 20)
         }
-        
-        val iconText = TextView(this).apply {
-            text = icon
-            textSize = 22f
-            setPadding(0, 0, 12, 0)
-        }
-        header.addView(iconText)
         
         val titleText = TextView(this).apply {
             text = title
             textSize = 18f
-            setTextColor(Color.parseColor("#2C3E50"))
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor("#1A2C3E"))
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(0, 0, 0, 12)
         }
-        header.addView(titleText)
+        section.addView(titleText)
         
-        val container = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(header)
-            
-            val divider = View(this@AdminActivity).apply {
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1).apply {
-                    setMargins(0, 10, 0, 0)
-                }
-                setBackgroundColor(Color.parseColor("#E0E0E0"))
-            }
-            addView(divider)
-        }
-        
-        return container
+        return section
     }
     
     private fun createInputField(hint: String, isNumber: Boolean = false): EditText {
         return EditText(this).apply {
             this.hint = hint
-            setPadding(18, 14, 18, 14)
+            setPadding(16, 14, 16, 14)
             textSize = 14f
             background = GradientDrawable().apply {
-                setColor(Color.WHITE)
-                cornerRadius = 12f
-                setStroke(1, Color.parseColor("#DDDDDD"))
+                setColor(Color.parseColor("#F5F7FA"))
+                cornerRadius = 10f
+                setStroke(1, Color.parseColor("#E8ECEF"))
             }
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -196,7 +195,7 @@ class AdminActivity : AppCompatActivity() {
         return Button(this).apply {
             this.text = text
             textSize = 14f
-            setPadding(18, 14, 18, 14)
+            setPadding(16, 12, 16, 12)
             setBackgroundColor(Color.parseColor(color))
             setTextColor(Color.WHITE)
             setAllCaps(false)
@@ -210,14 +209,14 @@ class AdminActivity : AppCompatActivity() {
         }
     }
     
-    private fun createCardView(content: View): LinearLayout {
+    private fun createWhiteCard(content: View): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(20, 15, 20, 15)
+            setPadding(20, 16, 20, 16)
             background = GradientDrawable().apply {
                 setColor(Color.WHITE)
                 cornerRadius = 16f
-                setStroke(1, Color.parseColor("#EEEEEE"))
+                setStroke(1, Color.parseColor("#EEF2F6"))
             }
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -232,43 +231,156 @@ class AdminActivity : AppCompatActivity() {
     private fun initAdminPanel() {
         supabase = SupabaseClient.getInstance()
         
-        scrollView = ScrollView(this)
-        mainContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(25, 30, 25, 50)
-            setBackgroundColor(Color.parseColor("#F5F7FA"))
-        }
-        
-        // ========== HEADER ==========
-        val header = LinearLayout(this).apply {
+        // Main container with horizontal layout (sidebar + content)
+        val rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(0, 0, 0, 20)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
         }
         
-        val title = TextView(this).apply {
-            text = "KCB RENTAL ADMIN"
-            textSize = 26f
-            setTextColor(Color.parseColor("#1A2C3E"))
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        // ========== SIDEBAR ==========
+        val sidebar = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(20, 40, 20, 30)
+            setBackgroundColor(Color.parseColor("#1A2C3E"))
+            layoutParams = LinearLayout.LayoutParams(
+                220,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
         }
-        header.addView(title)
         
-        val changePwdBtn = Button(this).apply {
-            text = "Change Pwd"
-            textSize = 12f
-            setBackgroundColor(Color.TRANSPARENT)
-            setTextColor(Color.parseColor("#3498DB"))
+        val appTitle = TextView(this).apply {
+            text = "KCB RENTAL"
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(0, 0, 0, 30)
+        }
+        sidebar.addView(appTitle)
+        
+        val menuItems = listOf(
+            Triple("📊", "Dashboard", "dashboard"),
+            Triple("💰", "PIN Management", "pin"),
+            Triple("📱", "App Whitelist", "apps"),
+            Triple("⚙️", "Settings", "settings")
+        )
+        
+        for ((icon, title, id) in menuItems) {
+            val menuItem = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(12, 14, 12, 14)
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    setMargins(0, 0, 0, 5)
+                }
+                background = GradientDrawable().apply {
+                    cornerRadius = 10f
+                }
+                setOnClickListener {
+                    currentSection = id
+                    updateContent()
+                }
+                setTag("menu_$id")
+            }
+            
+            val iconText = TextView(this).apply {
+                text = icon
+                textSize = 18f
+                setTextColor(Color.parseColor("#A0B0C0"))
+                setPadding(0, 0, 12, 0)
+            }
+            menuItem.addView(iconText)
+            
+            val titleText = TextView(this).apply {
+                text = title
+                textSize = 14f
+                setTextColor(Color.parseColor("#A0B0C0"))
+            }
+            menuItem.addView(titleText)
+            
+            sidebar.addView(menuItem)
+        }
+        
+        // Logout/Change Password
+        val spacer = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+        }
+        sidebar.addView(spacer)
+        
+        val logoutItem = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(12, 14, 12, 14)
+            gravity = android.view.Gravity.CENTER_VERTICAL
             setOnClickListener { showChangePasswordDialog() }
         }
-        header.addView(changePwdBtn)
         
-        mainContainer.addView(header)
+        val logoutIcon = TextView(this).apply {
+            text = "🔐"
+            textSize = 18f
+            setTextColor(Color.parseColor("#A0B0C0"))
+            setPadding(0, 0, 12, 0)
+        }
+        logoutItem.addView(logoutIcon)
         
-        // ========== STATS ROW ==========
+        val logoutText = TextView(this).apply {
+            text = "Change Password"
+            textSize = 14f
+            setTextColor(Color.parseColor("#A0B0C0"))
+        }
+        logoutItem.addView(logoutText)
+        
+        sidebar.addView(logoutItem)
+        
+        // ========== CONTENT AREA ==========
+        val scrollView = ScrollView(this)
+        contentContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(25, 30, 25, 40)
+            setBackgroundColor(Color.parseColor("#F8F9FC"))
+        }
+        
+        scrollView.addView(contentContainer)
+        
+        rootLayout.addView(sidebar)
+        rootLayout.addView(scrollView, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
+        
+        setContentView(rootLayout)
+        
+        // Load initial data
+        loadDashboardStats()
+        loadPinsCount()
+        loadInstalledApps()
+        loadCurrentWhitelistLocal()
+        loadTelegramSettings()
+        
+        updateContent()
+    }
+    
+    private fun updateContent() {
+        contentContainer.removeAllViews()
+        
+        when (currentSection) {
+            "dashboard" -> showDashboardContent()
+            "pin" -> showPinManagementContent()
+            "apps" -> showAppWhitelistContent()
+            "settings" -> showSettingsContent()
+        }
+    }
+    
+    private fun showDashboardContent() {
+        // Stats Row
         val statsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(0, 0, 0, 25)
+            setPadding(0, 0, 0, 20)
         }
         
         val statsCard1 = createStatCard("Total Income", "₱0", "💰", "#2ECC71")
@@ -276,63 +388,62 @@ class AdminActivity : AppCompatActivity() {
         val statsCard3 = createStatCard("Active PINs", "0", "🔑", "#E67E22")
         val statsCard4 = createStatCard("Today's Sales", "₱0", "📈", "#9B59B6")
         
-        totalIncomeCard = (statsCard1.getChildAt(1) as TextView)
-        totalSessionsCard = (statsCard2.getChildAt(1) as TextView)
-        activePinsCard = (statsCard3.getChildAt(1) as TextView)
-        todayIncomeCard = (statsCard4.getChildAt(1) as TextView)
+        totalIncomeCard = (statsCard1.getChildAt(0) as LinearLayout).getChildAt(1) as TextView
+        totalSessionsCard = (statsCard2.getChildAt(0) as LinearLayout).getChildAt(1) as TextView
+        activePinsCard = (statsCard3.getChildAt(0) as LinearLayout).getChildAt(1) as TextView
+        todayIncomeCard = (statsCard4.getChildAt(0) as LinearLayout).getChildAt(1) as TextView
         
         statsRow.addView(statsCard1)
         statsRow.addView(statsCard2)
         statsRow.addView(statsCard3)
         statsRow.addView(statsCard4)
         
-        mainContainer.addView(statsRow)
+        contentContainer.addView(statsRow)
         
-        // ========== RECENT SESSIONS SECTION ==========
-        mainContainer.addView(createSectionHeader("Recent Sessions", "📜"))
-        
-        val sessionsCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, 5, 0, 0)
-        }
+        // Recent Sessions
+        val sessionsSection = createSection("Recent Sessions")
         
         sessionHistoryRecycler = RecyclerView(this).apply {
             layoutManager = LinearLayoutManager(this@AdminActivity)
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 350)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 400)
         }
-        sessionsCard.addView(sessionHistoryRecycler)
+        sessionsSection.addView(sessionHistoryRecycler)
         
-        mainContainer.addView(createCardView(sessionsCard))
+        contentContainer.addView(createWhiteCard(sessionsSection))
         
-        // ========== GENERATE PIN SECTION ==========
-        mainContainer.addView(createSectionHeader("Generate New PIN", "🔐"))
+        // Reload data
+        loadDashboardStats()
+    }
+    
+    private fun showPinManagementContent() {
+        // Generate PIN Section
+        val generateSection = createSection("Generate New PIN")
         
         val generateCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 5, 0, 0)
         }
         
         generatePinInput = createInputField("PIN (leave blank for random)")
         generateCard.addView(generatePinInput)
         
-        generateMinutesInput = createInputField("Minutes (e.g., 60)", true)
+        generateMinutesInput = createInputField("Minutes", true)
         generateCard.addView(generateMinutesInput)
         
-        generateAmountInput = createInputField("Amount in ₱ (e.g., 15.00)", true)
+        generateAmountInput = createInputField("Amount (₱)", true)
         generateAmountInput.inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
         generateCard.addView(generateAmountInput)
         
-        generateBtn = createButton("GENERATE PIN", "#2ECC71") { generatePin() }
+        generateBtn = createButton("Generate PIN", "#2ECC71") { generatePin() }
         generateCard.addView(generateBtn)
         
-        mainContainer.addView(createCardView(generateCard))
+        generateSection.addView(createWhiteCard(generateCard))
+        contentContainer.addView(generateSection)
         
-        // ========== EXTEND PIN SECTION ==========
-        mainContainer.addView(createSectionHeader("Extend Active PIN", "⏰"))
+        // Extend PIN Section
+        val extendSection = createSection("Extend Active PIN")
         
         val extendCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 5, 0, 0)
         }
         
         extendPinInput = createInputField("PIN to extend")
@@ -341,11 +452,11 @@ class AdminActivity : AppCompatActivity() {
         extendMinutesInput = createInputField("Minutes to add", true)
         extendCard.addView(extendMinutesInput)
         
-        extendAmountInput = createInputField("Amount in ₱ (e.g., 5.00)", true)
+        extendAmountInput = createInputField("Amount (₱)", true)
         extendAmountInput.inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
         extendCard.addView(extendAmountInput)
         
-        extendBtn = createButton("EXTEND TIME", "#E67E22") {
+        extendBtn = createButton("Extend Time", "#E67E22") {
             val pin = extendPinInput.text.toString().trim()
             val minutes = extendMinutesInput.text.toString().toIntOrNull()
             val amount = extendAmountInput.text.toString().toDoubleOrNull()
@@ -361,51 +472,85 @@ class AdminActivity : AppCompatActivity() {
         }
         extendCard.addView(extendBtn)
         
-        mainContainer.addView(createCardView(extendCard))
+        extendSection.addView(createWhiteCard(extendCard))
+        contentContainer.addView(extendSection)
         
-        // ========== APP WHITELIST SECTION ==========
-        mainContainer.addView(createSectionHeader("App Whitelist", "📱"))
+        // Active PINs List
+        val pinsSection = createSection("Active PINs")
+        val pinsText = TextView(this).apply {
+            text = "Loading..."
+            textSize = 14f
+            setPadding(16, 12, 16, 12)
+            setTextColor(Color.parseColor("#666666"))
+        }
+        pinsSection.addView(pinsText)
+        contentContainer.addView(createWhiteCard(pinsSection))
+        
+        // Load pins
+        loadPinsList(pinsText)
+    }
+    
+    private fun showAppWhitelistContent() {
+        val whitelistSection = createSection("App Whitelist")
         
         val whitelistCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 5, 0, 0)
         }
         
         appStatusText = TextView(this).apply {
             text = "Loading apps..."
-            textSize = 12f
-            setPadding(0, 0, 0, 10)
+            textSize = 13f
+            setPadding(0, 0, 0, 12)
             setTextColor(Color.parseColor("#7F8C8D"))
         }
         whitelistCard.addView(appStatusText)
         
-        val appScrollView = ScrollView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 250)
+        // Fix: Use FrameLayout with fixed height and scroll
+        val scrollContainer = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                400
+            )
         }
+        
+        val scrollView = ScrollView(this)
         appContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(5, 5, 5, 5)
+            setPadding(8, 8, 8, 8)
         }
-        appScrollView.addView(appContainer)
-        whitelistCard.addView(appScrollView)
+        scrollView.addView(appContainer)
+        scrollContainer.addView(scrollView)
+        whitelistCard.addView(scrollContainer)
         
-        saveAppsBtn = createButton("SAVE WHITELIST", "#3498DB") { saveWhitelistLocal() }
+        saveAppsBtn = createButton("Save Whitelist", "#3498DB") { saveWhitelistLocal() }
         whitelistCard.addView(saveAppsBtn)
         
-        mainContainer.addView(createCardView(whitelistCard))
+        whitelistSection.addView(createWhiteCard(whitelistCard))
+        contentContainer.addView(whitelistSection)
         
-        // ========== SETTINGS SECTION ==========
-        mainContainer.addView(createSectionHeader("Settings", "⚙️"))
+        loadInstalledApps()
+    }
+    
+    private fun showSettingsContent() {
+        val settingsSection = createSection("Settings")
         
         val settingsCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 5, 0, 0)
         }
         
-        telegramTokenInput = createInputField("Telegram Bot Token")
+        val telegramLabel = TextView(this).apply {
+            text = "Telegram Bot Configuration"
+            textSize = 14f
+            setTextColor(Color.parseColor("#1A2C3E"))
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(0, 0, 0, 12)
+        }
+        settingsCard.addView(telegramLabel)
+        
+        telegramTokenInput = createInputField("Bot Token")
         settingsCard.addView(telegramTokenInput)
         
-        telegramChatIdInput = createInputField("Telegram Chat ID")
+        telegramChatIdInput = createInputField("Chat ID")
         settingsCard.addView(telegramChatIdInput)
         
         val buttonRow = LinearLayout(this).apply {
@@ -414,7 +559,7 @@ class AdminActivity : AppCompatActivity() {
         }
         
         saveTelegramBtn = Button(this).apply {
-            text = "SAVE"
+            text = "Save"
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
                 setMargins(0, 0, 10, 0)
             }
@@ -425,7 +570,7 @@ class AdminActivity : AppCompatActivity() {
         buttonRow.addView(saveTelegramBtn)
         
         testTelegramBtn = Button(this).apply {
-            text = "TEST"
+            text = "Test"
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             setBackgroundColor(Color.parseColor("#E67E22"))
             setTextColor(Color.WHITE)
@@ -435,19 +580,36 @@ class AdminActivity : AppCompatActivity() {
         
         settingsCard.addView(buttonRow)
         
-        exportReportBtn = createButton("EXPORT CSV REPORT", "#9B59B6") { exportReport() }
+        val spacer = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 20)
+        }
+        settingsCard.addView(spacer)
+        
+        exportReportBtn = createButton("Export CSV Report", "#9B59B6") { exportReport() }
         settingsCard.addView(exportReportBtn)
         
-        mainContainer.addView(createCardView(settingsCard))
+        settingsSection.addView(createWhiteCard(settingsCard))
+        contentContainer.addView(settingsSection)
         
-        scrollView.addView(mainContainer)
-        setContentView(scrollView)
-        
-        loadDashboardStats()
-        loadPinsCount()
-        loadInstalledApps()
-        loadCurrentWhitelistLocal()
         loadTelegramSettings()
+    }
+    
+    private fun loadPinsList(pinsText: TextView) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val pins = supabase.getActivePins()
+            withContext(Dispatchers.Main) {
+                if (pins.isEmpty()) {
+                    pinsText.text = "No active PINs"
+                } else {
+                    val sb = StringBuilder()
+                    for (p in pins) {
+                        val minutes = p.secondsLeft / 60
+                        sb.append("🔑 ${p.pin} - ${minutes} min remaining\n")
+                    }
+                    pinsText.text = sb.toString()
+                }
+            }
+        }
     }
     
     private fun loadTelegramSettings() {
@@ -479,14 +641,14 @@ class AdminActivity : AppCompatActivity() {
         val token = telegramTokenInput.text.toString().trim()
         val chatId = telegramChatIdInput.text.toString().trim()
         if (token.isEmpty() || chatId.isEmpty()) {
-            Toast.makeText(this, "Please enter Bot Token and Chat ID first", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Enter Bot Token and Chat ID first", Toast.LENGTH_SHORT).show()
             return
         }
         testTelegramBtn.isEnabled = false
-        testTelegramBtn.text = "SENDING..."
+        testTelegramBtn.text = "Sending..."
         Thread {
             try {
-                val urlString = "https://api.telegram.org/bot$token/sendMessage?chat_id=$chatId&text=✅%20Test%20notification%20from%20KCB%20Rental%20Kiosk!"
+                val urlString = "https://api.telegram.org/bot$token/sendMessage?chat_id=$chatId&text=✅%20Test%20from%20KCB%20Rental!"
                 val url = URL(urlString)
                 val connection = url.openConnection() as HttpURLConnection
                 connection.requestMethod = "GET"
@@ -496,17 +658,17 @@ class AdminActivity : AppCompatActivity() {
                 connection.disconnect()
                 runOnUiThread {
                     testTelegramBtn.isEnabled = true
-                    testTelegramBtn.text = "TEST"
+                    testTelegramBtn.text = "Test"
                     if (responseCode == 200) {
                         Toast.makeText(this, "Test sent! Check Telegram.", Toast.LENGTH_LONG).show()
                     } else {
-                        Toast.makeText(this, "Failed! Check your Token and Chat ID.", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, "Failed! Check your credentials.", Toast.LENGTH_LONG).show()
                     }
                 }
             } catch (e: Exception) {
                 runOnUiThread {
                     testTelegramBtn.isEnabled = true
-                    testTelegramBtn.text = "TEST"
+                    testTelegramBtn.text = "Test"
                     Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
@@ -526,24 +688,25 @@ class AdminActivity : AppCompatActivity() {
         }
         val customPin = generatePinInput.text.toString().trim()
         if (customPin.isNotEmpty() && customPin.length != 6) {
-            Toast.makeText(this, "PIN must be exactly 6 characters", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "PIN must be 6 characters", Toast.LENGTH_SHORT).show()
             return
         }
         val pin = if (customPin.isNotEmpty()) customPin else null
         generateBtn.isEnabled = false
-        generateBtn.text = "GENERATING..."
+        generateBtn.text = "Generating..."
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val result = supabase.generatePin(pin, minutes * 60, amount)
                 withContext(Dispatchers.Main) {
                     generateBtn.isEnabled = true
-                    generateBtn.text = "GENERATE PIN"
+                    generateBtn.text = "Generate PIN"
                     if (result != null) {
                         Toast.makeText(this@AdminActivity, "✅ PIN: $result ($minutes min - ₱$amount)", Toast.LENGTH_LONG).show()
                         generatePinInput.text.clear()
                         generateMinutesInput.text.clear()
                         generateAmountInput.text.clear()
                         loadPinsCount()
+                        updateContent()
                     } else {
                         Toast.makeText(this@AdminActivity, "Failed to generate PIN", Toast.LENGTH_SHORT).show()
                     }
@@ -551,7 +714,7 @@ class AdminActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     generateBtn.isEnabled = true
-                    generateBtn.text = "GENERATE PIN"
+                    generateBtn.text = "Generate PIN"
                     Toast.makeText(this@AdminActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
@@ -560,15 +723,15 @@ class AdminActivity : AppCompatActivity() {
     
     private fun extendTime(pin: String, minutes: Int, amount: Double) {
         extendBtn.isEnabled = false
-        extendBtn.text = "EXTENDING..."
+        extendBtn.text = "Extending..."
         CoroutineScope(Dispatchers.IO).launch {
             val success = supabase.extendTime(pin, minutes)
             if (success) {
                 supabase.recordExtension(pin, minutes, amount)
-                supabase.sendTelegramNotification("⏰ *Session Extended!*%0APIN: $pin%0AAdded: $minutes minutes%0AAdditional Payment: ₱${String.format("%.2f", amount)}")
+                supabase.sendTelegramNotification("⏰ *Session Extended!*%0APIN: $pin%0AAdded: $minutes minutes%0APayment: ₱${String.format("%.2f", amount)}")
                 withContext(Dispatchers.Main) {
                     extendBtn.isEnabled = true
-                    extendBtn.text = "EXTEND TIME"
+                    extendBtn.text = "Extend Time"
                     Toast.makeText(this@AdminActivity, "Added $minutes minutes (₱$amount) to PIN $pin", Toast.LENGTH_LONG).show()
                     extendPinInput.text.clear()
                     extendMinutesInput.text.clear()
@@ -578,7 +741,7 @@ class AdminActivity : AppCompatActivity() {
             } else {
                 withContext(Dispatchers.Main) {
                     extendBtn.isEnabled = true
-                    extendBtn.text = "EXTEND TIME"
+                    extendBtn.text = "Extend Time"
                     Toast.makeText(this@AdminActivity, "Failed to extend", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -621,7 +784,9 @@ class AdminActivity : AppCompatActivity() {
                 totalIncomeCard.text = currency.format(stats.yearly)
                 totalSessionsCard.text = stats.totalSessions.toString()
                 todayIncomeCard.text = currency.format(stats.daily)
-                sessionHistoryRecycler.adapter = SessionHistoryAdapter(history)
+                if (::sessionHistoryRecycler.isInitialized) {
+                    sessionHistoryRecycler.adapter = SessionHistoryAdapter(history)
+                }
             }
         }
     }
@@ -630,7 +795,9 @@ class AdminActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             val pins = supabase.getActivePins()
             withContext(Dispatchers.Main) {
-                activePinsCard.text = pins.size.toString()
+                if (::activePinsCard.isInitialized) {
+                    activePinsCard.text = pins.size.toString()
+                }
             }
         }
     }
@@ -657,7 +824,7 @@ class AdminActivity : AppCompatActivity() {
     }
     
     private fun loadInstalledApps() {
-        appStatusText.text = "Scanning apps..."
+        appStatusText.text = "Loading apps..."
         saveAppsBtn.isEnabled = false
         val installedApps = mutableListOf<Pair<String, String>>()
         val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
@@ -674,14 +841,14 @@ class AdminActivity : AppCompatActivity() {
         checkBoxes.clear()
         for (app in installedApps) {
             val checkBox = CheckBox(this).apply {
-                text = "${app.first}\n(${app.second})"
-                setPadding(15, 12, 15, 12)
+                text = "${app.first}\n${app.second}"
+                setPadding(12, 10, 12, 10)
                 textSize = 13f
             }
             appContainer.addView(checkBox)
             checkBoxes.add(Pair(checkBox, app.second))
         }
-        appStatusText.text = "Found ${installedApps.size} user apps. Select which ones to allow."
+        appStatusText.text = "Found ${installedApps.size} apps. Select allowed apps."
         saveAppsBtn.isEnabled = true
     }
     
@@ -694,15 +861,15 @@ class AdminActivity : AppCompatActivity() {
     
     private fun saveWhitelistLocal() {
         saveAppsBtn.isEnabled = false
-        saveAppsBtn.text = "SAVING..."
+        saveAppsBtn.text = "Saving..."
         val selectedPackages = mutableSetOf<String>()
         for ((checkBox, packageName) in checkBoxes) {
             if (checkBox.isChecked) selectedPackages.add(packageName)
         }
         prefs.edit().putStringSet("whitelist", selectedPackages).apply()
         saveAppsBtn.isEnabled = true
-        saveAppsBtn.text = "SAVE WHITELIST"
-        appStatusText.text = "✓ Saved ${selectedPackages.size} apps locally"
-        Toast.makeText(this, "Whitelist saved! ${selectedPackages.size} apps", Toast.LENGTH_LONG).show()
+        saveAppsBtn.text = "Save Whitelist"
+        appStatusText.text = "✓ Saved ${selectedPackages.size} apps"
+        Toast.makeText(this, "Saved ${selectedPackages.size} apps", Toast.LENGTH_LONG).show()
     }
 }
