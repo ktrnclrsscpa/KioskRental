@@ -34,6 +34,12 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var activePinsCard: TextView
     private lateinit var todayIncomeCard: TextView
     
+    // App Whitelist
+    private lateinit var appContainer: LinearLayout
+    private lateinit var saveAppsBtn: Button
+    private lateinit var appStatusText: TextView
+    private val checkBoxes = mutableListOf<Pair<CheckBox, String>>()
+    
     private val prefs by lazy { getSharedPreferences("kiosk_prefs", Context.MODE_PRIVATE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -118,7 +124,7 @@ class AdminActivity : AppCompatActivity() {
         statsRow.addView(statsCard4)
         mainContainer.addView(statsRow)
         
-        // Generate PIN Section
+        // ========== GENERATE PIN SECTION ==========
         val genTitle = TextView(this).apply {
             text = "📌 Generate New PIN"
             textSize = 18f
@@ -186,6 +192,7 @@ class AdminActivity : AppCompatActivity() {
                             generateMinutesInput.text.clear()
                             generateAmountInput.text.clear()
                             loadPinsCount()
+                            loadActivePins()
                         } else {
                             Toast.makeText(this@AdminActivity, "Failed to generate PIN", Toast.LENGTH_SHORT).show()
                         }
@@ -195,7 +202,7 @@ class AdminActivity : AppCompatActivity() {
         }
         mainContainer.addView(generateBtn)
         
-        // Extend PIN Section
+        // ========== EXTEND PIN SECTION ==========
         val extendTitle = TextView(this).apply {
             text = "⏰ Extend Active PIN"
             textSize = 18f
@@ -260,6 +267,7 @@ class AdminActivity : AppCompatActivity() {
                             extendMinutesInput.text.clear()
                             extendAmountInput.text.clear()
                             loadPinsCount()
+                            loadActivePins()
                         }
                     } else {
                         withContext(Dispatchers.Main) {
@@ -273,7 +281,7 @@ class AdminActivity : AppCompatActivity() {
         }
         mainContainer.addView(extendBtn)
         
-        // Active PINs List
+        // ========== ACTIVE PINS LIST ==========
         val pinsTitle = TextView(this).apply {
             text = "🔑 Active PINs"
             textSize = 18f
@@ -295,11 +303,51 @@ class AdminActivity : AppCompatActivity() {
             text = "🔄 REFRESH PIN LIST"
             setBackgroundColor(Color.TRANSPARENT)
             setTextColor(Color.parseColor("#3498DB"))
-            setOnClickListener { loadPinsList(pinsText) }
+            setOnClickListener { loadActivePins() }
         }
         mainContainer.addView(refreshPinsBtn)
         
-        // Telegram Settings Section
+        // ========== APP WHITELIST SECTION ==========
+        val whitelistTitle = TextView(this).apply {
+            text = "📱 App Whitelist"
+            textSize = 18f
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(0, 30, 0, 10)
+        }
+        mainContainer.addView(whitelistTitle)
+        
+        appStatusText = TextView(this).apply {
+            text = "Loading apps..."
+            textSize = 13f
+            setPadding(0, 0, 0, 12)
+            setTextColor(Color.parseColor("#7F8C8D"))
+        }
+        mainContainer.addView(appStatusText)
+        
+        // Scrollable container for apps
+        val appScrollView = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                300
+            )
+        }
+        appContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(8, 8, 8, 8)
+        }
+        appScrollView.addView(appContainer)
+        mainContainer.addView(appScrollView)
+        
+        saveAppsBtn = Button(this).apply {
+            text = "💾 SAVE WHITELIST"
+            setBackgroundColor(Color.parseColor("#3498DB"))
+            setTextColor(Color.WHITE)
+            setPadding(16, 14, 16, 14)
+            setOnClickListener { saveWhitelistLocal() }
+        }
+        mainContainer.addView(saveAppsBtn)
+        
+        // ========== TELEGRAM SETTINGS SECTION ==========
         val settingsTitle = TextView(this).apply {
             text = "⚙️ Telegram Settings"
             textSize = 18f
@@ -396,7 +444,7 @@ class AdminActivity : AppCompatActivity() {
         
         mainContainer.addView(telegramButtonRow)
         
-        // Export Report Button
+        // ========== EXPORT REPORT BUTTON ==========
         val exportBtn = Button(this).apply {
             text = "📥 EXPORT CSV REPORT"
             setBackgroundColor(Color.parseColor("#9B59B6"))
@@ -412,7 +460,9 @@ class AdminActivity : AppCompatActivity() {
         // Load initial data
         loadDashboardStats()
         loadPinsCount()
-        loadPinsList(pinsText)
+        loadActivePins()
+        loadInstalledApps()
+        loadCurrentWhitelistLocal()
         
         // Load Telegram settings
         CoroutineScope(Dispatchers.IO).launch {
@@ -490,10 +540,11 @@ class AdminActivity : AppCompatActivity() {
         }
     }
     
-    private fun loadPinsList(pinsText: TextView) {
+    private fun loadActivePins() {
         CoroutineScope(Dispatchers.IO).launch {
             val pins = supabase.getActivePins()
             withContext(Dispatchers.Main) {
+                val pinsText = (mainContainer.getChildAt(10) as? TextView) ?: return@withContext
                 if (pins.isEmpty()) {
                     pinsText.text = "No active PINs"
                 } else {
@@ -505,6 +556,56 @@ class AdminActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+    
+    private fun loadInstalledApps() {
+        appStatusText.text = "Loading apps..."
+        saveAppsBtn.isEnabled = false
+        val installedApps = mutableListOf<Pair<String, String>>()
+        val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+        for (app in packages) {
+            val isSystemApp = (app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+            val isUpdatedSystemApp = (app.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+            if (!isSystemApp || isUpdatedSystemApp) {
+                val appName = packageManager.getApplicationLabel(app).toString()
+                installedApps.add(Pair(appName, app.packageName))
+            }
+        }
+        installedApps.sortBy { it.first }
+        appContainer.removeAllViews()
+        checkBoxes.clear()
+        for (app in installedApps) {
+            val checkBox = CheckBox(this).apply {
+                text = "${app.first}\n${app.second}"
+                setPadding(12, 10, 12, 10)
+                textSize = 13f
+            }
+            appContainer.addView(checkBox)
+            checkBoxes.add(Pair(checkBox, app.second))
+        }
+        appStatusText.text = "Found ${installedApps.size} apps. Select allowed apps."
+        saveAppsBtn.isEnabled = true
+    }
+    
+    private fun loadCurrentWhitelistLocal() {
+        val savedWhitelist = prefs.getStringSet("whitelist", emptySet()) ?: emptySet()
+        for ((checkBox, packageName) in checkBoxes) {
+            checkBox.isChecked = savedWhitelist.contains(packageName)
+        }
+    }
+    
+    private fun saveWhitelistLocal() {
+        saveAppsBtn.isEnabled = false
+        saveAppsBtn.text = "SAVING..."
+        val selectedPackages = mutableSetOf<String>()
+        for ((checkBox, packageName) in checkBoxes) {
+            if (checkBox.isChecked) selectedPackages.add(packageName)
+        }
+        prefs.edit().putStringSet("whitelist", selectedPackages).apply()
+        saveAppsBtn.isEnabled = true
+        saveAppsBtn.text = "💾 SAVE WHITELIST"
+        appStatusText.text = "✓ Saved ${selectedPackages.size} apps"
+        Toast.makeText(this, "Saved ${selectedPackages.size} apps", Toast.LENGTH_LONG).show()
     }
     
     private fun exportReport() {
