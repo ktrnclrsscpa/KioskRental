@@ -138,6 +138,7 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(loadAppsBtn)
         
+        // FIXED ADMIN BUTTON - Opens AdminActivity as a new screen
         val adminBtn = Button(this).apply {
             text = "🔐 ADMIN"
             textSize = 14f
@@ -145,7 +146,8 @@ class MainActivity : AppCompatActivity() {
             setTextColor(android.graphics.Color.GRAY)
             setPadding(0, 10, 0, 0)
             setOnClickListener {
-                startActivity(android.content.Intent(this@MainActivity, AdminActivity::class.java))
+                val intent = android.content.Intent(this@MainActivity, AdminActivity::class.java)
+                startActivity(intent)
             }
         }
         mainLayout.addView(adminBtn)
