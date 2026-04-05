@@ -17,7 +17,13 @@ class SessionHistoryAdapter(private val sessions: List<SessionRecord>) :
 
     override fun onBindViewHolder(holder: SessionViewHolder, position: Int) {
         val session = sessions[position]
-        holder.text1.text = "${session.pin} | ${session.minutes} min | ₱${String.format("%.2f", session.amount)}"
+        
+        // Check if this is an extension
+        val isExtension = session.pin.endsWith("_EXT")
+        val cleanPin = session.pin.replace("_EXT", "")
+        val prefix = if (isExtension) "🔁 EXTENSION: " else "🎮 SESSION: "
+        
+        holder.text1.text = "$prefix$cleanPin | ${session.minutes} min | ₱${String.format("%.2f", session.amount)}"
         holder.text2.text = session.date
     }
 
