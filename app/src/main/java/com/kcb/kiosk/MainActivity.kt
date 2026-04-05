@@ -34,11 +34,10 @@ class MainActivity : AppCompatActivity() {
     private var gridReady = false
     private var remainingSeconds = 0
     private var extendCheckJob: Job? = null
-    private var paidAmount = 0.0  // Store the exact amount from the PIN
+    private var paidAmount = 0.0
     
     private lateinit var tts: TextToSpeech
     
-    // Movable floating timer
     private lateinit var floatingTimerContainer: LinearLayout
     private lateinit var floatingTimer: TextView
     private var windowManager: android.view.WindowManager? = null
@@ -232,7 +231,7 @@ class MainActivity : AppCompatActivity() {
                     if (result.isValid && result.secondsLeft > 0) {
                         currentPin = pin
                         remainingSeconds = result.secondsLeft
-                        paidAmount = result.amount  // Store the exact amount from the PIN
+                        paidAmount = result.amount
                         startSession()
                     } else {
                         Toast.makeText(this@MainActivity, "Invalid or expired PIN", Toast.LENGTH_LONG).show()
@@ -265,7 +264,6 @@ class MainActivity : AppCompatActivity() {
             startCountDownTimer()
             startExtendListener()
             
-            // Send Telegram notification and record session
             sendNewSessionNotification()
             
         } catch (e: Exception) {
@@ -278,22 +276,22 @@ class MainActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val minutes = remainingSeconds / 60
-                // Record session with the actual paid amount from the PIN
                 val recorded = supabase.recordSession(currentPin!!, minutes, paidAmount)
-                // Send Telegram notification
                 val message = "🎮 *New Rental Session!*%0APIN: ${currentPin}%0ADuration: ${minutes} minutes%0AAmount: ₱${String.format("%.2f", paidAmount)}"
                 val sent = supabase.sendTelegramNotification(message)
                 
                 withContext(Dispatchers.Main) {
                     if (sent && recorded) {
-                        Toast.makeText(this@MainActivity, "✅ Session started! Telegram sent.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, "✅ Session started!", Toast.LENGTH_SHORT).show()
+                    } else if (recorded && !sent) {
+                        Toast.makeText(this@MainActivity, "✅ Session started (Telegram failed)", Toast.LENGTH_SHORT).show()
                     } else {
-                        Toast.makeText(this@MainActivity, "⚠️ Session started but Telegram failed.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, "⚠️ Session started but save failed", Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity, "⚠️ Session started but error: ${e.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "⚠️ Error: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -331,23 +329,30 @@ class MainActivity : AppCompatActivity() {
         extendCheckJob = CoroutineScope(Dispatchers.IO).launch {
             var lastKnownSeconds = remainingSeconds
             while (isActive && currentPin != null) {
-                delay(3000)
+                delay(2000)
                 try {
                     val result = supabase.validatePin(currentPin!!)
                     if (result.isValid && result.secondsLeft > 0) {
-                        if (result.secondsLeft > lastKnownSeconds + 10) {
-                            val newTotalSeconds = result.secondsLeft
+                        val newTotalSeconds = result.secondsLeft
+                        if (newTotalSeconds > lastKnownSeconds + 5) {
+                            val addedSeconds = newTotalSeconds - lastKnownSeconds
+                            val addedMinutes = addedSeconds / 60
+                            
                             withContext(Dispatchers.Main) {
                                 countDownTimer?.cancel()
                                 remainingSeconds = newTotalSeconds
                                 startCountDownTimer()
-                                val addedMinutes = (newTotalSeconds - lastKnownSeconds) / 60
                                 Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes", Toast.LENGTH_LONG).show()
                                 sendExtensionNotification(addedMinutes)
                             }
                             lastKnownSeconds = newTotalSeconds
                         } else {
                             lastKnownSeconds = result.secondsLeft
+                            if (Math.abs(remainingSeconds - result.secondsLeft) > 2) {
+                                withContext(Dispatchers.Main) {
+                                    remainingSeconds = result.secondsLeft
+                                }
+                            }
                         }
                     } else if (result.secondsLeft <= 0) {
                         withContext(Dispatchers.Main) {
