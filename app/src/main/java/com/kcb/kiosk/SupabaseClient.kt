@@ -171,7 +171,6 @@ class SupabaseClient private constructor() {
             var token = ""
             var chatId = ""
             
-            // Get bot token
             val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.telegram_bot_token"))
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
@@ -189,7 +188,6 @@ class SupabaseClient private constructor() {
             }
             connection.disconnect()
             
-            // Get chat ID
             val url2 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.telegram_chat_id"))
             val connection2 = url2.openConnection() as HttpURLConnection
             connection2.requestMethod = "GET"
@@ -215,7 +213,6 @@ class SupabaseClient private constructor() {
 
     suspend fun updateTelegramConfig(token: String, chatId: String): Boolean = withContext(Dispatchers.IO) {
         try {
-            // Update token
             val url1 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.telegram_bot_token"))
             val conn1 = url1.openConnection() as HttpURLConnection
             conn1.requestMethod = "PATCH"
@@ -227,7 +224,6 @@ class SupabaseClient private constructor() {
             val response1 = conn1.responseCode
             conn1.disconnect()
             
-            // Update chat ID
             val url2 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.telegram_chat_id"))
             val conn2 = url2.openConnection() as HttpURLConnection
             conn2.requestMethod = "PATCH"
@@ -253,7 +249,6 @@ class SupabaseClient private constructor() {
                 return@withContext false
             }
             
-            // Clean the message - remove markdown symbols that might cause issues
             val cleanMessage = message
                 .replace("*", "")
                 .replace("%0A", "\n")
@@ -411,7 +406,6 @@ class SupabaseClient private constructor() {
             var extendPrice = 10.0
             var extendDuration = 30
             
-            // Get pricing_type
             val url1 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.pricing_type"))
             val conn1 = url1.openConnection() as HttpURLConnection
             conn1.requestMethod = "GET"
@@ -426,7 +420,6 @@ class SupabaseClient private constructor() {
             }
             conn1.disconnect()
             
-            // Get price_amount
             val url2 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.price_amount"))
             val conn2 = url2.openConnection() as HttpURLConnection
             conn2.requestMethod = "GET"
@@ -441,7 +434,6 @@ class SupabaseClient private constructor() {
             }
             conn2.disconnect()
             
-            // Get price_duration_minutes
             val url3 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.price_duration_minutes"))
             val conn3 = url3.openConnection() as HttpURLConnection
             conn3.requestMethod = "GET"
@@ -456,7 +448,6 @@ class SupabaseClient private constructor() {
             }
             conn3.disconnect()
             
-            // Get extend_price_amount
             val url4 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.extend_price_amount"))
             val conn4 = url4.openConnection() as HttpURLConnection
             conn4.requestMethod = "GET"
@@ -471,7 +462,6 @@ class SupabaseClient private constructor() {
             }
             conn4.disconnect()
             
-            // Get extend_duration_minutes
             val url5 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.extend_duration_minutes"))
             val conn5 = url5.openConnection() as HttpURLConnection
             conn5.requestMethod = "GET"
@@ -500,7 +490,6 @@ class SupabaseClient private constructor() {
         extendDuration: Int
     ): Boolean = withContext(Dispatchers.IO) {
         try {
-            // Update pricing_type
             val url1 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.pricing_type"))
             val conn1 = url1.openConnection() as HttpURLConnection
             conn1.requestMethod = "PATCH"
@@ -511,7 +500,6 @@ class SupabaseClient private constructor() {
             conn1.outputStream.write("{\"setting_value\":\"$pricingType\"}".toByteArray())
             conn1.disconnect()
             
-            // Update price_amount
             val url2 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.price_amount"))
             val conn2 = url2.openConnection() as HttpURLConnection
             conn2.requestMethod = "PATCH"
@@ -522,7 +510,6 @@ class SupabaseClient private constructor() {
             conn2.outputStream.write("{\"setting_value\":\"$priceAmount\"}".toByteArray())
             conn2.disconnect()
             
-            // Update price_duration_minutes
             val url3 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.price_duration_minutes"))
             val conn3 = url3.openConnection() as HttpURLConnection
             conn3.requestMethod = "PATCH"
@@ -533,7 +520,6 @@ class SupabaseClient private constructor() {
             conn3.outputStream.write("{\"setting_value\":\"$durationMinutes\"}".toByteArray())
             conn3.disconnect()
             
-            // Update extend_price_amount
             val url4 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.extend_price_amount"))
             val conn4 = url4.openConnection() as HttpURLConnection
             conn4.requestMethod = "PATCH"
@@ -544,7 +530,6 @@ class SupabaseClient private constructor() {
             conn4.outputStream.write("{\"setting_value\":\"$extendPrice\"}".toByteArray())
             conn4.disconnect()
             
-            // Update extend_duration_minutes
             val url5 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.extend_duration_minutes"))
             val conn5 = url5.openConnection() as HttpURLConnection
             conn5.requestMethod = "PATCH"
