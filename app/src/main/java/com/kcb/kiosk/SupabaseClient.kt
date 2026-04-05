@@ -164,17 +164,22 @@ class SupabaseClient private constructor() {
         }
     }
 
-    // ==================== TELEGRAM (direct HTTP – same as working test) ====================
+    // ==================== TELEGRAM (FIXED) ====================
     
     suspend fun getTelegramConfig(): Pair<String, String> = withContext(Dispatchers.IO) {
         try {
             var token = ""
             var chatId = ""
+            
+            // Get bot token
             val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.telegram_bot_token"))
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.setRequestProperty("apikey", apiKey)
             connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
+            
             if (connection.responseCode == 200) {
                 val responseText = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonArray = JSONArray(responseText)
@@ -184,11 +189,15 @@ class SupabaseClient private constructor() {
             }
             connection.disconnect()
             
+            // Get chat ID
             val url2 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.telegram_chat_id"))
             val connection2 = url2.openConnection() as HttpURLConnection
             connection2.requestMethod = "GET"
             connection2.setRequestProperty("apikey", apiKey)
             connection2.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection2.connectTimeout = 5000
+            connection2.readTimeout = 5000
+            
             if (connection2.responseCode == 200) {
                 val responseText = connection2.inputStream.bufferedReader().use { it.readText() }
                 val jsonArray = JSONArray(responseText)
@@ -206,6 +215,7 @@ class SupabaseClient private constructor() {
 
     suspend fun updateTelegramConfig(token: String, chatId: String): Boolean = withContext(Dispatchers.IO) {
         try {
+            // Update token
             val url1 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.telegram_bot_token"))
             val conn1 = url1.openConnection() as HttpURLConnection
             conn1.requestMethod = "PATCH"
@@ -214,8 +224,10 @@ class SupabaseClient private constructor() {
             conn1.setRequestProperty("Content-Type", "application/json")
             conn1.doOutput = true
             conn1.outputStream.write("{\"setting_value\":\"$token\"}".toByteArray())
+            val response1 = conn1.responseCode
             conn1.disconnect()
             
+            // Update chat ID
             val url2 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.telegram_chat_id"))
             val conn2 = url2.openConnection() as HttpURLConnection
             conn2.requestMethod = "PATCH"
@@ -224,33 +236,44 @@ class SupabaseClient private constructor() {
             conn2.setRequestProperty("Content-Type", "application/json")
             conn2.doOutput = true
             conn2.outputStream.write("{\"setting_value\":\"$chatId\"}".toByteArray())
+            val response2 = conn2.responseCode
             conn2.disconnect()
             
-            true
+            (response1 in 200..299) && (response2 in 200..299)
         } catch (e: Exception) { 
             false
         }
     }
 
-    // This uses the exact same working method as your DIRECT TEST button
     suspend fun sendTelegramNotification(message: String): Boolean = withContext(Dispatchers.IO) {
         try {
             val (token, chatId) = getTelegramConfig()
+            
             if (token.isEmpty() || chatId.isEmpty()) {
                 return@withContext false
             }
-            val encodedMessage = URLEncoder.encode(message, "UTF-8")
-            val url = URL("https://api.telegram.org/bot$token/sendMessage?chat_id=$chatId&text=$encodedMessage&parse_mode=HTML")
+            
+            // Clean the message - remove markdown symbols that might cause issues
+            val cleanMessage = message
+                .replace("*", "")
+                .replace("%0A", "\n")
+            
+            val encodedMessage = URLEncoder.encode(cleanMessage, "UTF-8")
+            val urlString = "https://api.telegram.org/bot$token/sendMessage?chat_id=$chatId&text=$encodedMessage"
+            
+            val url = URL(urlString)
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.connectTimeout = 10000
             connection.readTimeout = 10000
+            
             val responseCode = connection.responseCode
             connection.disconnect()
-            return@withContext responseCode == 200
+            
+            responseCode == 200
         } catch (e: Exception) {
             e.printStackTrace()
-            return@withContext false
+            false
         }
     }
 
@@ -370,7 +393,7 @@ class SupabaseClient private constructor() {
         }
     }
 
-    // ==================== PRICING CONFIG (for extensions) ====================
+    // ==================== PRICING CONFIG ====================
     
     data class PricingConfig(
         val pricingType: String,
