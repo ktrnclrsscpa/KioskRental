@@ -305,17 +305,18 @@ class MainActivity : AppCompatActivity() {
         extendCheckJob = CoroutineScope(Dispatchers.IO).launch {
             var lastSeconds = remainingSeconds
             while (isActive && currentPin != null) {
-                delay(3000)
+                delay(2000)
                 try {
                     val result = supabase.validatePin(currentPin!!)
                     if (result.isValid && result.secondsLeft > 0) {
-                        if (result.secondsLeft != lastSeconds) {
-                            val newSeconds = result.secondsLeft
+                        val newSeconds = result.secondsLeft
+                        if (newSeconds != lastSeconds) {
+                            val addedSeconds = newSeconds - lastSeconds
+                            val addedMinutes = addedSeconds / 60
                             withContext(Dispatchers.Main) {
                                 countDownTimer?.cancel()
                                 remainingSeconds = newSeconds
                                 startCountDownTimer()
-                                val addedMinutes = (newSeconds - lastSeconds) / 60
                                 if (addedMinutes > 0) {
                                     Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes", Toast.LENGTH_LONG).show()
                                 }
