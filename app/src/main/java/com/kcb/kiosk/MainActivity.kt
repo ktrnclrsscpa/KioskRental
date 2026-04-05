@@ -31,7 +31,6 @@ class MainActivity : AppCompatActivity() {
     private var currentPin: String? = null
     private var isActive = false
     private var appList = mutableListOf<AppInfo>()
-    private var gridReady = false
     private var remainingSeconds = 0
     private var extendCheckJob: Job? = null
     private var paidAmount = 0.0
@@ -199,7 +198,6 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
-            gridReady = true
             if (isActive) {
                 appGrid.visibility = android.view.View.VISIBLE
             }
@@ -257,29 +255,21 @@ class MainActivity : AppCompatActivity() {
             
             if (appList.isNotEmpty()) {
                 appGrid.visibility = android.view.View.VISIBLE
-                gridReady = true
             }
             
             showFloatingTimer()
             startCountDownTimer()
             startExtendListener()
             
-            sendNewSessionNotification()
+            CoroutineScope(Dispatchers.IO).launch {
+                val minutes = remainingSeconds / 60
+                supabase.recordSession(currentPin!!, minutes, paidAmount)
+                supabase.sendTelegramNotification("🎮 *New Rental Session!*%0APIN: ${currentPin}%0ADuration: ${minutes} minutes%0AAmount: ₱${String.format("%.2f", paidAmount)}")
+            }
             
         } catch (e: Exception) {
             Toast.makeText(this, "Session error: ${e.message}", Toast.LENGTH_SHORT).show()
             endSession()
-        }
-    }
-    
-    private fun sendNewSessionNotification() {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val minutes = remainingSeconds / 60
-                supabase.recordSession(currentPin!!, minutes, paidAmount)
-                val message = "🎮 *New Rental Session!*%0APIN: ${currentPin}%0ADuration: ${minutes} minutes%0AAmount: ₱${String.format("%.2f", paidAmount)}"
-                supabase.sendTelegramNotification(message)
-            } catch (e: Exception) { }
         }
     }
     
@@ -313,25 +303,24 @@ class MainActivity : AppCompatActivity() {
     private fun startExtendListener() {
         extendCheckJob?.cancel()
         extendCheckJob = CoroutineScope(Dispatchers.IO).launch {
-            var lastKnownSeconds = remainingSeconds
+            var lastSeconds = remainingSeconds
             while (isActive && currentPin != null) {
                 delay(3000)
                 try {
                     val result = supabase.validatePin(currentPin!!)
                     if (result.isValid && result.secondsLeft > 0) {
-                        if (result.secondsLeft != lastKnownSeconds) {
-                            val newTotalSeconds = result.secondsLeft
+                        if (result.secondsLeft != lastSeconds) {
+                            val newSeconds = result.secondsLeft
                             withContext(Dispatchers.Main) {
                                 countDownTimer?.cancel()
-                                remainingSeconds = newTotalSeconds
+                                remainingSeconds = newSeconds
                                 startCountDownTimer()
-                                val addedMinutes = (newTotalSeconds - lastKnownSeconds) / 60
+                                val addedMinutes = (newSeconds - lastSeconds) / 60
                                 if (addedMinutes > 0) {
                                     Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes", Toast.LENGTH_LONG).show()
-                                    sendExtensionNotification(addedMinutes)
                                 }
                             }
-                            lastKnownSeconds = newTotalSeconds
+                            lastSeconds = newSeconds
                         }
                     } else if (result.secondsLeft <= 0) {
                         withContext(Dispatchers.Main) {
@@ -341,15 +330,6 @@ class MainActivity : AppCompatActivity() {
                     }
                 } catch (e: Exception) { }
             }
-        }
-    }
-    
-    private fun sendExtensionNotification(addedMinutes: Int) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                // Only send Telegram notification - NO dashboard recording for extensions
-                supabase.sendTelegramNotification("⏰ *Session Extended!*%0APIN: ${currentPin}%0AAdded: $addedMinutes minutes")
-            } catch (e: Exception) { }
         }
     }
     
