@@ -113,7 +113,7 @@ class AdminActivity : AppCompatActivity() {
         headerRow.addView(changePwdBtn)
         rootLayout.addView(headerRow)
         
-        // Tab bar - adjusted to fit "SETTINGS"
+        // Tab bar
         val tabBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(20, 0, 20, 0)
@@ -247,11 +247,12 @@ class AdminActivity : AppCompatActivity() {
             }
             addView(historyTitle)
             
+            // Wider scrollable area for transactions
             transactionRecycler = RecyclerView(this@AdminActivity).apply {
                 layoutManager = LinearLayoutManager(this@AdminActivity)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    400
+                    600  // Increased height for better scrolling
                 )
             }
             addView(transactionRecycler)
@@ -461,7 +462,6 @@ class AdminActivity : AppCompatActivity() {
             telegramChatIdInput = createEditText("Chat ID")
             addView(telegramChatIdInput)
             
-            // Button row for SAVE and TEST
             val buttonRow = LinearLayout(this@AdminActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 setPadding(0, 10, 0, 10)
