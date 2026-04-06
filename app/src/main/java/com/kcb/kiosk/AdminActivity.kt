@@ -142,32 +142,33 @@ class AdminActivity : AppCompatActivity() {
         generateAmountInput.inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
         mainLayout.addView(generateAmountInput)
         
-        val generateBtn = createButton("GENERATE PIN", "#2ECC71") { button ->
+        val generateBtn = createButton("GENERATE PIN", "#2ECC71")
+        generateBtn.setOnClickListener {
             val minutes = generateMinutesInput.text.toString().toIntOrNull()
             val amount = generateAmountInput.text.toString().toDoubleOrNull()
             if (minutes == null || minutes <= 0) {
                 Toast.makeText(this@AdminActivity, "Enter valid minutes", Toast.LENGTH_SHORT).show()
-                return@createButton
+                return@setOnClickListener
             }
             if (amount == null || amount <= 0) {
                 Toast.makeText(this@AdminActivity, "Enter valid amount", Toast.LENGTH_SHORT).show()
-                return@createButton
+                return@setOnClickListener
             }
             val customPin = generatePinInput.text.toString().trim()
             if (customPin.isNotEmpty() && customPin.length != 6) {
                 Toast.makeText(this@AdminActivity, "PIN must be 6 characters", Toast.LENGTH_SHORT).show()
-                return@createButton
+                return@setOnClickListener
             }
             val pin = if (customPin.isNotEmpty()) customPin else null
             
-            button.isEnabled = false
-            button.text = "GENERATING..."
+            generateBtn.isEnabled = false
+            generateBtn.text = "GENERATING..."
             
             CoroutineScope(Dispatchers.IO).launch {
                 val result = supabase.generatePin(pin, minutes * 60, amount)
                 withContext(Dispatchers.Main) {
-                    button.isEnabled = true
-                    button.text = "GENERATE PIN"
+                    generateBtn.isEnabled = true
+                    generateBtn.text = "GENERATE PIN"
                     if (result != null) {
                         Toast.makeText(this@AdminActivity, "✅ PIN: $result ($minutes min - ₱$amount)", Toast.LENGTH_LONG).show()
                         generatePinInput.text.clear()
@@ -202,21 +203,22 @@ class AdminActivity : AppCompatActivity() {
         extendAmountInput.inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
         mainLayout.addView(extendAmountInput)
         
-        val extendBtn = createButton("EXTEND TIME", "#E67E22") { button ->
+        val extendBtn = createButton("EXTEND TIME", "#E67E22")
+        extendBtn.setOnClickListener {
             val pin = extendPinInput.text.toString().trim()
             val minutes = extendMinutesInput.text.toString().toIntOrNull()
             val amount = extendAmountInput.text.toString().toDoubleOrNull()
             if (pin.isEmpty() || minutes == null || minutes <= 0) {
                 Toast.makeText(this@AdminActivity, "Enter PIN and valid minutes", Toast.LENGTH_SHORT).show()
-                return@createButton
+                return@setOnClickListener
             }
             if (amount == null || amount <= 0) {
                 Toast.makeText(this@AdminActivity, "Enter valid amount", Toast.LENGTH_SHORT).show()
-                return@createButton
+                return@setOnClickListener
             }
             
-            button.isEnabled = false
-            button.text = "EXTENDING..."
+            extendBtn.isEnabled = false
+            extendBtn.text = "EXTENDING..."
             
             CoroutineScope(Dispatchers.IO).launch {
                 val success = supabase.extendTime(pin, minutes)
@@ -224,8 +226,8 @@ class AdminActivity : AppCompatActivity() {
                     supabase.recordExtension(pin, minutes, amount)
                     supabase.sendTelegramNotification("⏰ *Session Extended!*%0APIN: $pin%0AAdded: $minutes minutes%0APayment: ₱${String.format("%.2f", amount)}")
                     withContext(Dispatchers.Main) {
-                        button.isEnabled = true
-                        button.text = "EXTEND TIME"
+                        extendBtn.isEnabled = true
+                        extendBtn.text = "EXTEND TIME"
                         Toast.makeText(this@AdminActivity, "Added $minutes minutes (₱$amount) to PIN $pin", Toast.LENGTH_LONG).show()
                         extendPinInput.text.clear()
                         extendMinutesInput.text.clear()
@@ -235,8 +237,8 @@ class AdminActivity : AppCompatActivity() {
                     }
                 } else {
                     withContext(Dispatchers.Main) {
-                        button.isEnabled = true
-                        button.text = "EXTEND TIME"
+                        extendBtn.isEnabled = true
+                        extendBtn.text = "EXTEND TIME"
                         Toast.makeText(this@AdminActivity, "Failed to extend", Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -295,13 +297,8 @@ class AdminActivity : AppCompatActivity() {
         appScrollView.addView(appContainer)
         mainLayout.addView(appScrollView)
         
-        saveAppsBtn = Button(this).apply {
-            text = "SAVE WHITELIST"
-            setBackgroundColor(Color.parseColor("#3498DB"))
-            setTextColor(Color.WHITE)
-            setPadding(16, 14, 16, 14)
-            setOnClickListener { saveWhitelistLocal() }
-        }
+        saveAppsBtn = createButton("SAVE WHITELIST", "#3498DB")
+        saveAppsBtn.setOnClickListener { saveWhitelistLocal() }
         mainLayout.addView(saveAppsBtn)
         
         // ========== TELEGRAM SETTINGS ==========
@@ -344,58 +341,48 @@ class AdminActivity : AppCompatActivity() {
         }
         buttonRow.addView(saveTelegramBtn)
         
-        val testTelegramBtn = Button(this).apply {
-            text = "TEST"
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            setBackgroundColor(Color.parseColor("#E67E22"))
-            setTextColor(Color.WHITE)
-            setOnClickListener { button ->
-                val token = telegramTokenInput.text.toString().trim()
-                val chatId = telegramChatIdInput.text.toString().trim()
-                if (token.isEmpty() || chatId.isEmpty()) {
-                    Toast.makeText(this@AdminActivity, "Enter Bot Token and Chat ID first", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-                button.isEnabled = false
-                button.text = "SENDING..."
-                Thread {
-                    try {
-                        val url = URL("https://api.telegram.org/bot$token/sendMessage?chat_id=$chatId&text=✅%20Test%20from%20KCB%20Rental!")
-                        val conn = url.openConnection() as HttpURLConnection
-                        conn.requestMethod = "GET"
-                        conn.connectTimeout = 10000
-                        val responseCode = conn.responseCode
-                        conn.disconnect()
-                        runOnUiThread {
-                            button.isEnabled = true
-                            button.text = "TEST"
-                            if (responseCode == 200) {
-                                Toast.makeText(this@AdminActivity, "Test sent! Check Telegram.", Toast.LENGTH_SHORT).show()
-                            } else {
-                                Toast.makeText(this@AdminActivity, "Failed! Check credentials.", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    } catch (e: Exception) {
-                        runOnUiThread {
-                            button.isEnabled = true
-                            button.text = "TEST"
-                            Toast.makeText(this@AdminActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+        val testTelegramBtn = createButton("TEST", "#E67E22")
+        testTelegramBtn.setOnClickListener {
+            val token = telegramTokenInput.text.toString().trim()
+            val chatId = telegramChatIdInput.text.toString().trim()
+            if (token.isEmpty() || chatId.isEmpty()) {
+                Toast.makeText(this@AdminActivity, "Enter Bot Token and Chat ID first", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            testTelegramBtn.isEnabled = false
+            testTelegramBtn.text = "SENDING..."
+            Thread {
+                try {
+                    val url = URL("https://api.telegram.org/bot$token/sendMessage?chat_id=$chatId&text=✅%20Test%20from%20KCB%20Rental!")
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.requestMethod = "GET"
+                    conn.connectTimeout = 10000
+                    val responseCode = conn.responseCode
+                    conn.disconnect()
+                    runOnUiThread {
+                        testTelegramBtn.isEnabled = true
+                        testTelegramBtn.text = "TEST"
+                        if (responseCode == 200) {
+                            Toast.makeText(this@AdminActivity, "Test sent! Check Telegram.", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(this@AdminActivity, "Failed! Check credentials.", Toast.LENGTH_SHORT).show()
                         }
                     }
-                }.start()
-            }
+                } catch (e: Exception) {
+                    runOnUiThread {
+                        testTelegramBtn.isEnabled = true
+                        testTelegramBtn.text = "TEST"
+                        Toast.makeText(this@AdminActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }.start()
         }
         buttonRow.addView(testTelegramBtn)
         
         mainLayout.addView(buttonRow)
         
-        val exportBtn = Button(this).apply {
-            text = "📥 EXPORT CSV REPORT"
-            setBackgroundColor(Color.parseColor("#9B59B6"))
-            setTextColor(Color.WHITE)
-            setPadding(16, 14, 16, 14)
-            setOnClickListener { exportReport() }
-        }
+        val exportBtn = createButton("📥 EXPORT CSV REPORT", "#9B59B6")
+        exportBtn.setOnClickListener { exportReport() }
         mainLayout.addView(exportBtn)
         
         scrollView.addView(mainLayout)
@@ -450,7 +437,7 @@ class AdminActivity : AppCompatActivity() {
         }
     }
     
-    private fun createButton(text: String, color: String, onClick: (Button) -> Unit): Button {
+    private fun createButton(text: String, color: String): Button {
         return Button(this).apply {
             this.text = text
             textSize = 14f
@@ -458,7 +445,6 @@ class AdminActivity : AppCompatActivity() {
             setBackgroundColor(Color.parseColor(color))
             setTextColor(Color.WHITE)
             setAllCaps(false)
-            setOnClickListener { onClick(this) }
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
