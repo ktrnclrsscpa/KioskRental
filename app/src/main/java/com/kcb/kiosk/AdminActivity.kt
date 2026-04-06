@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -71,7 +72,6 @@ class AdminActivity : AppCompatActivity() {
     private fun showAdminPanel() {
         supabase = SupabaseClient.getInstance()
         
-        // Main scroll view for entire content
         val mainScrollView = ScrollView(this)
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -79,7 +79,7 @@ class AdminActivity : AppCompatActivity() {
             setBackgroundColor(Color.parseColor("#F5F7FA"))
         }
         
-        // ========== HEADER ==========
+        // Header
         val header = TextView(this).apply {
             text = "🔐 KCB RENTAL ADMIN"
             textSize = 24f
@@ -98,7 +98,7 @@ class AdminActivity : AppCompatActivity() {
         }
         mainLayout.addView(changePwdBtn)
         
-        // ========== INCOME SUMMARY ==========
+        // Income Summary
         val statsTitle = TextView(this).apply {
             text = "💰 INCOME SUMMARY"
             textSize = 18f
@@ -124,7 +124,7 @@ class AdminActivity : AppCompatActivity() {
         }
         mainLayout.addView(refreshStatsBtn)
         
-        // ========== GENERATE PIN ==========
+        // Generate PIN
         val genTitle = TextView(this).apply {
             text = "📌 Generate New PIN"
             textSize = 18f
@@ -185,7 +185,7 @@ class AdminActivity : AppCompatActivity() {
         }
         mainLayout.addView(generateBtn)
         
-        // ========== EXTEND PIN ==========
+        // Extend PIN
         val extendTitle = TextView(this).apply {
             text = "⏰ Extend Active PIN"
             textSize = 18f
@@ -247,7 +247,7 @@ class AdminActivity : AppCompatActivity() {
         }
         mainLayout.addView(extendBtn)
         
-        // ========== ACTIVE PINS ==========
+        // Active PINs
         val pinsTitle = TextView(this).apply {
             text = "🔑 Active PINs"
             textSize = 18f
@@ -267,7 +267,7 @@ class AdminActivity : AppCompatActivity() {
         }
         mainLayout.addView(refreshPinsBtn)
         
-        // ========== APP WHITELIST ==========
+        // App Whitelist
         val whitelistTitle = TextView(this).apply {
             text = "📱 App Whitelist"
             textSize = 18f
@@ -284,13 +284,11 @@ class AdminActivity : AppCompatActivity() {
         }
         mainLayout.addView(appStatusText)
         
-        // Fixed height scrollable container for app list
         val appScrollView = ScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 400
             )
-            setPadding(0, 0, 0, 0)
         }
         appContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -303,7 +301,7 @@ class AdminActivity : AppCompatActivity() {
         saveAppsBtn.setOnClickListener { saveWhitelistLocal() }
         mainLayout.addView(saveAppsBtn)
         
-        // ========== TELEGRAM SETTINGS ==========
+        // Telegram Settings
         val settingsTitle = TextView(this).apply {
             text = "⚙️ Telegram Settings"
             textSize = 18f
@@ -383,7 +381,6 @@ class AdminActivity : AppCompatActivity() {
         
         mainLayout.addView(buttonRow)
         
-        // Space before export button
         val spacer = View(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -399,7 +396,6 @@ class AdminActivity : AppCompatActivity() {
         mainScrollView.addView(mainLayout)
         setContentView(mainScrollView)
         
-        // Load data
         loadStats()
         loadActivePins()
         loadTelegramSettings(telegramTokenInput, telegramChatIdInput)
