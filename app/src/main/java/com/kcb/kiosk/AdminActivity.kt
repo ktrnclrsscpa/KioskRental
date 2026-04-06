@@ -71,7 +71,8 @@ class AdminActivity : AppCompatActivity() {
     private fun showAdminPanel() {
         supabase = SupabaseClient.getInstance()
         
-        val scrollView = ScrollView(this)
+        // Main scroll view for entire content
+        val mainScrollView = ScrollView(this)
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(30, 40, 30, 50)
@@ -283,12 +284,13 @@ class AdminActivity : AppCompatActivity() {
         }
         mainLayout.addView(appStatusText)
         
-        // Scrollable container for apps - fixed height
+        // Fixed height scrollable container for app list
         val appScrollView = ScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 400
             )
+            setPadding(0, 0, 0, 0)
         }
         appContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -381,12 +383,21 @@ class AdminActivity : AppCompatActivity() {
         
         mainLayout.addView(buttonRow)
         
+        // Space before export button
+        val spacer = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                20
+            )
+        }
+        mainLayout.addView(spacer)
+        
         val exportBtn = createButton("📥 EXPORT CSV REPORT", "#9B59B6")
         exportBtn.setOnClickListener { exportReport() }
         mainLayout.addView(exportBtn)
         
-        scrollView.addView(mainLayout)
-        setContentView(scrollView)
+        mainScrollView.addView(mainLayout)
+        setContentView(mainScrollView)
         
         // Load data
         loadStats()
