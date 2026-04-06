@@ -175,7 +175,14 @@ class AdminActivity : AppCompatActivity() {
             setPadding(30, 20, 30, 40)
         }
         scrollView.addView(contentContainer)
-        rootLayout.addView(scrollView, LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
+        
+        // Add scrollView to rootLayout with MATCH_PARENT and weight
+        val scrollParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            0,
+            1f
+        )
+        rootLayout.addView(scrollView, scrollParams)
         
         // Create content for each tab
         salesContent = createSalesContent()
