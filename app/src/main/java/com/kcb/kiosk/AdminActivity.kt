@@ -112,46 +112,46 @@ class AdminActivity : AppCompatActivity() {
         headerRow.addView(changePwdBtn)
         rootLayout.addView(headerRow)
         
-        // Tab bar
+        // Tab bar - reduced font size and padding
         val tabBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(30, 0, 30, 0)
+            setPadding(20, 0, 20, 0)
             setBackgroundColor(Color.WHITE)
             elevation = 4f
         }
         
         val salesTab = TextView(this).apply {
             text = "SALES"
-            textSize = 16f
+            textSize = 14f
             setTextColor(Color.parseColor("#7F8C8D"))
-            setPadding(30, 15, 30, 15)
+            setPadding(25, 15, 25, 15)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             gravity = android.view.Gravity.CENTER
             tag = "sales"
         }
         val pinsTab = TextView(this).apply {
             text = "PINS"
-            textSize = 16f
+            textSize = 14f
             setTextColor(Color.parseColor("#7F8C8D"))
-            setPadding(30, 15, 30, 15)
+            setPadding(25, 15, 25, 15)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             gravity = android.view.Gravity.CENTER
             tag = "pins"
         }
         val appsTab = TextView(this).apply {
             text = "APPS"
-            textSize = 16f
+            textSize = 14f
             setTextColor(Color.parseColor("#7F8C8D"))
-            setPadding(30, 15, 30, 15)
+            setPadding(25, 15, 25, 15)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             gravity = android.view.Gravity.CENTER
             tag = "apps"
         }
         val settingsTab = TextView(this).apply {
             text = "SETTINGS"
-            textSize = 16f
+            textSize = 14f
             setTextColor(Color.parseColor("#7F8C8D"))
-            setPadding(30, 15, 30, 15)
+            setPadding(25, 15, 25, 15)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             gravity = android.view.Gravity.CENTER
             tag = "settings"
@@ -162,7 +162,6 @@ class AdminActivity : AppCompatActivity() {
         tabBar.addView(appsTab)
         tabBar.addView(settingsTab)
         
-        // Set click listeners
         salesTab.setOnClickListener { selectTab("sales", tabBar) }
         pinsTab.setOnClickListener { selectTab("pins", tabBar) }
         appsTab.setOnClickListener { selectTab("apps", tabBar) }
@@ -197,10 +196,8 @@ class AdminActivity : AppCompatActivity() {
         
         setContentView(rootLayout)
         
-        // Select default tab
         selectTab("sales", tabBar)
         
-        // Load data
         loadTransactionHistory()
         loadActivePins()
         loadInstalledApps()
@@ -232,6 +229,7 @@ class AdminActivity : AppCompatActivity() {
     private fun createSalesContent(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            
             dailyTotalText = TextView(this@AdminActivity).apply {
                 text = "Daily Total: ₱0.00"
                 textSize = 16f
@@ -252,7 +250,7 @@ class AdminActivity : AppCompatActivity() {
                 layoutManager = LinearLayoutManager(this@AdminActivity)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    500
+                    400
                 )
             }
             addView(transactionRecycler)
@@ -264,6 +262,16 @@ class AdminActivity : AppCompatActivity() {
                 setOnClickListener { loadTransactionHistory() }
             }
             addView(refreshBtn)
+            
+            // Export CSV button moved to SALES section
+            val exportBtn = Button(this@AdminActivity).apply {
+                text = "📥 EXPORT CSV REPORT"
+                setBackgroundColor(Color.parseColor("#9B59B6"))
+                setTextColor(Color.WHITE)
+                setPadding(16, 14, 16, 14)
+                setOnClickListener { exportReport() }
+            }
+            addView(exportBtn)
         }
     }
     
@@ -511,10 +519,6 @@ class AdminActivity : AppCompatActivity() {
             }
             buttonRow.addView(testTelegramBtn)
             addView(buttonRow)
-            
-            val exportBtn = createButton("📥 EXPORT CSV REPORT", "#9B59B6")
-            exportBtn.setOnClickListener { exportReport() }
-            addView(exportBtn)
         }
     }
     
@@ -630,17 +634,31 @@ class AdminActivity : AppCompatActivity() {
     private fun exportReport() {
         CoroutineScope(Dispatchers.IO).launch {
             val history = supabase.getSessionHistory()
-            val csv = StringBuilder("PIN,Minutes,Amount,Date,Type\n")
+            val dateFormat = SimpleDateFormat("MM/dd/yyyy", Locale.US)
+            val today = dateFormat.format(Date())
+            var dailyTotal = 0.0
+            val csv = StringBuilder()
+            // Add summary header
+            csv.append("DAILY TOTAL (Today):,₱0.00\n\n")
+            csv.append("PIN,Minutes,Amount,Date,Type\n")
             for (record in history) {
                 val type = if (record.pin.endsWith("_EXT")) "EXTENSION" else "SESSION"
                 val cleanPin = record.pin.replace("_EXT", "")
                 csv.append("$cleanPin,${record.minutes},${record.amount},${record.date},$type\n")
+                val recordDate = record.date.split(" ")[0]
+                if (recordDate == today) dailyTotal += record.amount
             }
+            // Insert daily total at top
+            val finalCsv = "DAILY TOTAL (Today):,₱${String.format("%.2f", dailyTotal)}\n\n${csv.substring(csv.indexOf("\n") + 1)}"
             withContext(Dispatchers.Main) {
                 try {
                     val file = File(cacheDir, "sales_report.csv")
-                    file.writeText(csv.toString())
-                    val uri = androidx.core.content.FileProvider.getUriForFile(this@AdminActivity, "${packageName}.fileprovider", file)
+                    file.writeText(finalCsv)
+                    val uri = androidx.core.content.FileProvider.getUriForFile(
+                        this@AdminActivity,
+                        "${packageName}.fileprovider",
+                        file
+                    )
                     val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                         type = "text/csv"
                         putExtra(android.content.Intent.EXTRA_STREAM, uri)
