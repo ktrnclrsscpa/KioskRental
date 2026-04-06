@@ -8,6 +8,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -16,11 +17,14 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.text.NumberFormat
+import java.text.SimpleDateFormat
 import java.util.*
 
 class AdminActivity : AppCompatActivity() {
@@ -28,22 +32,33 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var supabase: SupabaseClient
     private val prefs by lazy { getSharedPreferences("kiosk_prefs", Context.MODE_PRIVATE) }
     
+    // Tab contents
     private lateinit var salesContent: LinearLayout
     private lateinit var pinsContent: LinearLayout
     private lateinit var appsContent: LinearLayout
     private lateinit var settingsContent: LinearLayout
     
-    private lateinit var totalIncomeText: TextView
-    private lateinit var totalSessionsText: TextView
-    private lateinit var todayIncomeText: TextView
+    // Sales tab UI
+    private lateinit var dailyTotalText: TextView
+    private lateinit var transactionRecycler: RecyclerView
+    private lateinit var refreshSalesBtn: Button
+    
+    // Pins tab UI
     private lateinit var pinsText: TextView
+    
+    // Apps tab UI
     private lateinit var appContainer: LinearLayout
     private lateinit var appStatusText: TextView
     private lateinit var saveAppsBtn: Button
     private val checkBoxes = mutableListOf<Pair<CheckBox, String>>()
     
+    // Settings tab UI
+    private lateinit var telegramTokenInput: EditText
+    private lateinit var telegramChatIdInput: EditText
+    private lateinit var testTelegramBtn: Button
+    
     private var currentTab = "sales"
-
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         checkAdminPassword()
@@ -106,10 +121,9 @@ class AdminActivity : AppCompatActivity() {
             setOnClickListener { showChangePasswordDialog() }
         }
         headerRow.addView(changePwdBtn)
-        
         rootLayout.addView(headerRow)
         
-        // Tab bar
+        // Tab bar - adjusted for better display
         val tabBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(30, 0, 30, 0)
@@ -117,51 +131,26 @@ class AdminActivity : AppCompatActivity() {
             elevation = 4f
         }
         
-        val salesTab = TextView(this).apply {
-            text = "SALES"
-            textSize = 16f
-            setTextColor(Color.parseColor("#7F8C8D"))
-            setPadding(30, 15, 30, 15)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            gravity = android.view.Gravity.CENTER
-            setOnClickListener { selectTab("sales", tabBar) }
-            tag = "sales"
+        val createTab = { text: String, tag: String ->
+            TextView(this).apply {
+                this.text = text
+                textSize = 16f
+                setTextColor(Color.parseColor("#7F8C8D"))
+                setPadding(30, 15, 30, 15)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                gravity = android.view.Gravity.CENTER
+                setOnClickListener { selectTab(tag, tabBar) }
+                this.tag = tag
+            }
         }
         
-        val pinsTab = TextView(this).apply {
-            text = "PINS"
-            textSize = 16f
-            setTextColor(Color.parseColor("#7F8C8D"))
-            setPadding(30, 15, 30, 15)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            gravity = android.view.Gravity.CENTER
-            setOnClickListener { selectTab("pins", tabBar) }
-            tag = "pins"
-        }
-        
-        val appsTab = TextView(this).apply {
-            text = "APPS"
-            textSize = 16f
-            setTextColor(Color.parseColor("#7F8C8D"))
-            setPadding(30, 15, 30, 15)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            gravity = android.view.Gravity.CENTER
-            setOnClickListener { selectTab("apps", tabBar) }
-            tag = "apps"
-        }
-        
-        val settingsTab = TextView(this).apply {
-            text = "SETTINGS"
-            textSize = 16f
-            setTextColor(Color.parseColor("#7F8C8D"))
-            setPadding(30, 15, 30, 15)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            gravity = android.view.Gravity.CENTER
-            setOnClickListener { selectTab("settings", tabBar) }
-            tag = "settings"
-        }
+        val salesTab = createTab("SALES", "sales")
+        val pinsTab = createTab("PINS", "pins")
+        val appsTab = createTab("APPS", "apps")
+        val settingsTab = createTab("SETTINGS", "settings")
         
         tabBar.addView(salesTab)
+        tabBar.addView(pinsTab)
         tabBar.addView(pinsTab)
         tabBar.addView(appsTab)
         tabBar.addView(settingsTab)
@@ -175,8 +164,6 @@ class AdminActivity : AppCompatActivity() {
             setPadding(30, 20, 30, 40)
         }
         scrollView.addView(contentContainer)
-        
-        // Add scrollView to rootLayout with MATCH_PARENT and weight
         val scrollParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             0,
@@ -200,18 +187,18 @@ class AdminActivity : AppCompatActivity() {
         // Select default tab
         selectTab("sales", tabBar)
         
-        // Load data
-        loadStats()
+        // Load initial data
+        loadTransactionHistory()
         loadActivePins()
-        loadTelegramSettings()
         loadInstalledApps()
         loadCurrentWhitelistLocal()
+        loadTelegramSettings()
     }
     
     private fun selectTab(tab: String, tabBar: LinearLayout) {
         currentTab = tab
         for (i in 0 until tabBar.childCount) {
-            val child = tabBar.getChildAt(i) as TextView
+            val child = tabBar.getChildAt(i) as? TextView ?: continue
             if (child.tag == tab) {
                 child.setTextColor(Color.parseColor("#2ECC71"))
                 child.setTypeface(Typeface.DEFAULT_BOLD)
@@ -224,36 +211,46 @@ class AdminActivity : AppCompatActivity() {
         pinsContent.visibility = if (tab == "pins") View.VISIBLE else View.GONE
         appsContent.visibility = if (tab == "apps") View.VISIBLE else View.GONE
         settingsContent.visibility = if (tab == "settings") View.VISIBLE else View.GONE
+        
+        if (tab == "sales") {
+            loadTransactionHistory()
+        } else if (tab == "pins") {
+            loadActivePins()
+        }
     }
     
     private fun createSalesContent(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             
-            val statsTitle = TextView(this@AdminActivity).apply {
-                text = "💰 INCOME SUMMARY"
+            val dailyTotalCard = createCardText("Daily Total: ₱0.00")
+            dailyTotalText = dailyTotalCard
+            addView(dailyTotalCard)
+            
+            val historyTitle = TextView(this@AdminActivity).apply {
+                text = "📋 TRANSACTION HISTORY"
                 textSize = 18f
                 typeface = Typeface.DEFAULT_BOLD
-                setPadding(0, 0, 0, 10)
+                setPadding(0, 20, 0, 10)
             }
-            addView(statsTitle)
+            addView(historyTitle)
             
-            totalIncomeText = createCardText("Total Income: ₱0")
-            addView(totalIncomeText)
+            transactionRecycler = RecyclerView(this@AdminActivity).apply {
+                layoutManager = LinearLayoutManager(this@AdminActivity)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    500
+                )
+            }
+            addView(transactionRecycler)
             
-            totalSessionsText = createCardText("Total Sessions: 0")
-            addView(totalSessionsText)
-            
-            todayIncomeText = createCardText("Today's Sales: ₱0")
-            addView(todayIncomeText)
-            
-            val refreshStatsBtn = Button(this@AdminActivity).apply {
-                text = "REFRESH STATS"
+            refreshSalesBtn = Button(this@AdminActivity).apply {
+                text = "REFRESH"
                 setBackgroundColor(Color.parseColor("#3498DB"))
                 setTextColor(Color.WHITE)
-                setOnClickListener { loadStats() }
+                setOnClickListener { loadTransactionHistory() }
             }
-            addView(refreshStatsBtn)
+            addView(refreshSalesBtn)
         }
     }
     
@@ -312,7 +309,7 @@ class AdminActivity : AppCompatActivity() {
                             generateMinutesInput.text.clear()
                             generateAmountInput.text.clear()
                             loadActivePins()
-                            loadStats()
+                            loadTransactionHistory() // refresh sales tab
                         } else {
                             Toast.makeText(this@AdminActivity, "Failed to generate PIN", Toast.LENGTH_SHORT).show()
                         }
@@ -368,7 +365,7 @@ class AdminActivity : AppCompatActivity() {
                             extendMinutesInput.text.clear()
                             extendAmountInput.text.clear()
                             loadActivePins()
-                            loadStats()
+                            loadTransactionHistory()
                         }
                     } else {
                         withContext(Dispatchers.Main) {
@@ -447,10 +444,10 @@ class AdminActivity : AppCompatActivity() {
             }
             addView(settingsTitle)
             
-            val telegramTokenInput = createEditText("Bot Token")
+            telegramTokenInput = createEditText("Bot Token")
             addView(telegramTokenInput)
             
-            val telegramChatIdInput = createEditText("Chat ID")
+            telegramChatIdInput = createEditText("Chat ID")
             addView(telegramChatIdInput)
             
             val buttonRow = LinearLayout(this@AdminActivity).apply {
@@ -478,7 +475,7 @@ class AdminActivity : AppCompatActivity() {
             }
             buttonRow.addView(saveTelegramBtn)
             
-            val testTelegramBtn = createButton("TEST", "#E67E22")
+            testTelegramBtn = createButton("TEST", "#E67E22")
             testTelegramBtn.setOnClickListener {
                 val token = telegramTokenInput.text.toString().trim()
                 val chatId = telegramChatIdInput.text.toString().trim()
@@ -523,72 +520,47 @@ class AdminActivity : AppCompatActivity() {
         }
     }
     
-    private fun createCardText(text: String): TextView {
-        return TextView(this).apply {
-            this.text = text
-            textSize = 16f
-            setPadding(16, 12, 16, 12)
-            background = GradientDrawable().apply {
-                setColor(Color.WHITE)
-                cornerRadius = 12f
-                setStroke(1, Color.parseColor("#EEEEEE"))
-            }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, 0, 0, 8)
-            }
-        }
-    }
-    
-    private fun createEditText(hint: String, isNumber: Boolean = false): EditText {
-        return EditText(this).apply {
-            this.hint = hint
-            setPadding(16, 14, 16, 14)
-            textSize = 14f
-            background = GradientDrawable().apply {
-                setColor(Color.WHITE)
-                cornerRadius = 12f
-                setStroke(1, Color.parseColor("#DDDDDD"))
-            }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, 0, 0, 12)
-            }
-            if (isNumber) {
-                inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            }
-        }
-    }
-    
-    private fun createButton(text: String, color: String): Button {
-        return Button(this).apply {
-            this.text = text
-            textSize = 14f
-            setPadding(18, 14, 18, 14)
-            setBackgroundColor(Color.parseColor(color))
-            setTextColor(Color.WHITE)
-            setAllCaps(false)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, 5, 0, 5)
-            }
-        }
-    }
-    
-    private fun loadStats() {
+    private fun loadTransactionHistory() {
         CoroutineScope(Dispatchers.IO).launch {
-            val stats = supabase.getIncomeStats()
+            val history = supabase.getSessionHistory()
             withContext(Dispatchers.Main) {
-                val currency = NumberFormat.getCurrencyInstance(Locale("en", "PH"))
-                totalIncomeText.text = "Total Income: ${currency.format(stats.yearly)}"
-                totalSessionsText.text = "Total Sessions: ${stats.totalSessions}"
-                todayIncomeText.text = "Today's Sales: ${currency.format(stats.daily)}"
+                // Compute daily total
+                val dateFormat = SimpleDateFormat("MM/dd/yyyy", Locale.US)
+                val today = dateFormat.format(Date())
+                var dailyTotal = 0.0
+                val displayList = mutableListOf<Triple<String, String, Double>>() // (pin, details, amount)
+                
+                for (record in history) {
+                    val type = if (record.pin.endsWith("_EXT")) "🔁 EXTENSION" else "🎮 SESSION"
+                    val cleanPin = record.pin.replace("_EXT", "")
+                    val detail = "$type: $cleanPin | ${record.minutes} min | ₱${String.format("%.2f", record.amount)} | ${record.date}"
+                    displayList.add(Triple(cleanPin, detail, record.amount))
+                    
+                    // Check if date matches today
+                    val recordDate = record.date.split(" ")[0] // assuming date format "MM/dd HH:mm"
+                    if (recordDate == today) {
+                        dailyTotal += record.amount
+                    }
+                }
+                
+                dailyTotalText.text = "Daily Total (Today): ₱${String.format("%.2f", dailyTotal)}"
+                
+                // Simple adapter for display
+                val adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+                    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+                        val tv = TextView(parent.context).apply {
+                            setPadding(16, 12, 16, 12)
+                            textSize = 14f
+                            setTextColor(Color.BLACK)
+                        }
+                        return object : RecyclerView.ViewHolder(tv) {}
+                    }
+                    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+                        (holder.itemView as TextView).text = displayList[position].second
+                    }
+                    override fun getItemCount(): Int = displayList.size
+                }
+                transactionRecycler.adapter = adapter
             }
         }
     }
@@ -614,11 +586,8 @@ class AdminActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             val (token, chatId) = supabase.getTelegramConfig()
             withContext(Dispatchers.Main) {
-                // Find the EditText views inside settingsContent
-                val tokenInput = (settingsContent.getChildAt(1) as? EditText)
-                val chatIdInput = (settingsContent.getChildAt(2) as? EditText)
-                tokenInput?.setText(token)
-                chatIdInput?.setText(chatId)
+                telegramTokenInput.setText(token)
+                telegramChatIdInput.setText(chatId)
             }
         }
     }
@@ -723,5 +692,64 @@ class AdminActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+    
+    // Helper UI methods
+    private fun createCardText(text: String): TextView {
+        return TextView(this).apply {
+            this.text = text
+            textSize = 16f
+            setPadding(16, 12, 16, 12)
+            background = GradientDrawable().apply {
+                setColor(Color.WHITE)
+                cornerRadius = 12f
+                setStroke(1, Color.parseColor("#EEEEEE"))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 8)
+            }
+        }
+    }
+    
+    private fun createEditText(hint: String, isNumber: Boolean = false): EditText {
+        return EditText(this).apply {
+            this.hint = hint
+            setPadding(16, 14, 16, 14)
+            textSize = 14f
+            background = GradientDrawable().apply {
+                setColor(Color.WHITE)
+                cornerRadius = 12f
+                setStroke(1, Color.parseColor("#DDDDDD"))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 12)
+            }
+            if (isNumber) {
+                inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            }
+        }
+    }
+    
+    private fun createButton(text: String, color: String): Button {
+        return Button(this).apply {
+            this.text = text
+            textSize = 14f
+            setPadding(18, 14, 18, 14)
+            setBackgroundColor(Color.parseColor(color))
+            setTextColor(Color.WHITE)
+            setAllCaps(false)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 5, 0, 5)
+            }
+        }
     }
 }
