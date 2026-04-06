@@ -112,7 +112,7 @@ class AdminActivity : AppCompatActivity() {
         headerRow.addView(changePwdBtn)
         rootLayout.addView(headerRow)
         
-        // Tab bar - reduced font size and padding
+        // Tab bar - adjusted font size and padding to prevent clipping
         val tabBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(20, 0, 20, 0)
@@ -120,42 +120,22 @@ class AdminActivity : AppCompatActivity() {
             elevation = 4f
         }
         
-        val salesTab = TextView(this).apply {
-            text = "SALES"
-            textSize = 14f
-            setTextColor(Color.parseColor("#7F8C8D"))
-            setPadding(25, 15, 25, 15)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            gravity = android.view.Gravity.CENTER
-            tag = "sales"
+        val createTab = { text: String, tag: String ->
+            TextView(this).apply {
+                this.text = text
+                textSize = 13f   // smaller font to fit
+                setTextColor(Color.parseColor("#7F8C8D"))
+                setPadding(20, 15, 20, 15)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                gravity = android.view.Gravity.CENTER
+                this.tag = tag
+            }
         }
-        val pinsTab = TextView(this).apply {
-            text = "PINS"
-            textSize = 14f
-            setTextColor(Color.parseColor("#7F8C8D"))
-            setPadding(25, 15, 25, 15)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            gravity = android.view.Gravity.CENTER
-            tag = "pins"
-        }
-        val appsTab = TextView(this).apply {
-            text = "APPS"
-            textSize = 14f
-            setTextColor(Color.parseColor("#7F8C8D"))
-            setPadding(25, 15, 25, 15)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            gravity = android.view.Gravity.CENTER
-            tag = "apps"
-        }
-        val settingsTab = TextView(this).apply {
-            text = "SETTINGS"
-            textSize = 14f
-            setTextColor(Color.parseColor("#7F8C8D"))
-            setPadding(25, 15, 25, 15)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            gravity = android.view.Gravity.CENTER
-            tag = "settings"
-        }
+        
+        val salesTab = createTab("SALES", "sales")
+        val pinsTab = createTab("PINS", "pins")
+        val appsTab = createTab("APPS", "apps")
+        val settingsTab = createTab("SETTINGS", "settings")
         
         tabBar.addView(salesTab)
         tabBar.addView(pinsTab)
@@ -263,7 +243,6 @@ class AdminActivity : AppCompatActivity() {
             }
             addView(refreshBtn)
             
-            // Export CSV button moved to SALES section
             val exportBtn = Button(this@AdminActivity).apply {
                 text = "📥 EXPORT CSV REPORT"
                 setBackgroundColor(Color.parseColor("#9B59B6"))
@@ -638,7 +617,6 @@ class AdminActivity : AppCompatActivity() {
             val today = dateFormat.format(Date())
             var dailyTotal = 0.0
             val csv = StringBuilder()
-            // Add summary header
             csv.append("DAILY TOTAL (Today):,₱0.00\n\n")
             csv.append("PIN,Minutes,Amount,Date,Type\n")
             for (record in history) {
@@ -648,7 +626,6 @@ class AdminActivity : AppCompatActivity() {
                 val recordDate = record.date.split(" ")[0]
                 if (recordDate == today) dailyTotal += record.amount
             }
-            // Insert daily total at top
             val finalCsv = "DAILY TOTAL (Today):,₱${String.format("%.2f", dailyTotal)}\n\n${csv.substring(csv.indexOf("\n") + 1)}"
             withContext(Dispatchers.Main) {
                 try {
