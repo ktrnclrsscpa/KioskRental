@@ -46,6 +46,7 @@ class AdminActivity : AppCompatActivity() {
     private val checkBoxes = mutableListOf<Pair<CheckBox, String>>()
     private lateinit var telegramTokenInput: EditText
     private lateinit var telegramChatIdInput: EditText
+    private lateinit var saveTelegramBtn: Button
     private lateinit var testTelegramBtn: Button
     
     private var currentTab = "sales"
@@ -112,7 +113,7 @@ class AdminActivity : AppCompatActivity() {
         headerRow.addView(changePwdBtn)
         rootLayout.addView(headerRow)
         
-        // Tab bar - adjusted font size and padding to prevent clipping
+        // Tab bar - adjusted to fit "SETTINGS"
         val tabBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(20, 0, 20, 0)
@@ -120,22 +121,42 @@ class AdminActivity : AppCompatActivity() {
             elevation = 4f
         }
         
-        val createTab = { text: String, tag: String ->
-            TextView(this).apply {
-                this.text = text
-                textSize = 13f   // smaller font to fit
-                setTextColor(Color.parseColor("#7F8C8D"))
-                setPadding(20, 15, 20, 15)
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                gravity = android.view.Gravity.CENTER
-                this.tag = tag
-            }
+        val salesTab = TextView(this).apply {
+            text = "SALES"
+            textSize = 13f
+            setTextColor(Color.parseColor("#7F8C8D"))
+            setPadding(20, 15, 20, 15)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            gravity = android.view.Gravity.CENTER
+            tag = "sales"
         }
-        
-        val salesTab = createTab("SALES", "sales")
-        val pinsTab = createTab("PINS", "pins")
-        val appsTab = createTab("APPS", "apps")
-        val settingsTab = createTab("SETTINGS", "settings")
+        val pinsTab = TextView(this).apply {
+            text = "PINS"
+            textSize = 13f
+            setTextColor(Color.parseColor("#7F8C8D"))
+            setPadding(20, 15, 20, 15)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            gravity = android.view.Gravity.CENTER
+            tag = "pins"
+        }
+        val appsTab = TextView(this).apply {
+            text = "APPS"
+            textSize = 13f
+            setTextColor(Color.parseColor("#7F8C8D"))
+            setPadding(20, 15, 20, 15)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            gravity = android.view.Gravity.CENTER
+            tag = "apps"
+        }
+        val settingsTab = TextView(this).apply {
+            text = "SETTINGS"
+            textSize = 13f
+            setTextColor(Color.parseColor("#7F8C8D"))
+            setPadding(20, 15, 20, 15)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            gravity = android.view.Gravity.CENTER
+            tag = "settings"
+        }
         
         tabBar.addView(salesTab)
         tabBar.addView(pinsTab)
@@ -425,6 +446,7 @@ class AdminActivity : AppCompatActivity() {
     private fun createSettingsContent(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            
             val settingsTitle = TextView(this@AdminActivity).apply {
                 text = "⚙️ Telegram Settings"
                 textSize = 18f
@@ -432,71 +454,88 @@ class AdminActivity : AppCompatActivity() {
                 setPadding(0, 0, 0, 10)
             }
             addView(settingsTitle)
+            
             telegramTokenInput = createEditText("Bot Token")
             addView(telegramTokenInput)
+            
             telegramChatIdInput = createEditText("Chat ID")
             addView(telegramChatIdInput)
             
+            // Button row for SAVE and TEST
             val buttonRow = LinearLayout(this@AdminActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 setPadding(0, 10, 0, 10)
             }
-            val saveTelegramBtn = Button(this@AdminActivity).apply {
+            
+            saveTelegramBtn = Button(this@AdminActivity).apply {
                 text = "SAVE"
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
                     setMargins(0, 0, 10, 0)
                 }
                 setBackgroundColor(Color.parseColor("#2ECC71"))
                 setTextColor(Color.WHITE)
+                setAllCaps(false)
                 setOnClickListener {
                     val token = telegramTokenInput.text.toString().trim()
                     val chatId = telegramChatIdInput.text.toString().trim()
                     CoroutineScope(Dispatchers.IO).launch {
                         val success = supabase.updateTelegramConfig(token, chatId)
                         withContext(Dispatchers.Main) {
-                            Toast.makeText(this@AdminActivity, if (success) "Telegram saved!" else "Failed to save", Toast.LENGTH_SHORT).show()
+                            if (success) {
+                                Toast.makeText(this@AdminActivity, "Telegram settings saved!", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(this@AdminActivity, "Failed to save", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     }
                 }
             }
             buttonRow.addView(saveTelegramBtn)
-            testTelegramBtn = createButton("TEST", "#E67E22")
-            testTelegramBtn.setOnClickListener {
-                val token = telegramTokenInput.text.toString().trim()
-                val chatId = telegramChatIdInput.text.toString().trim()
-                if (token.isEmpty() || chatId.isEmpty()) {
-                    Toast.makeText(this@AdminActivity, "Enter Bot Token and Chat ID first", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-                testTelegramBtn.isEnabled = false
-                testTelegramBtn.text = "SENDING..."
-                Thread {
-                    try {
-                        val url = URL("https://api.telegram.org/bot$token/sendMessage?chat_id=$chatId&text=✅%20Test%20from%20KCB%20Rental!")
-                        val conn = url.openConnection() as HttpURLConnection
-                        conn.requestMethod = "GET"
-                        conn.connectTimeout = 10000
-                        val responseCode = conn.responseCode
-                        conn.disconnect()
-                        runOnUiThread {
-                            testTelegramBtn.isEnabled = true
-                            testTelegramBtn.text = "TEST"
-                            if (responseCode == 200) {
-                                Toast.makeText(this@AdminActivity, "Test sent! Check Telegram.", Toast.LENGTH_SHORT).show()
-                            } else {
-                                Toast.makeText(this@AdminActivity, "Failed! Check credentials.", Toast.LENGTH_SHORT).show()
+            
+            testTelegramBtn = Button(this@AdminActivity).apply {
+                text = "TEST"
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                setBackgroundColor(Color.parseColor("#E67E22"))
+                setTextColor(Color.WHITE)
+                setAllCaps(false)
+                setOnClickListener {
+                    val token = telegramTokenInput.text.toString().trim()
+                    val chatId = telegramChatIdInput.text.toString().trim()
+                    if (token.isEmpty() || chatId.isEmpty()) {
+                        Toast.makeText(this@AdminActivity, "Enter Bot Token and Chat ID first", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                    testTelegramBtn.isEnabled = false
+                    testTelegramBtn.text = "SENDING..."
+                    Thread {
+                        try {
+                            val url = URL("https://api.telegram.org/bot$token/sendMessage?chat_id=$chatId&text=✅%20Test%20from%20KCB%20Rental!")
+                            val conn = url.openConnection() as HttpURLConnection
+                            conn.requestMethod = "GET"
+                            conn.connectTimeout = 10000
+                            val responseCode = conn.responseCode
+                            conn.disconnect()
+                            runOnUiThread {
+                                testTelegramBtn.isEnabled = true
+                                testTelegramBtn.text = "TEST"
+                                if (responseCode == 200) {
+                                    Toast.makeText(this@AdminActivity, "Test sent! Check Telegram.", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(this@AdminActivity, "Failed! Check credentials.", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                testTelegramBtn.isEnabled = true
+                                testTelegramBtn.text = "TEST"
+                                Toast.makeText(this@AdminActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
                             }
                         }
-                    } catch (e: Exception) {
-                        runOnUiThread {
-                            testTelegramBtn.isEnabled = true
-                            testTelegramBtn.text = "TEST"
-                            Toast.makeText(this@AdminActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }.start()
+                    }.start()
+                }
             }
             buttonRow.addView(testTelegramBtn)
+            
             addView(buttonRow)
         }
     }
