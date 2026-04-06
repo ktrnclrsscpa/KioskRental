@@ -2,11 +2,13 @@ package com.kcb.kiosk
 
 import android.app.AlertDialog
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -24,6 +26,12 @@ class AdminActivity : AppCompatActivity() {
     
     private lateinit var supabase: SupabaseClient
     private val prefs by lazy { getSharedPreferences("kiosk_prefs", Context.MODE_PRIVATE) }
+    
+    // App Whitelist
+    private lateinit var appContainer: LinearLayout
+    private lateinit var saveAppsBtn: Button
+    private lateinit var appStatusText: TextView
+    private val checkBoxes = mutableListOf<Pair<CheckBox, String>>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -86,7 +94,7 @@ class AdminActivity : AppCompatActivity() {
         }
         mainLayout.addView(changePwdBtn)
         
-        // Stats Section
+        // ========== STATS SECTION ==========
         val statsTitle = TextView(this).apply {
             text = "💰 INCOME SUMMARY"
             textSize = 18f
@@ -129,7 +137,7 @@ class AdminActivity : AppCompatActivity() {
         }
         mainLayout.addView(refreshStatsBtn)
         
-        // Generate PIN Section
+        // ========== GENERATE PIN SECTION ==========
         val genTitle = TextView(this).apply {
             text = "📌 Generate New PIN"
             textSize = 18f
@@ -207,7 +215,7 @@ class AdminActivity : AppCompatActivity() {
         }
         mainLayout.addView(generateBtn)
         
-        // Extend PIN Section
+        // ========== EXTEND PIN SECTION ==========
         val extendTitle = TextView(this).apply {
             text = "⏰ Extend Active PIN"
             textSize = 18f
@@ -286,7 +294,7 @@ class AdminActivity : AppCompatActivity() {
         }
         mainLayout.addView(extendBtn)
         
-        // Active PINs Section
+        // ========== ACTIVE PINS SECTION ==========
         val pinsTitle = TextView(this).apply {
             text = "🔑 Active PINs"
             textSize = 18f
@@ -311,7 +319,47 @@ class AdminActivity : AppCompatActivity() {
         }
         mainLayout.addView(refreshPinsBtn)
         
-        // Telegram Settings Section
+        // ========== APP WHITELIST SECTION ==========
+        val whitelistTitle = TextView(this).apply {
+            text = "📱 App Whitelist"
+            textSize = 18f
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(0, 20, 0, 10)
+        }
+        mainLayout.addView(whitelistTitle)
+        
+        appStatusText = TextView(this).apply {
+            text = "Loading apps..."
+            textSize = 13f
+            setPadding(0, 0, 0, 12)
+            setTextColor(Color.parseColor("#7F8C8D"))
+        }
+        mainLayout.addView(appStatusText)
+        
+        // Scrollable container for apps
+        val appScrollView = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                350
+            )
+        }
+        appContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(8, 8, 8, 8)
+        }
+        appScrollView.addView(appContainer)
+        mainLayout.addView(appScrollView)
+        
+        saveAppsBtn = Button(this).apply {
+            text = "SAVE WHITELIST"
+            setBackgroundColor(Color.parseColor("#3498DB"))
+            setTextColor(Color.WHITE)
+            setPadding(16, 14, 16, 14)
+            setOnClickListener { saveWhitelistLocal() }
+        }
+        mainLayout.addView(saveAppsBtn)
+        
+        // ========== TELEGRAM SETTINGS SECTION ==========
         val settingsTitle = TextView(this).apply {
             text = "⚙️ Telegram Settings"
             textSize = 18f
@@ -425,6 +473,8 @@ class AdminActivity : AppCompatActivity() {
         loadStats(totalIncomeText, totalSessionsText, todayIncomeText)
         loadActivePins()
         loadTelegramSettings(telegramTokenInput, telegramChatIdInput)
+        loadInstalledApps()
+        loadCurrentWhitelistLocal()
     }
     
     private fun createCardBackground(): GradientDrawable {
@@ -481,6 +531,56 @@ class AdminActivity : AppCompatActivity() {
                 chatIdInput.setText(chatId)
             }
         }
+    }
+    
+    private fun loadInstalledApps() {
+        appStatusText.text = "Loading apps..."
+        saveAppsBtn.isEnabled = false
+        val installedApps = mutableListOf<Pair<String, String>>()
+        val packages = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+        for (app in packages) {
+            val isSystemApp = (app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+            val isUpdatedSystemApp = (app.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+            if (!isSystemApp || isUpdatedSystemApp) {
+                val appName = packageManager.getApplicationLabel(app).toString()
+                installedApps.add(Pair(appName, app.packageName))
+            }
+        }
+        installedApps.sortBy { it.first }
+        appContainer.removeAllViews()
+        checkBoxes.clear()
+        for (app in installedApps) {
+            val checkBox = CheckBox(this).apply {
+                text = "${app.first}\n${app.second}"
+                setPadding(12, 10, 12, 10)
+                textSize = 13f
+            }
+            appContainer.addView(checkBox)
+            checkBoxes.add(Pair(checkBox, app.second))
+        }
+        appStatusText.text = "Found ${installedApps.size} apps. Select allowed apps."
+        saveAppsBtn.isEnabled = true
+    }
+    
+    private fun loadCurrentWhitelistLocal() {
+        val savedWhitelist = prefs.getStringSet("whitelist", emptySet()) ?: emptySet()
+        for ((checkBox, packageName) in checkBoxes) {
+            checkBox.isChecked = savedWhitelist.contains(packageName)
+        }
+    }
+    
+    private fun saveWhitelistLocal() {
+        saveAppsBtn.isEnabled = false
+        saveAppsBtn.text = "SAVING..."
+        val selectedPackages = mutableSetOf<String>()
+        for ((checkBox, packageName) in checkBoxes) {
+            if (checkBox.isChecked) selectedPackages.add(packageName)
+        }
+        prefs.edit().putStringSet("whitelist", selectedPackages).apply()
+        saveAppsBtn.isEnabled = true
+        saveAppsBtn.text = "SAVE WHITELIST"
+        appStatusText.text = "✓ Saved ${selectedPackages.size} apps"
+        Toast.makeText(this, "Saved ${selectedPackages.size} apps", Toast.LENGTH_LONG).show()
     }
     
     private fun exportReport() {
