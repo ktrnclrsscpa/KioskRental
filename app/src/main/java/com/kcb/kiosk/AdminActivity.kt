@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -27,6 +28,13 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var supabase: SupabaseClient
     private val prefs by lazy { getSharedPreferences("kiosk_prefs", Context.MODE_PRIVATE) }
     
+    // Content containers for each tab
+    private lateinit var salesContent: LinearLayout
+    private lateinit var pinsContent: LinearLayout
+    private lateinit var appsContent: LinearLayout
+    private lateinit var settingsContent: LinearLayout
+    
+    // Shared UI elements
     private lateinit var totalIncomeText: TextView
     private lateinit var totalSessionsText: TextView
     private lateinit var todayIncomeText: TextView
@@ -35,6 +43,8 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var appStatusText: TextView
     private lateinit var saveAppsBtn: Button
     private val checkBoxes = mutableListOf<Pair<CheckBox, String>>()
+    
+    private var currentTab = "sales"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,7 +64,7 @@ class AdminActivity : AppCompatActivity() {
                 val password = input.text.toString()
                 val savedPassword = prefs.getString("admin_password", "admin123")
                 if (password == savedPassword) {
-                    showAdminPanel()
+                    initAdminPanel()
                 } else {
                     Toast.makeText(this, "Wrong password!", Toast.LENGTH_SHORT).show()
                     finish()
@@ -67,52 +77,153 @@ class AdminActivity : AppCompatActivity() {
             .show()
     }
     
-    private fun showAdminPanel() {
+    private fun initAdminPanel() {
         supabase = SupabaseClient.getInstance()
         
-        val scrollView = ScrollView(this)
-        val mainLayout = LinearLayout(this).apply {
+        val rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(30, 40, 30, 50)
             setBackgroundColor(Color.parseColor("#F5F7FA"))
         }
         
-        // Header
-        val header = TextView(this).apply {
-            text = "🔐 KCB RENTAL ADMIN"
-            textSize = 24f
+        // Header with title and change password
+        val headerRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(30, 30, 30, 20)
+        }
+        
+        val title = TextView(this).apply {
+            text = "ADMIN PANEL"
+            textSize = 22f
             setTextColor(Color.parseColor("#2C3E50"))
             typeface = Typeface.DEFAULT_BOLD
-            gravity = android.view.Gravity.CENTER
-            setPadding(0, 0, 0, 30)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
-        mainLayout.addView(header)
+        headerRow.addView(title)
         
         val changePwdBtn = Button(this).apply {
             text = "Change Password"
+            textSize = 12f
             setBackgroundColor(Color.TRANSPARENT)
             setTextColor(Color.parseColor("#3498DB"))
             setOnClickListener { showChangePasswordDialog() }
         }
-        mainLayout.addView(changePwdBtn)
+        headerRow.addView(changePwdBtn)
+        
+        rootLayout.addView(headerRow)
+        
+        // Tab bar
+        val tabBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(30, 0, 30, 0)
+            setBackgroundColor(Color.WHITE)
+            elevation = 4f
+        }
+        
+        val createTab = { text: String, tag: String ->
+            TextView(this).apply {
+                this.text = text
+                textSize = 16f
+                setTextColor(Color.parseColor("#7F8C8D"))
+                setPadding(30, 15, 30, 15)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                gravity = android.view.Gravity.CENTER
+                setOnClickListener {
+                    currentTab = tag
+                    updateTabSelection(tabBar, tag)
+                    showContentForTab(tag)
+                }
+                this.tag = tag
+            }
+        }
+        
+        val salesTab = createTab("SALES", "sales")
+        val pinsTab = createTab("PINS", "pins")
+        val appsTab = createTab("APPS", "apps")
+        val settingsTab = createTab("SETTINGS", "settings")
+        
+        tabBar.addView(salesTab)
+        tabBar.addView(pinsTab)
+        tabBar.addView(appsTab)
+        tabBar.addView(settingsTab)
+        
+        rootLayout.addView(tabBar)
+        
+        // Scrollable content area
+        val scrollView = ScrollView(this)
+        val contentContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(30, 20, 30, 40)
+        }
+        scrollView.addView(contentContainer)
+        rootLayout.addView(scrollView, LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
+        
+        // Create content for each tab
+        salesContent = createSalesContent()
+        pinsContent = createPinsContent()
+        appsContent = createAppsContent()
+        settingsContent = createSettingsContent()
+        
+        contentContainer.addView(salesContent)
+        contentContainer.addView(pinsContent)
+        contentContainer.addView(appsContent)
+        contentContainer.addView(settingsContent)
+        
+        setContentView(rootLayout)
+        
+        // Show default tab
+        updateTabSelection(tabBar, "sales")
+        showContentForTab("sales")
+        
+        // Load data
+        loadStats()
+        loadActivePins()
+        loadTelegramSettings()
+        loadInstalledApps()
+        loadCurrentWhitelistLocal()
+    }
+    
+    private fun updateTabSelection(tabBar: LinearLayout, selectedTag: String) {
+        for (i in 0 until tabBar.childCount) {
+            val child = tabBar.getChildAt(i) as TextView
+            if (child.tag == selectedTag) {
+                child.setTextColor(Color.parseColor("#2ECC71"))
+                child.setTypeface(Typeface.DEFAULT_BOLD)
+            } else {
+                child.setTextColor(Color.parseColor("#7F8C8D"))
+                child.setTypeface(Typeface.DEFAULT)
+            }
+        }
+    }
+    
+    private fun showContentForTab(tab: String) {
+        salesContent.visibility = if (tab == "sales") View.VISIBLE else View.GONE
+        pinsContent.visibility = if (tab == "pins") View.VISIBLE else View.GONE
+        appsContent.visibility = if (tab == "apps") View.VISIBLE else View.GONE
+        settingsContent.visibility = if (tab == "settings") View.VISIBLE else View.GONE
+    }
+    
+    private fun createSalesContent(): LinearLayout {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
         
         // Income Summary
         val statsTitle = TextView(this).apply {
             text = "💰 INCOME SUMMARY"
             textSize = 18f
             typeface = Typeface.DEFAULT_BOLD
-            setPadding(0, 20, 0, 10)
+            setPadding(0, 0, 0, 10)
         }
-        mainLayout.addView(statsTitle)
+        container.addView(statsTitle)
         
         totalIncomeText = createCardText("Total Income: ₱0")
-        mainLayout.addView(totalIncomeText)
+        container.addView(totalIncomeText)
         
         totalSessionsText = createCardText("Total Sessions: 0")
-        mainLayout.addView(totalSessionsText)
+        container.addView(totalSessionsText)
         
         todayIncomeText = createCardText("Today's Sales: ₱0")
-        mainLayout.addView(todayIncomeText)
+        container.addView(todayIncomeText)
         
         val refreshStatsBtn = Button(this).apply {
             text = "REFRESH STATS"
@@ -120,26 +231,34 @@ class AdminActivity : AppCompatActivity() {
             setTextColor(Color.WHITE)
             setOnClickListener { loadStats() }
         }
-        mainLayout.addView(refreshStatsBtn)
+        container.addView(refreshStatsBtn)
+        
+        return container
+    }
+    
+    private fun createPinsContent(): LinearLayout {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
         
         // Generate PIN
         val genTitle = TextView(this).apply {
             text = "📌 Generate New PIN"
             textSize = 18f
             typeface = Typeface.DEFAULT_BOLD
-            setPadding(0, 20, 0, 10)
+            setPadding(0, 0, 0, 10)
         }
-        mainLayout.addView(genTitle)
+        container.addView(genTitle)
         
         val generatePinInput = createEditText("PIN (leave blank for random)")
-        mainLayout.addView(generatePinInput)
+        container.addView(generatePinInput)
         
         val generateMinutesInput = createEditText("Minutes", true)
-        mainLayout.addView(generateMinutesInput)
+        container.addView(generateMinutesInput)
         
         val generateAmountInput = createEditText("Amount (₱)", true)
         generateAmountInput.inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-        mainLayout.addView(generateAmountInput)
+        container.addView(generateAmountInput)
         
         val generateBtn = createButton("GENERATE PIN", "#2ECC71")
         generateBtn.setOnClickListener {
@@ -172,15 +291,15 @@ class AdminActivity : AppCompatActivity() {
                         generatePinInput.text.clear()
                         generateMinutesInput.text.clear()
                         generateAmountInput.text.clear()
-                        loadStats()
                         loadActivePins()
+                        loadStats()
                     } else {
                         Toast.makeText(this@AdminActivity, "Failed to generate PIN", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
         }
-        mainLayout.addView(generateBtn)
+        container.addView(generateBtn)
         
         // Extend PIN
         val extendTitle = TextView(this).apply {
@@ -189,17 +308,17 @@ class AdminActivity : AppCompatActivity() {
             typeface = Typeface.DEFAULT_BOLD
             setPadding(0, 20, 0, 10)
         }
-        mainLayout.addView(extendTitle)
+        container.addView(extendTitle)
         
         val extendPinInput = createEditText("PIN to extend")
-        mainLayout.addView(extendPinInput)
+        container.addView(extendPinInput)
         
         val extendMinutesInput = createEditText("Minutes to add", true)
-        mainLayout.addView(extendMinutesInput)
+        container.addView(extendMinutesInput)
         
         val extendAmountInput = createEditText("Amount (₱)", true)
         extendAmountInput.inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-        mainLayout.addView(extendAmountInput)
+        container.addView(extendAmountInput)
         
         val extendBtn = createButton("EXTEND TIME", "#E67E22")
         extendBtn.setOnClickListener {
@@ -228,8 +347,8 @@ class AdminActivity : AppCompatActivity() {
                         extendPinInput.text.clear()
                         extendMinutesInput.text.clear()
                         extendAmountInput.text.clear()
-                        loadStats()
                         loadActivePins()
+                        loadStats()
                     }
                 } else {
                     withContext(Dispatchers.Main) {
@@ -240,7 +359,7 @@ class AdminActivity : AppCompatActivity() {
                 }
             }
         }
-        mainLayout.addView(extendBtn)
+        container.addView(extendBtn)
         
         // Active PINs
         val pinsTitle = TextView(this).apply {
@@ -249,10 +368,10 @@ class AdminActivity : AppCompatActivity() {
             typeface = Typeface.DEFAULT_BOLD
             setPadding(0, 20, 0, 10)
         }
-        mainLayout.addView(pinsTitle)
+        container.addView(pinsTitle)
         
         pinsText = createCardText("Loading...")
-        mainLayout.addView(pinsText)
+        container.addView(pinsText)
         
         val refreshPinsBtn = Button(this).apply {
             text = "REFRESH PIN LIST"
@@ -260,16 +379,23 @@ class AdminActivity : AppCompatActivity() {
             setTextColor(Color.WHITE)
             setOnClickListener { loadActivePins() }
         }
-        mainLayout.addView(refreshPinsBtn)
+        container.addView(refreshPinsBtn)
         
-        // App Whitelist (simple, no nested ScrollView needed because main ScrollView handles scrolling)
+        return container
+    }
+    
+    private fun createAppsContent(): LinearLayout {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        
         val whitelistTitle = TextView(this).apply {
             text = "📱 App Whitelist"
             textSize = 18f
             typeface = Typeface.DEFAULT_BOLD
-            setPadding(0, 20, 0, 10)
+            setPadding(0, 0, 0, 10)
         }
-        mainLayout.addView(whitelistTitle)
+        container.addView(whitelistTitle)
         
         appStatusText = TextView(this).apply {
             text = "Loading apps..."
@@ -277,33 +403,39 @@ class AdminActivity : AppCompatActivity() {
             setPadding(0, 0, 0, 12)
             setTextColor(Color.parseColor("#7F8C8D"))
         }
-        mainLayout.addView(appStatusText)
+        container.addView(appStatusText)
         
-        // Simple container for apps - no fixed height, just let it expand
         appContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(8, 8, 8, 8)
         }
-        mainLayout.addView(appContainer)
+        container.addView(appContainer)
         
         saveAppsBtn = createButton("SAVE WHITELIST", "#3498DB")
         saveAppsBtn.setOnClickListener { saveWhitelistLocal() }
-        mainLayout.addView(saveAppsBtn)
+        container.addView(saveAppsBtn)
         
-        // Telegram Settings
+        return container
+    }
+    
+    private fun createSettingsContent(): LinearLayout {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        
         val settingsTitle = TextView(this).apply {
             text = "⚙️ Telegram Settings"
             textSize = 18f
             typeface = Typeface.DEFAULT_BOLD
-            setPadding(0, 20, 0, 10)
+            setPadding(0, 0, 0, 10)
         }
-        mainLayout.addView(settingsTitle)
+        container.addView(settingsTitle)
         
         val telegramTokenInput = createEditText("Bot Token")
-        mainLayout.addView(telegramTokenInput)
+        container.addView(telegramTokenInput)
         
         val telegramChatIdInput = createEditText("Chat ID")
-        mainLayout.addView(telegramChatIdInput)
+        container.addView(telegramChatIdInput)
         
         val buttonRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -367,22 +499,13 @@ class AdminActivity : AppCompatActivity() {
             }.start()
         }
         buttonRow.addView(testTelegramBtn)
-        mainLayout.addView(buttonRow)
+        container.addView(buttonRow)
         
-        // Export Report
         val exportBtn = createButton("📥 EXPORT CSV REPORT", "#9B59B6")
         exportBtn.setOnClickListener { exportReport() }
-        mainLayout.addView(exportBtn)
+        container.addView(exportBtn)
         
-        scrollView.addView(mainLayout)
-        setContentView(scrollView)
-        
-        // Load data
-        loadStats()
-        loadActivePins()
-        loadTelegramSettings(telegramTokenInput, telegramChatIdInput)
-        loadInstalledApps()
-        loadCurrentWhitelistLocal()
+        return container
     }
     
     private fun createCardText(text: String): TextView {
@@ -472,12 +595,14 @@ class AdminActivity : AppCompatActivity() {
         }
     }
     
-    private fun loadTelegramSettings(tokenInput: EditText, chatIdInput: EditText) {
+    private fun loadTelegramSettings() {
         CoroutineScope(Dispatchers.IO).launch {
             val (token, chatId) = supabase.getTelegramConfig()
             withContext(Dispatchers.Main) {
-                tokenInput.setText(token)
-                chatIdInput.setText(chatId)
+                val tokenInput = (settingsContent.getChildAt(1) as? EditText)
+                val chatIdInput = (settingsContent.getChildAt(2) as? EditText)
+                tokenInput?.setText(token)
+                chatIdInput?.setText(chatId)
             }
         }
     }
