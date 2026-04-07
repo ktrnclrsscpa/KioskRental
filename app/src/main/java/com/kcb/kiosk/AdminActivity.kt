@@ -13,7 +13,6 @@ import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -23,7 +22,6 @@ import kotlinx.coroutines.*
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
-import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -31,6 +29,9 @@ class AdminActivity : AppCompatActivity() {
     
     private lateinit var supabase: SupabaseClient
     private val prefs by lazy { getSharedPreferences("kiosk_prefs", Context.MODE_PRIVATE) }
+    
+    private lateinit var contentContainer: LinearLayout
+    private lateinit var tabBar: LinearLayout
     
     private lateinit var salesContent: LinearLayout
     private lateinit var pinsContent: LinearLayout
@@ -114,7 +115,7 @@ class AdminActivity : AppCompatActivity() {
         rootLayout.addView(headerRow)
         
         // Tab bar
-        val tabBar = LinearLayout(this).apply {
+        tabBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(20, 0, 20, 0)
             setBackgroundColor(Color.WHITE)
@@ -163,16 +164,8 @@ class AdminActivity : AppCompatActivity() {
         tabBar.addView(appsTab)
         tabBar.addView(settingsTab)
         
-        salesTab.setOnClickListener { selectTab("sales", tabBar) }
-        pinsTab.setOnClickListener { selectTab("pins", tabBar) }
-        appsTab.setOnClickListener { selectTab("apps", tabBar) }
-        settingsTab.setOnClickListener { selectTab("settings", tabBar) }
-        
-        rootLayout.addView(tabBar)
-        
-        // Content area: LinearLayout that will hold the current tab's content.
-        // We will replace the content dynamically to allow full-screen usage.
-        val contentContainer = LinearLayout(this).apply {
+        // Content container that will hold the active tab's content
+        contentContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -180,61 +173,58 @@ class AdminActivity : AppCompatActivity() {
                 1f
             )
         }
+        
+        rootLayout.addView(tabBar)
         rootLayout.addView(contentContainer)
         
-        // Create content for each tab (but not added yet; we'll add/remove as needed)
+        // Create content for each tab
         salesContent = createSalesContent()
         pinsContent = createPinsContent()
         appsContent = createAppsContent()
         settingsContent = createSettingsContent()
         
-        // Initially add sales content
-        contentContainer.addView(salesContent)
+        // Set click listeners
+        salesTab.setOnClickListener { selectTab("sales") }
+        pinsTab.setOnClickListener { selectTab("pins") }
+        appsTab.setOnClickListener { selectTab("apps") }
+        settingsTab.setOnClickListener { selectTab("settings") }
         
-        // Store references for tab switching
-        val contentMap = mapOf(
-            "sales" to salesContent,
-            "pins" to pinsContent,
-            "apps" to appsContent,
-            "settings" to settingsContent
-        )
-        
-        // Override selectTab to replace content
-        fun selectTabWithFullscreen(tab: String) {
-            currentTab = tab
-            // Update tab colors
-            for (i in 0 until tabBar.childCount) {
-                val child = tabBar.getChildAt(i) as? TextView ?: continue
-                if (child.tag == tab) {
-                    child.setTextColor(Color.parseColor("#2ECC71"))
-                    child.setTypeface(Typeface.DEFAULT_BOLD)
-                } else {
-                    child.setTextColor(Color.parseColor("#7F8C8D"))
-                    child.setTypeface(Typeface.DEFAULT)
-                }
-            }
-            // Replace content
-            contentContainer.removeAllViews()
-            contentMap[tab]?.let { contentContainer.addView(it) }
-            // Refresh data if needed
-            when (tab) {
-                "sales" -> loadTransactionHistory()
-                "pins" -> loadActivePins()
-            }
-        }
-        
-        // Replace click listeners
-        salesTab.setOnClickListener { selectTabWithFullscreen("sales") }
-        pinsTab.setOnClickListener { selectTabWithFullscreen("pins") }
-        appsTab.setOnClickListener { selectTabWithFullscreen("apps") }
-        settingsTab.setOnClickListener { selectTabWithFullscreen("settings") }
+        setContentView(rootLayout)
         
         // Initial load
-        selectTabWithFullscreen("sales")
+        selectTab("sales")
         
         loadInstalledApps()
         loadCurrentWhitelistLocal()
         loadTelegramSettings()
+    }
+    
+    private fun selectTab(tab: String) {
+        currentTab = tab
+        // Update tab colors
+        for (i in 0 until tabBar.childCount) {
+            val child = tabBar.getChildAt(i) as? TextView ?: continue
+            if (child.tag == tab) {
+                child.setTextColor(Color.parseColor("#2ECC71"))
+                child.setTypeface(Typeface.DEFAULT_BOLD)
+            } else {
+                child.setTextColor(Color.parseColor("#7F8C8D"))
+                child.setTypeface(Typeface.DEFAULT)
+            }
+        }
+        // Replace content
+        contentContainer.removeAllViews()
+        when (tab) {
+            "sales" -> contentContainer.addView(salesContent)
+            "pins" -> contentContainer.addView(pinsContent)
+            "apps" -> contentContainer.addView(appsContent)
+            "settings" -> contentContainer.addView(settingsContent)
+        }
+        // Refresh data if needed
+        when (tab) {
+            "sales" -> loadTransactionHistory()
+            "pins" -> loadActivePins()
+        }
     }
     
     private fun createSalesContent(): LinearLayout {
@@ -261,7 +251,6 @@ class AdminActivity : AppCompatActivity() {
             }
             addView(historyTitle)
             
-            // RecyclerView takes remaining space
             transactionRecycler = RecyclerView(this@AdminActivity).apply {
                 layoutManager = LinearLayoutManager(this@AdminActivity)
                 layoutParams = LinearLayout.LayoutParams(
