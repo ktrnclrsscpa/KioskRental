@@ -170,66 +170,80 @@ class AdminActivity : AppCompatActivity() {
         
         rootLayout.addView(tabBar)
         
-        // Scrollable content
-        val scrollView = ScrollView(this)
+        // Content area: LinearLayout that will hold the current tab's content.
+        // We will replace the content dynamically to allow full-screen usage.
         val contentContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(30, 20, 30, 40)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
         }
-        scrollView.addView(contentContainer)
-        val scrollParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            0,
-            1f
-        )
-        rootLayout.addView(scrollView, scrollParams)
+        rootLayout.addView(contentContainer)
         
-        // Create content for each tab
+        // Create content for each tab (but not added yet; we'll add/remove as needed)
         salesContent = createSalesContent()
         pinsContent = createPinsContent()
         appsContent = createAppsContent()
         settingsContent = createSettingsContent()
         
+        // Initially add sales content
         contentContainer.addView(salesContent)
-        contentContainer.addView(pinsContent)
-        contentContainer.addView(appsContent)
-        contentContainer.addView(settingsContent)
         
-        setContentView(rootLayout)
+        // Store references for tab switching
+        val contentMap = mapOf(
+            "sales" to salesContent,
+            "pins" to pinsContent,
+            "apps" to appsContent,
+            "settings" to settingsContent
+        )
         
-        selectTab("sales", tabBar)
+        // Override selectTab to replace content
+        fun selectTabWithFullscreen(tab: String) {
+            currentTab = tab
+            // Update tab colors
+            for (i in 0 until tabBar.childCount) {
+                val child = tabBar.getChildAt(i) as? TextView ?: continue
+                if (child.tag == tab) {
+                    child.setTextColor(Color.parseColor("#2ECC71"))
+                    child.setTypeface(Typeface.DEFAULT_BOLD)
+                } else {
+                    child.setTextColor(Color.parseColor("#7F8C8D"))
+                    child.setTypeface(Typeface.DEFAULT)
+                }
+            }
+            // Replace content
+            contentContainer.removeAllViews()
+            contentMap[tab]?.let { contentContainer.addView(it) }
+            // Refresh data if needed
+            when (tab) {
+                "sales" -> loadTransactionHistory()
+                "pins" -> loadActivePins()
+            }
+        }
         
-        loadTransactionHistory()
-        loadActivePins()
+        // Replace click listeners
+        salesTab.setOnClickListener { selectTabWithFullscreen("sales") }
+        pinsTab.setOnClickListener { selectTabWithFullscreen("pins") }
+        appsTab.setOnClickListener { selectTabWithFullscreen("apps") }
+        settingsTab.setOnClickListener { selectTabWithFullscreen("settings") }
+        
+        // Initial load
+        selectTabWithFullscreen("sales")
+        
         loadInstalledApps()
         loadCurrentWhitelistLocal()
         loadTelegramSettings()
     }
     
-    private fun selectTab(tab: String, tabBar: LinearLayout) {
-        currentTab = tab
-        for (i in 0 until tabBar.childCount) {
-            val child = tabBar.getChildAt(i) as? TextView ?: continue
-            if (child.tag == tab) {
-                child.setTextColor(Color.parseColor("#2ECC71"))
-                child.setTypeface(Typeface.DEFAULT_BOLD)
-            } else {
-                child.setTextColor(Color.parseColor("#7F8C8D"))
-                child.setTypeface(Typeface.DEFAULT)
-            }
-        }
-        salesContent.visibility = if (tab == "sales") View.VISIBLE else View.GONE
-        pinsContent.visibility = if (tab == "pins") View.VISIBLE else View.GONE
-        appsContent.visibility = if (tab == "apps") View.VISIBLE else View.GONE
-        settingsContent.visibility = if (tab == "settings") View.VISIBLE else View.GONE
-        
-        if (tab == "sales") loadTransactionHistory()
-        else if (tab == "pins") loadActivePins()
-    }
-    
     private fun createSalesContent(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
             
             dailyTotalText = TextView(this@AdminActivity).apply {
                 text = "Daily Total: ₱0.00"
@@ -247,12 +261,13 @@ class AdminActivity : AppCompatActivity() {
             }
             addView(historyTitle)
             
-            // Wider scrollable area for transactions
+            // RecyclerView takes remaining space
             transactionRecycler = RecyclerView(this@AdminActivity).apply {
                 layoutManager = LinearLayoutManager(this@AdminActivity)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    600  // Increased height for better scrolling
+                    0,
+                    1f
                 )
             }
             addView(transactionRecycler)
@@ -279,8 +294,12 @@ class AdminActivity : AppCompatActivity() {
     private fun createPinsContent(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
             
-            // Generate PIN
+            // Generate PIN section
             val genTitle = TextView(this@AdminActivity).apply {
                 text = "📌 Generate New PIN"
                 textSize = 18f
@@ -338,7 +357,7 @@ class AdminActivity : AppCompatActivity() {
             }
             addView(generateBtn)
             
-            // Extend PIN
+            // Extend PIN section
             val extendTitle = TextView(this@AdminActivity).apply {
                 text = "⏰ Extend Active PIN"
                 textSize = 18f
@@ -396,7 +415,7 @@ class AdminActivity : AppCompatActivity() {
             }
             addView(extendBtn)
             
-            // Active PINs
+            // Active PINs list - takes remaining space
             val pinsTitle = TextView(this@AdminActivity).apply {
                 text = "🔑 Active PINs"
                 textSize = 18f
@@ -404,8 +423,20 @@ class AdminActivity : AppCompatActivity() {
                 setPadding(0, 20, 0, 10)
             }
             addView(pinsTitle)
-            pinsText = createCardText("Loading...")
+            
+            pinsText = TextView(this@AdminActivity).apply {
+                text = "Loading..."
+                textSize = 14f
+                setPadding(16, 12, 16, 12)
+                background = createCardBackground()
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    0,
+                    1f
+                )
+            }
             addView(pinsText)
+            
             val refreshPinsBtn = Button(this@AdminActivity).apply {
                 text = "REFRESH PIN LIST"
                 setBackgroundColor(Color.parseColor("#3498DB"))
@@ -419,6 +450,11 @@ class AdminActivity : AppCompatActivity() {
     private fun createAppsContent(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
+            
             val whitelistTitle = TextView(this@AdminActivity).apply {
                 text = "📱 App Whitelist"
                 textSize = 18f
@@ -426,6 +462,7 @@ class AdminActivity : AppCompatActivity() {
                 setPadding(0, 0, 0, 10)
             }
             addView(whitelistTitle)
+            
             appStatusText = TextView(this@AdminActivity).apply {
                 text = "Loading apps..."
                 textSize = 13f
@@ -433,11 +470,18 @@ class AdminActivity : AppCompatActivity() {
                 setTextColor(Color.parseColor("#7F8C8D"))
             }
             addView(appStatusText)
+            
             appContainer = LinearLayout(this@AdminActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(8, 8, 8, 8)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    0,
+                    1f
+                )
             }
             addView(appContainer)
+            
             saveAppsBtn = createButton("SAVE WHITELIST", "#3498DB")
             saveAppsBtn.setOnClickListener { saveWhitelistLocal() }
             addView(saveAppsBtn)
@@ -447,6 +491,10 @@ class AdminActivity : AppCompatActivity() {
     private fun createSettingsContent(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
             
             val settingsTitle = TextView(this@AdminActivity).apply {
                 text = "⚙️ Telegram Settings"
@@ -710,19 +758,6 @@ class AdminActivity : AppCompatActivity() {
     }
     
     // Helper methods
-    private fun createCardText(text: String): TextView {
-        return TextView(this).apply {
-            this.text = text
-            textSize = 16f
-            setPadding(16, 12, 16, 12)
-            background = createCardBackground()
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, 0, 0, 8) }
-        }
-    }
-    
     private fun createCardBackground(): GradientDrawable {
         return GradientDrawable().apply {
             setColor(Color.WHITE)
