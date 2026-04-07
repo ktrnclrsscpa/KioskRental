@@ -13,6 +13,7 @@ import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -404,7 +405,7 @@ class AdminActivity : AppCompatActivity() {
             }
             addView(extendBtn)
             
-            // Active PINs list - takes remaining space
+            // Active PINs list - make it scrollable using a ScrollView
             val pinsTitle = TextView(this@AdminActivity).apply {
                 text = "🔑 Active PINs"
                 textSize = 18f
@@ -413,18 +414,22 @@ class AdminActivity : AppCompatActivity() {
             }
             addView(pinsTitle)
             
-            pinsText = TextView(this@AdminActivity).apply {
-                text = "Loading..."
-                textSize = 14f
-                setPadding(16, 12, 16, 12)
-                background = createCardBackground()
+            // ScrollView for active pins list
+            val pinsScrollView = ScrollView(this@AdminActivity).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     0,
                     1f
                 )
             }
-            addView(pinsText)
+            pinsText = TextView(this@AdminActivity).apply {
+                text = "Loading..."
+                textSize = 14f
+                setPadding(16, 12, 16, 12)
+                background = createCardBackground()
+            }
+            pinsScrollView.addView(pinsText)
+            addView(pinsScrollView)
             
             val refreshPinsBtn = Button(this@AdminActivity).apply {
                 text = "REFRESH PIN LIST"
@@ -460,16 +465,20 @@ class AdminActivity : AppCompatActivity() {
             }
             addView(appStatusText)
             
-            appContainer = LinearLayout(this@AdminActivity).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(8, 8, 8, 8)
+            // ScrollView for the app list
+            val appScrollView = ScrollView(this@AdminActivity).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     0,
                     1f
                 )
             }
-            addView(appContainer)
+            appContainer = LinearLayout(this@AdminActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(8, 8, 8, 8)
+            }
+            appScrollView.addView(appContainer)
+            addView(appScrollView)
             
             saveAppsBtn = createButton("SAVE WHITELIST", "#3498DB")
             saveAppsBtn.setOnClickListener { saveWhitelistLocal() }
