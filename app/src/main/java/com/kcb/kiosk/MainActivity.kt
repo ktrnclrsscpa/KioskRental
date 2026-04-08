@@ -18,7 +18,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var appRecycler: RecyclerView
     private var timer: CountDownTimer? = null
 
-    // --- ITONG LISTAHAN ANG MAG-FILTER NG APPS ---
+    // --- DITO MO ILALAGAY ANG WHITELIST ---
+    // Magdagdag o magbawas ng package names dito
     private val allowedApps = listOf(
         "com.android.chrome",           // Chrome
         "com.google.android.youtube",    // YouTube
@@ -48,7 +49,7 @@ class MainActivity : AppCompatActivity() {
             hint = "Enter PIN"; layoutParams = LinearLayout.LayoutParams(0, -2, 1f) 
         }
         val btn = Button(this).apply { 
-            text = "ACTIVATE"
+            text = "GO"
             setOnClickListener { handleAction() } 
         }
         row.addView(pinInput); row.addView(btn)
@@ -73,7 +74,6 @@ class MainActivity : AppCompatActivity() {
         val mainIntent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
         val allApps = packageManager.queryIntentActivities(mainIntent, 0)
         
-        // I-filter ang apps base sa package names sa allowedApps list
         val filteredList = allApps.filter { 
             allowedApps.contains(it.activityInfo.packageName) 
         }.map {
@@ -100,9 +100,8 @@ class MainActivity : AppCompatActivity() {
                 if (res.isValid && res.secondsLeft > 0) {
                     startTimer(res.secondsLeft.toLong())
                     pinInput.text.clear()
-                    Toast.makeText(this@MainActivity, "PIN Activated!", Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(this@MainActivity, "Invalid PIN or No Time", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "Invalid PIN", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -115,10 +114,7 @@ class MainActivity : AppCompatActivity() {
                 val s = ms / 1000
                 timerText.text = String.format("%02d : %02d", s / 60, s % 60)
             }
-            override fun onFinish() { 
-                timerText.text = "EXPIRED"
-                Toast.makeText(this@MainActivity, "Session Finished", Toast.LENGTH_LONG).show()
-            }
+            override fun onFinish() { timerText.text = "EXPIRED" }
         }.start()
     }
 }
