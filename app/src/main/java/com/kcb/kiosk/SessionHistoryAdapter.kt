@@ -6,31 +6,29 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
-class SessionHistoryAdapter(private val sessions: List<SessionRecord>) : 
-    RecyclerView.Adapter<SessionHistoryAdapter.SessionViewHolder>() {
+data class SessionRecord(
+    val pin: String,
+    val minutes: Int,
+    val amount: Double,
+    val timestamp: String
+)
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SessionViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(android.R.layout.simple_list_item_2, parent, false)
-        return SessionViewHolder(view)
+class SessionHistoryAdapter(private val history: List<SessionRecord>) :
+    RecyclerView.Adapter<SessionHistoryAdapter.ViewHolder>() {
+
+    class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val detailText: TextView = view.findViewById(android.R.id.text1)
     }
 
-    override fun onBindViewHolder(holder: SessionViewHolder, position: Int) {
-        val session = sessions[position]
-        
-        // Check if this is an extension
-        val isExtension = session.pin.endsWith("_EXT")
-        val cleanPin = session.pin.replace("_EXT", "")
-        val prefix = if (isExtension) "🔁 EXTENSION: " else "🎮 SESSION: "
-        
-        holder.text1.text = "$prefix$cleanPin | ${session.minutes} min | ₱${String.format("%.2f", session.amount)}"
-        holder.text2.text = session.date
+    override fun onCreateViewHolder(p: ViewGroup, t: Int): ViewHolder {
+        val v = LayoutInflater.from(p.context).inflate(android.R.layout.simple_list_item_1, p, false)
+        return ViewHolder(v)
     }
 
-    override fun getItemCount(): Int = sessions.size
+    override fun onBindViewHolder(h: ViewHolder, pos: Int) {
+        val item = history[pos]
+        h.detailText.text = "PIN: ${item.pin} | ${item.minutes} mins | ₱${item.amount}"
+    }
 
-    class SessionViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val text1: TextView = itemView.findViewById(android.R.id.text1)
-        val text2: TextView = itemView.findViewById(android.R.id.text2)
-    }
-    }
+    override fun getItemCount() = history.size
+}
