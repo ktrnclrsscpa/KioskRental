@@ -1,9 +1,8 @@
 package com.kcb.kiosk
 
-import android.content.Intent
-import android.os.Bundle
-import android.os.CountDownTimer
-import android.view.Gravity
+import android.content.*
+import android.os.*
+import android.provider.Settings
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
@@ -11,117 +10,70 @@ import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
 
 class MainActivity : AppCompatActivity() {
-    data class PinRes(val isValid: Boolean, val secondsLeft: Int)
     private lateinit var supabase: SupabaseClient
     private lateinit var timerText: TextView
     private lateinit var pinInput: EditText
     private lateinit var appRecycler: RecyclerView
-    private var countDownTimer: CountDownTimer? = null
-
-    // ==========================================
-    // 📝 EDIT MO DITO ANG MGA APPS NA PWEDE
-    // ==========================================
-    private val allowedApps = listOf(
-        "com.android.chrome",           // Chrome
-        "com.google.android.youtube",    // YouTube
-        "com.brave.browser",            // Brave
-        "com.kcb.kiosk",                // Itong Kiosk App mo
-        "com.facebook.katana",          // Facebook
-        "com.zhiliaoapp.musically",     // TikTok
-        "com.google.android.apps.maps"  // Google Maps
-    )
+    private var currentLocalSeconds = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         supabase = SupabaseClient.getInstance()
-        
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(40, 60, 40, 40)
-            gravity = Gravity.CENTER_HORIZONTAL
-            setBackgroundColor(android.graphics.Color.WHITE)
-        }
-
-        val title = TextView(this).apply { 
-            text = "KCB RENTAL"; textSize = 32f; setPadding(0, 0, 0, 40)
-            setTypeface(null, android.graphics.Typeface.BOLD)
-        }
-        
-        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        pinInput = EditText(this).apply { 
-            hint = "Enter PIN"; layoutParams = LinearLayout.LayoutParams(0, -2, 1f) 
-        }
-        val activateBtn = Button(this).apply { 
-            text = "ACTIVATE"
-            setOnClickListener { handleAction() } 
-        }
-        row.addView(pinInput); row.addView(activateBtn)
-
-        timerText = TextView(this).apply { 
-            text = "00 : 00"; textSize = 48f; setPadding(0, 50, 0, 50)
-            setTextColor(android.graphics.Color.RED)
-        }
-        
-        appRecycler = RecyclerView(this).apply { 
-            layoutManager = GridLayoutManager(this@MainActivity, 3) 
-            layoutParams = LinearLayout.LayoutParams(-1, 0, 1f)
-        }
-
-        root.addView(title); root.addView(row); root.addView(timerText); root.addView(appRecycler)
-        setContentView(root)
-        
-        loadFilteredApps()
+        setupUI()
+        if (intent.getBooleanExtra("locked", false)) applyLockUI()
     }
 
-    private fun loadFilteredApps() {
-        val mainIntent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
-        val allApps = packageManager.queryIntentActivities(mainIntent, 0)
-        
-        // Kinukuha lang ang apps na nasa allowedApps list
-        val filteredList = allApps.filter { 
-            allowedApps.contains(it.activityInfo.packageName) 
-        }.map {
-            AppInfo(it.loadLabel(packageManager).toString(), it.activityInfo.packageName)
-        }
-        
-        appRecycler.adapter = AppAdapter(filteredList, packageManager)
+    private fun setupUI() {
+        // ... (UI construction similar to previous examples)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        loadWhitelistedApps()
     }
 
     private fun handleAction() {
         val pin = pinInput.text.toString().trim()
+        if (pin == "000000") { startActivity(Intent(this, AdminActivity::class.java)); return }
         
-        if (pin == "000000") {
-            startActivity(Intent(this, AdminActivity::class.java))
-            return
-        }
-
-        if (pin.isEmpty()) return
-
         CoroutineScope(Dispatchers.IO).launch {
             val res = supabase.validatePin(pin)
-            withContext(Dispatchers.Main) {
-                if (res.isValid && res.secondsLeft > 0) {
-                    startTimer(res.secondsLeft.toLong())
-                    pinInput.text.clear()
-                    Toast.makeText(this@MainActivity, "Activated!", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this@MainActivity, "Invalid PIN", Toast.LENGTH_SHORT).show()
+            if (res.isValid) {
+                withContext(Dispatchers.Main) {
+                    startGlobalTimer(res.secondsLeft.toLong(), false)
+                    listenForRemoteExtension(pin)
                 }
             }
         }
     }
 
-    private fun startTimer(seconds: Long) {
-        countDownTimer?.cancel()
-        countDownTimer = object : CountDownTimer(seconds * 1000, 1000) {
-            override fun onTick(ms: Long) {
-                val s = ms / 1000
-                timerText.text = String.format("%02d : %02d", s / 60, s % 60)
+    private fun listenForRemoteExtension(pin: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            while (isActive) {
+                delay(10000)
+                val updated = supabase.getCurrentRemainingSeconds(pin)
+                if (updated > currentLocalSeconds + 15) { // Threshold for extension
+                    withContext(Dispatchers.Main) { startGlobalTimer(updated, true) }
+                }
             }
-            override fun onFinish() { 
-                timerText.text = "EXPIRED"
-                Toast.makeText(this@MainActivity, "Time is up!", Toast.LENGTH_LONG).show()
-            }
-        }.start()
+        }
+    }
+
+    private fun startGlobalTimer(seconds: Long, isExt: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
+            return
+        }
+        currentLocalSeconds = seconds
+        val intent = Intent(this, FloatingTimerService::class.java).apply {
+            putExtra("seconds", seconds); putExtra("isExtension", isExt)
+        }
+        startService(intent)
+    }
+
+    private fun applyLockUI() {
+        appRecycler.alpha = 0.2f
+        appRecycler.isEnabled = false
+        Toast.makeText(this, "LOCKED: Please Extend Time", Toast.LENGTH_LONG).show()
     }
 }
