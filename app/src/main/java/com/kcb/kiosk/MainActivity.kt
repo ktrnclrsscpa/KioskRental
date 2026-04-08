@@ -18,54 +18,107 @@ class MainActivity : AppCompatActivity() {
     private lateinit var appRecycler: RecyclerView
     private var timer: CountDownTimer? = null
 
+    // --- ITONG LISTAHAN ANG MAG-FILTER NG APPS ---
+    private val allowedApps = listOf(
+        "com.android.chrome",           // Chrome
+        "com.google.android.youtube",    // YouTube
+        "com.brave.browser",            // Brave
+        "com.kcb.kiosk",                // Itong App mo
+        "com.facebook.katana"           // Facebook (sample)
+    )
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         supabase = SupabaseClient.getInstance()
+        
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(40, 60, 40, 40)
             gravity = Gravity.CENTER_HORIZONTAL
+            setBackgroundColor(android.graphics.Color.WHITE)
         }
-        val t = TextView(this).apply { text = "KCB RENTAL"; textSize = 30f; setPadding(0,0,0,40) }
+
+        val title = TextView(this).apply { 
+            text = "KCB RENTAL"; textSize = 30f; setPadding(0, 0, 0, 40)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+        
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        pinInput = EditText(this).apply { hint = "PIN"; layoutParams = LinearLayout.LayoutParams(0,-2,1f) }
-        val btn = Button(this).apply { text = "GO"; setOnClickListener { act() } }
+        pinInput = EditText(this).apply { 
+            hint = "Enter PIN"; layoutParams = LinearLayout.LayoutParams(0, -2, 1f) 
+        }
+        val btn = Button(this).apply { 
+            text = "ACTIVATE"
+            setOnClickListener { handleAction() } 
+        }
         row.addView(pinInput); row.addView(btn)
-        timerText = TextView(this).apply { text = "00:00"; textSize = 40f; setPadding(0,40,0,40) }
-        appRecycler = RecyclerView(this).apply { layoutManager = GridLayoutManager(this@MainActivity, 3) }
-        root.addView(t); root.addView(row); root.addView(timerText); root.addView(appRecycler)
+
+        timerText = TextView(this).apply { 
+            text = "00 : 00"; textSize = 45f; setPadding(0, 40, 0, 40)
+            setTextColor(android.graphics.Color.RED)
+        }
+        
+        appRecycler = RecyclerView(this).apply { 
+            layoutManager = GridLayoutManager(this@MainActivity, 3) 
+            layoutParams = LinearLayout.LayoutParams(-1, 0, 1f)
+        }
+
+        root.addView(title); root.addView(row); root.addView(timerText); root.addView(appRecycler)
         setContentView(root)
-        load()
+        
+        loadFilteredApps()
     }
 
-    private fun load() {
-        val intent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
-        val apps = packageManager.queryIntentActivities(intent, 0).map {
+    private fun loadFilteredApps() {
+        val mainIntent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
+        val allApps = packageManager.queryIntentActivities(mainIntent, 0)
+        
+        // I-filter ang apps base sa package names sa allowedApps list
+        val filteredList = allApps.filter { 
+            allowedApps.contains(it.activityInfo.packageName) 
+        }.map {
             AppInfo(it.loadLabel(packageManager).toString(), it.activityInfo.packageName)
         }
-        appRecycler.adapter = AppAdapter(apps, packageManager)
+        
+        appRecycler.adapter = AppAdapter(filteredList, packageManager)
     }
 
-    private fun act() {
-        val p = pinInput.text.toString()
-        if (p == "000000") { startActivity(Intent(this, AdminActivity::class.java)); return }
+    private fun handleAction() {
+        val pin = pinInput.text.toString().trim()
+        
+        // --- ADMIN SHORTCUT ---
+        if (pin == "000000") {
+            startActivity(Intent(this, AdminActivity::class.java))
+            return
+        }
+
+        if (pin.isEmpty()) return
+
         CoroutineScope(Dispatchers.IO).launch {
-            val res = supabase.validatePin(p)
+            val res = supabase.validatePin(pin)
             withContext(Dispatchers.Main) {
-                if (res.isValid) start(res.secondsLeft.toLong())
-                else Toast.makeText(this@MainActivity, "Invalid", 0).show()
+                if (res.isValid && res.secondsLeft > 0) {
+                    startTimer(res.secondsLeft.toLong())
+                    pinInput.text.clear()
+                    Toast.makeText(this@MainActivity, "PIN Activated!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@MainActivity, "Invalid PIN or No Time", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
 
-    private fun start(s: Long) {
+    private fun startTimer(seconds: Long) {
         timer?.cancel()
-        timer = object : CountDownTimer(s * 1000, 1000) {
+        timer = object : CountDownTimer(seconds * 1000, 1000) {
             override fun onTick(ms: Long) {
-                val sec = ms / 1000
-                timerText.text = String.format("%02d:%02d", sec/60, sec%60)
+                val s = ms / 1000
+                timerText.text = String.format("%02d : %02d", s / 60, s % 60)
             }
-            override fun onFinish() { timerText.text = "EXPIRED" }
+            override fun onFinish() { 
+                timerText.text = "EXPIRED"
+                Toast.makeText(this@MainActivity, "Session Finished", Toast.LENGTH_LONG).show()
+            }
         }.start()
     }
 }
