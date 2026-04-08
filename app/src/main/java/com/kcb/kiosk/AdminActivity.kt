@@ -1,17 +1,14 @@
 package com.kcb.kiosk
 
-import android.content.Intent
 import android.os.Bundle
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.coroutines.*
-import java.text.SimpleDateFormat
-import java.util.*
 
 class AdminActivity : AppCompatActivity() {
     private lateinit var supabase: SupabaseClient
-    private val botToken = "YOUR_TELEGRAM_TOKEN"
-    private val chatId = "YOUR_CHAT_ID"
+    private val botToken = "8754642119:AAEueRR7PuzTcKAkfQ8b2sfMK_HeJ_WDrpU"
+    private val chatId = "579327360"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,11 +24,11 @@ class AdminActivity : AppCompatActivity() {
         }
 
         val etPin = EditText(this).apply { hint = "PIN ng Customer" }
-        val etAmt = EditText(this).apply { hint = "Singil (₱)"; inputType = 2 }
-        val etMins = EditText(this).apply { hint = "Dagdaga na Minuto"; inputType = 2 }
+        val etAmt = EditText(this).apply { hint = "Magkano (₱)"; inputType = 2 }
+        val etMins = EditText(this).apply { hint = "Ilang Minutes"; inputType = 2 }
 
         val btnExtend = Button(this).apply {
-            text = "I-EXTEND ANG ORAS"
+            text = "EXTEND TIME"
             setOnClickListener {
                 val pin = etPin.text.toString()
                 val mins = etMins.text.toString().toLongOrNull() ?: 0
@@ -40,10 +37,7 @@ class AdminActivity : AppCompatActivity() {
             }
         }
 
-        root.addView(etPin)
-        root.addView(etAmt)
-        root.addView(etMins)
-        root.addView(btnExtend)
+        root.addView(etPin); root.addView(etAmt); root.addView(etMins); root.addView(btnExtend)
         setContentView(root)
     }
 
@@ -56,19 +50,17 @@ class AdminActivity : AppCompatActivity() {
             withContext(Dispatchers.Main) {
                 if (success) {
                     sendTelegramAlert(pin, minsToAdd, amt, newTotal)
-                    Toast.makeText(this@AdminActivity, "Extension Success!", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this@AdminActivity, "Failed to update database.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@AdminActivity, "Success! New: ${newTotal/60}m", Toast.LENGTH_SHORT).show()
                 }
             }
         }
     }
 
     private fun sendTelegramAlert(pin: String, added: Long, amt: Double, total: Long) {
-        val msg = "📢 *SALE ALERT*\nPIN: $pin\nAdded: $added mins\nAmt: ₱$amt\nTotal: ${total/60}m"
+        val msg = "💰 SALE: PIN $pin | Added $added mins | Total ₱$amt"
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                java.net.URL("https://api.telegram.org/bot$botToken/sendMessage?chat_id=$chatId&text=${java.net.URLEncoder.encode(msg, "UTF-8")}&parse_mode=Markdown").readText()
+                java.net.URL("https://api.telegram.org/bot$botToken/sendMessage?chat_id=$chatId&text=${java.net.URLEncoder.encode(msg, "UTF-8")}").readText()
             } catch (e: Exception) {}
         }
     }

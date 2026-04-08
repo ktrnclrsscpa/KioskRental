@@ -37,12 +37,10 @@ dependencies {
     implementation 'com.google.android.material:material:1.11.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
 
-    // --- SUPABASE & KTOR (Ang kailangan para sa SupabaseClient) ---
+    // --- SUPABASE & KTOR (Fixed Versions) ---
     implementation "io.github.jan-tennert.supabase:postgrest-kt:1.4.7"
-    implementation "io.github.jan-tennert.supabase:gotrue-kt:1.4.7"
+    implementation "io.github.jan-tennert.supabase:supabase-kt:1.4.7"
     implementation "io.ktor:ktor-client-android:2.3.5"
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0"
-    
-    // Coroutines for background tasks
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
 }
