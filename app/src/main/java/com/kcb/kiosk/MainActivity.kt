@@ -308,10 +308,6 @@ class MainActivity : AppCompatActivity() {
                 delay(2000)
                 try {
                     val result = supabase.validatePin(currentPin!!)
-                    // Debug toast to see database value
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(this@MainActivity, "DB: ${result.secondsLeft}s, Local: ${remainingSeconds}s", Toast.LENGTH_SHORT).show()
-                    }
                     if (result.isValid && result.secondsLeft > 0) {
                         val newSeconds = result.secondsLeft
                         if (newSeconds != lastSeconds) {
@@ -322,9 +318,7 @@ class MainActivity : AppCompatActivity() {
                                 remainingSeconds = newSeconds
                                 startCountDownTimer()
                                 if (addedMinutes > 0) {
-                                    val mins = newSeconds / 60
-                                    val secs = newSeconds % 60
-                                    Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes min → ${mins}:${String.format("%02d", secs)}", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes", Toast.LENGTH_LONG).show()
                                 }
                             }
                             lastSeconds = newSeconds
