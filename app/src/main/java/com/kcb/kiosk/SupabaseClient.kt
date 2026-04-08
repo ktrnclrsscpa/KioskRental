@@ -28,8 +28,7 @@ class SupabaseClient private constructor() {
         return "$urlString${separator}apikey=$apiKey"
     }
 
-    // ==================== CREDITS (PINs with amount) ====================
-    
+    // ==================== CREDITS ====================
     suspend fun generatePin(customPin: String?, seconds: Int, amount: Double): String? = withContext(Dispatchers.IO) {
         try {
             val pin = if (!customPin.isNullOrEmpty()) customPin else generateRandomPin()
@@ -349,7 +348,7 @@ class SupabaseClient private constructor() {
         } catch (e: Exception) { emptyList() }
     }
 
-    // ==================== PRICING CONFIG ====================
+    // ==================== PRICING ====================
     data class PricingConfig(val pricingType: String, val priceAmount: Double, val durationMinutes: Int, val extendPrice: Double, val extendDuration: Int)
     suspend fun getPricingConfig(): PricingConfig = withContext(Dispatchers.IO) { PricingConfig("fixed", 15.0, 60, 10.0, 30) }
     suspend fun updatePricingConfig(pricingType: String, priceAmount: Double, durationMinutes: Int, extendPrice: Double, extendDuration: Int): Boolean = withContext(Dispatchers.IO) { true }
