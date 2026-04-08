@@ -3,6 +3,7 @@ package com.kcb.kiosk
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.filter.eq
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -13,7 +14,7 @@ data class PinRes(
 )
 
 class SupabaseClient {
-    // SIGURADUHIN NA TAMA ANG URL AT KEY MO DITO
+    // PALITAN ITO NG TOTOONG CREDENTIALS MO
     private val client = createSupabaseClient(
         supabaseUrl = "https://qbricrnjchbdyseeuwif.supabase.co",
         supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicmljcm5qY2hiZHlzZWV1d2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDU0NDUsImV4cCI6MjA4OTc4MTQ0NX0.5sJqi3fZc4VIFQAIw1QptHt7MlGdnkn5SVxYdRu4f7Q"
@@ -31,7 +32,8 @@ class SupabaseClient {
 
     suspend fun validatePin(pinValue: String): PinRes {
         return try {
-            client.from("credits").select {
+            val table = client.from("credits")
+            table.select {
                 filter {
                     eq("pin", pinValue)
                 }
@@ -43,7 +45,8 @@ class SupabaseClient {
 
     suspend fun getCurrentRemainingSeconds(pinValue: String): Long {
         return try {
-            val res = client.from("credits").select {
+            val table = client.from("credits")
+            val res = table.select {
                 filter {
                     eq("pin", pinValue)
                 }
@@ -56,7 +59,8 @@ class SupabaseClient {
 
     suspend fun updatePinTime(pinValue: String, newSeconds: Long, amount: Double, isExtension: Boolean): Boolean {
         return try {
-            client.from("credits").update({
+            val table = client.from("credits")
+            table.update({
                 set("seconds_left", newSeconds)
                 set("amount", amount)
                 set("is_extension", isExtension)
