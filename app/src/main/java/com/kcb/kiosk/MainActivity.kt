@@ -11,8 +11,6 @@ import kotlinx.coroutines.*
 
 class MainActivity : AppCompatActivity() {
     private lateinit var supabase: SupabaseClient
-    private lateinit var timerText: TextView
-    private lateinit var pinInput: EditText
     private lateinit var appRecycler: RecyclerView
     private var currentLocalSeconds = 0L
 
@@ -24,7 +22,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupUI() {
-        // ... (UI construction similar to previous examples)
+        // UI Code here...
+        // appRecycler = RecyclerView(this)
     }
 
     override fun onResume() {
@@ -32,48 +31,13 @@ class MainActivity : AppCompatActivity() {
         loadWhitelistedApps()
     }
 
-    private fun handleAction() {
-        val pin = pinInput.text.toString().trim()
-        if (pin == "000000") { startActivity(Intent(this, AdminActivity::class.java)); return }
-        
-        CoroutineScope(Dispatchers.IO).launch {
-            val res = supabase.validatePin(pin)
-            if (res.isValid) {
-                withContext(Dispatchers.Main) {
-                    startGlobalTimer(res.secondsLeft.toLong(), false)
-                    listenForRemoteExtension(pin)
-                }
-            }
-        }
-    }
-
-    private fun listenForRemoteExtension(pin: String) {
-        CoroutineScope(Dispatchers.IO).launch {
-            while (isActive) {
-                delay(10000)
-                val updated = supabase.getCurrentRemainingSeconds(pin)
-                if (updated > currentLocalSeconds + 15) { // Threshold for extension
-                    withContext(Dispatchers.Main) { startGlobalTimer(updated, true) }
-                }
-            }
-        }
-    }
-
-    private fun startGlobalTimer(seconds: Long, isExt: Boolean) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
-            return
-        }
-        currentLocalSeconds = seconds
-        val intent = Intent(this, FloatingTimerService::class.java).apply {
-            putExtra("seconds", seconds); putExtra("isExtension", isExt)
-        }
-        startService(intent)
+    fun loadWhitelistedApps() {
+        val prefs = getSharedPreferences("KioskPrefs", Context.MODE_PRIVATE)
+        val saved = prefs.getStringSet("allowed_packages", setOf())
+        // Adapter logic here...
     }
 
     private fun applyLockUI() {
-        appRecycler.alpha = 0.2f
-        appRecycler.isEnabled = false
-        Toast.makeText(this, "LOCKED: Please Extend Time", Toast.LENGTH_LONG).show()
+        // Lock logic...
     }
 }

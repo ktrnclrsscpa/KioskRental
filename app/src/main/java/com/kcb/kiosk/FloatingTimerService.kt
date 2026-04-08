@@ -25,11 +25,11 @@ class FloatingTimerService : Service(), TextToSpeech.OnInitListener {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         
         floatingView = LayoutInflater.from(this).inflate(android.R.layout.simple_list_item_1, null)
-        timerText = floatingView.findViewById(android.R.id.text1).apply {
+        timerText = floatingView.findViewById<TextView>(android.R.id.text1).apply {
             setBackgroundColor(android.graphics.Color.parseColor("#E6000000"))
             setTextColor(android.graphics.Color.YELLOW)
-            setPadding(20, 10, 20, 10)
-            textSize = 14f
+            setPadding(25, 15, 25, 15)
+            textSize = 16f
         }
 
         val params = WindowManager.LayoutParams(
@@ -64,7 +64,7 @@ class FloatingTimerService : Service(), TextToSpeech.OnInitListener {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val seconds = intent?.getLongExtra("seconds", 0) ?: 0
         if (intent?.getBooleanExtra("isExtension", false) == true) {
-            tts?.speak("Time extended. Enjoy your game.", TextToSpeech.QUEUE_FLUSH, null, null)
+            tts?.speak("Time extended.", TextToSpeech.QUEUE_FLUSH, null, null)
             said1Min = false; said30Sec = false
         }
         startTimer(seconds)
@@ -78,10 +78,10 @@ class FloatingTimerService : Service(), TextToSpeech.OnInitListener {
                 val s = ms / 1000
                 timerText.text = String.format("%02d:%02d", s / 60, s % 60)
                 if (s == 60L && !said1Min) { tts?.speak("One minute remaining", TextToSpeech.QUEUE_FLUSH, null, null); said1Min = true }
-                if (s == 30L && !said30Sec) { tts?.speak("30 seconds left", TextToSpeech.QUEUE_FLUSH, null, null); said30Sec = true }
+                if (s == 30L && !said30Sec) { tts?.speak("Thirty seconds left", TextToSpeech.QUEUE_FLUSH, null, null); said30Sec = true }
             }
             override fun onFinish() {
-                tts?.speak("Time is up. Session expired.", TextToSpeech.QUEUE_FLUSH, null, null)
+                tts?.speak("Time is up.", TextToSpeech.QUEUE_FLUSH, null, null)
                 val lockIntent = Intent(this@FloatingTimerService, MainActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
                     putExtra("locked", true)
