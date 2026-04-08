@@ -308,23 +308,23 @@ class MainActivity : AppCompatActivity() {
                 delay(2000)
                 try {
                     val result = supabase.validatePin(currentPin!!)
+                    // Debug toast to see database value
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "DB: ${result.secondsLeft}s, Local: ${remainingSeconds}s", Toast.LENGTH_SHORT).show()
+                    }
                     if (result.isValid && result.secondsLeft > 0) {
                         val newSeconds = result.secondsLeft
-                        // If the database value is different from what we have
                         if (newSeconds != lastSeconds) {
                             val addedSeconds = newSeconds - lastSeconds
                             val addedMinutes = addedSeconds / 60
                             withContext(Dispatchers.Main) {
-                                // Cancel old timer
                                 countDownTimer?.cancel()
-                                // Update remaining seconds
                                 remainingSeconds = newSeconds
-                                // Start fresh timer
                                 startCountDownTimer()
                                 if (addedMinutes > 0) {
-                                    val minutes = newSeconds / 60
+                                    val mins = newSeconds / 60
                                     val secs = newSeconds % 60
-                                    Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes (now ${minutes}:${String.format("%02d", secs)})", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes min → ${mins}:${String.format("%02d", secs)}", Toast.LENGTH_LONG).show()
                                 }
                             }
                             lastSeconds = newSeconds
