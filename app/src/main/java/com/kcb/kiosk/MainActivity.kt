@@ -305,28 +305,32 @@ class MainActivity : AppCompatActivity() {
         extendCheckJob = CoroutineScope(Dispatchers.IO).launch {
             var lastSeconds = remainingSeconds
             while (isActive && currentPin != null) {
-                delay(3000)
+                delay(2000)
                 try {
                     val result = supabase.validatePin(currentPin!!)
                     if (result.isValid && result.secondsLeft > 0) {
                         val newSeconds = result.secondsLeft
+                        // If the database value is different from what we have
                         if (newSeconds != lastSeconds) {
                             val addedSeconds = newSeconds - lastSeconds
                             val addedMinutes = addedSeconds / 60
                             withContext(Dispatchers.Main) {
+                                // Cancel old timer
                                 countDownTimer?.cancel()
+                                // Update remaining seconds
                                 remainingSeconds = newSeconds
+                                // Start fresh timer
                                 startCountDownTimer()
                                 if (addedMinutes > 0) {
-                                    Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes", Toast.LENGTH_LONG).show()
+                                    val minutes = newSeconds / 60
+                                    val secs = newSeconds % 60
+                                    Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes (now ${minutes}:${String.format("%02d", secs)})", Toast.LENGTH_LONG).show()
                                 }
                             }
                             lastSeconds = newSeconds
                         }
                     } else if (result.secondsLeft <= 0) {
-                        withContext(Dispatchers.Main) {
-                            endSession()
-                        }
+                        withContext(Dispatchers.Main) { endSession() }
                         break
                     }
                 } catch (e: Exception) { }
