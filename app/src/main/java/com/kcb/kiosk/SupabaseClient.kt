@@ -10,7 +10,6 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
 
-// Data classes defined outside so other files can use them
 data class PinData(val pin: String, val secondsLeft: Int)
 data class SessionRecord(val pin: String, val minutes: Int, val amount: Double, val date: String)
 data class IncomeStats(val daily: Double, val weekly: Double, val monthly: Double, val yearly: Double, val totalSessions: Int)
@@ -50,10 +49,7 @@ class SupabaseClient private constructor() {
             val responseCode = connection.responseCode
             connection.disconnect()
             return@withContext if (responseCode in 200..299) pin else null
-        } catch (e: Exception) { 
-            e.printStackTrace()
-            null 
-        }
+        } catch (e: Exception) { null }
     }
 
     data class PinValidationResult(val isValid: Boolean, val secondsLeft: Int, val amount: Double, val error: String?)
@@ -106,12 +102,8 @@ class SupabaseClient private constructor() {
                     list.add(PinData(obj.getString("pin"), obj.getInt("seconds_left")))
                 }
                 return@withContext list
-            } else {
-                return@withContext emptyList()
-            }
-        } catch (e: Exception) { 
-            emptyList()
-        }
+            } else { return@withContext emptyList() }
+        } catch (e: Exception) { emptyList() }
     }
 
     suspend fun deletePin(pin: String): Boolean = withContext(Dispatchers.IO) {
@@ -127,12 +119,10 @@ class SupabaseClient private constructor() {
             val responseCode = connection.responseCode
             connection.disconnect()
             responseCode in 200..299
-        } catch (e: Exception) { 
-            false
-        }
+        } catch (e: Exception) { false }
     }
 
-    // CORRECTED extendTime - ADDS minutes to current remaining time
+    // FIXED: Adds extra minutes to current remaining seconds
     suspend fun extendTime(pin: String, extraMinutes: Int): Boolean = withContext(Dispatchers.IO) {
         try {
             val encodedPin = URLEncoder.encode(pin, "UTF-8")
@@ -149,10 +139,10 @@ class SupabaseClient private constructor() {
             } else return@withContext false
             getConnection.disconnect()
             
-            // 2. Calculate new seconds by ADDING the extra minutes
+            // 2. Add extra minutes
             val newSeconds = currentSeconds + (extraMinutes * 60)
             
-            // 3. Update the database
+            // 3. Update database
             val updateUrl = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits?pin=eq.$encodedPin"))
             val updateConnection = updateUrl.openConnection() as HttpURLConnection
             updateConnection.requestMethod = "PATCH"
@@ -165,13 +155,10 @@ class SupabaseClient private constructor() {
             val responseCode = updateConnection.responseCode
             updateConnection.disconnect()
             responseCode in 200..299
-        } catch (e: Exception) { 
-            false
-        }
+        } catch (e: Exception) { false }
     }
 
-    // ==================== TELEGRAM (with date/time) ====================
-    
+    // ==================== TELEGRAM ====================
     private fun getCurrentDateTime(): String {
         val dateFormat = SimpleDateFormat("MM/dd/yyyy HH:mm:ss", Locale.US)
         return dateFormat.format(Date())
@@ -250,14 +237,10 @@ class SupabaseClient private constructor() {
             val responseCode = connection.responseCode
             connection.disconnect()
             responseCode == 200
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
+        } catch (e: Exception) { false }
     }
 
     // ==================== SESSION HISTORY ====================
-    
     suspend fun recordSession(pin: String, minutes: Int, amount: Double): Boolean = withContext(Dispatchers.IO) {
         try {
             val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/session_history"))
@@ -267,8 +250,6 @@ class SupabaseClient private constructor() {
             connection.setRequestProperty("Authorization", "Bearer $apiKey")
             connection.setRequestProperty("Content-Type", "application/json")
             connection.doOutput = true
-            connection.connectTimeout = 5000
-            connection.readTimeout = 5000
             val jsonBody = JSONObject().apply {
                 put("pin", pin)
                 put("minutes", minutes)
@@ -291,8 +272,6 @@ class SupabaseClient private constructor() {
             connection.setRequestProperty("Authorization", "Bearer $apiKey")
             connection.setRequestProperty("Content-Type", "application/json")
             connection.doOutput = true
-            connection.connectTimeout = 5000
-            connection.readTimeout = 5000
             val jsonBody = JSONObject().apply {
                 put("pin", pin)
                 put("minutes", minutes)
@@ -313,18 +292,12 @@ class SupabaseClient private constructor() {
             connection.requestMethod = "GET"
             connection.setRequestProperty("apikey", apiKey)
             connection.setRequestProperty("Authorization", "Bearer $apiKey")
-            connection.connectTimeout = 5000
-            connection.readTimeout = 5000
             val now = System.currentTimeMillis()
             val oneDay = 24 * 60 * 60 * 1000L
             val oneWeek = 7 * oneDay
             val oneMonth = 30 * oneDay
             val oneYear = 365 * oneDay
-            var daily = 0.0
-            var weekly = 0.0
-            var monthly = 0.0
-            var yearly = 0.0
-            var totalSessions = 0
+            var daily = 0.0; var weekly = 0.0; var monthly = 0.0; var yearly = 0.0; var totalSessions = 0
             if (connection.responseCode == 200) {
                 val responseText = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonArray = JSONArray(responseText)
@@ -345,9 +318,7 @@ class SupabaseClient private constructor() {
             }
             connection.disconnect()
             IncomeStats(daily, weekly, monthly, yearly, totalSessions)
-        } catch (e: Exception) {
-            IncomeStats(0.0, 0.0, 0.0, 0.0, 0)
-        }
+        } catch (e: Exception) { IncomeStats(0.0, 0.0, 0.0, 0.0, 0) }
     }
 
     suspend fun getSessionHistory(): List<SessionRecord> = withContext(Dispatchers.IO) {
@@ -357,8 +328,6 @@ class SupabaseClient private constructor() {
             connection.requestMethod = "GET"
             connection.setRequestProperty("apikey", apiKey)
             connection.setRequestProperty("Authorization", "Bearer $apiKey")
-            connection.connectTimeout = 5000
-            connection.readTimeout = 5000
             val list = mutableListOf<SessionRecord>()
             if (connection.responseCode == 200) {
                 val responseText = connection.inputStream.bufferedReader().use { it.readText() }
@@ -371,51 +340,24 @@ class SupabaseClient private constructor() {
                     val minutes = obj.getInt("minutes")
                     val amount = obj.getDouble("amount")
                     val startedAt = obj.getString("started_at")
-                    val date = try {
-                        dateFormat.format(inputFormat.parse(startedAt))
-                    } catch (e: Exception) { 
-                        startedAt.substring(0, 16)
-                    }
+                    val date = try { dateFormat.format(inputFormat.parse(startedAt)) } catch (e: Exception) { startedAt.substring(0, 16) }
                     list.add(SessionRecord(pin, minutes, amount, date))
                 }
             }
             connection.disconnect()
             list
-        } catch (e: Exception) { 
-            emptyList()
-        }
+        } catch (e: Exception) { emptyList() }
     }
 
-    // ==================== PRICING CONFIG (for compatibility) ====================
-    
-    data class PricingConfig(
-        val pricingType: String,
-        val priceAmount: Double,
-        val durationMinutes: Int,
-        val extendPrice: Double,
-        val extendDuration: Int
-    )
-
-    suspend fun getPricingConfig(): PricingConfig = withContext(Dispatchers.IO) {
-        PricingConfig("fixed", 15.0, 60, 10.0, 30)
-    }
-
-    suspend fun updatePricingConfig(
-        pricingType: String,
-        priceAmount: Double,
-        durationMinutes: Int,
-        extendPrice: Double,
-        extendDuration: Int
-    ): Boolean = withContext(Dispatchers.IO) {
-        true
-    }
+    // ==================== PRICING CONFIG ====================
+    data class PricingConfig(val pricingType: String, val priceAmount: Double, val durationMinutes: Int, val extendPrice: Double, val extendDuration: Int)
+    suspend fun getPricingConfig(): PricingConfig = withContext(Dispatchers.IO) { PricingConfig("fixed", 15.0, 60, 10.0, 30) }
+    suspend fun updatePricingConfig(pricingType: String, priceAmount: Double, durationMinutes: Int, extendPrice: Double, extendDuration: Int): Boolean = withContext(Dispatchers.IO) { true }
 
     companion object {
         private var instance: SupabaseClient? = null
         fun getInstance(): SupabaseClient {
-            if (instance == null) {
-                instance = SupabaseClient()
-            }
+            if (instance == null) instance = SupabaseClient()
             return instance!!
         }
     }
