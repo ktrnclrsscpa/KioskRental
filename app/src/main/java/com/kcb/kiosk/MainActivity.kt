@@ -17,7 +17,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
-import java.util.*
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
     private lateinit var pinInput: EditText
@@ -34,10 +34,6 @@ class MainActivity : AppCompatActivity() {
     private var remainingSeconds = 0
     private var extendCheckJob: Job? = null
     private var paidAmount = 0.0
-    
-    // Accurate timer using system time
-    private var endTimeMillis = 0L
-    private var timerJob: Job? = null
     
     private lateinit var tts: TextToSpeech
     
@@ -261,11 +257,8 @@ class MainActivity : AppCompatActivity() {
                 appGrid.visibility = android.view.View.VISIBLE
             }
             
-            // Calculate end time based on current system time + remaining seconds
-            endTimeMillis = System.currentTimeMillis() + (remainingSeconds * 1000L)
-            
             showFloatingTimer()
-            startAccurateTimer()
+            startCountDownTimer()
             startExtendListener()
             
             CoroutineScope(Dispatchers.IO).launch {
@@ -280,21 +273,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
-    private fun startAccurateTimer() {
-        timerJob?.cancel()
-        timerJob = CoroutineScope(Dispatchers.Main).launch {
-            while (isActive && endTimeMillis > 0) {
-                val now = System.currentTimeMillis()
-                val secondsLeft = ((endTimeMillis - now) / 1000).toInt()
-                if (secondsLeft <= 0) {
-                    // Time expired
-                    withContext(Dispatchers.Main) {
-                        speakAlert("Time expired")
-                        endSession()
-                    }
-                    break
-                }
-                remainingSeconds = secondsLeft
+    private fun startCountDownTimer() {
+        countDownTimer?.cancel()
+        countDownTimer = object : CountDownTimer(remainingSeconds * 1000L, 1000) {
+            override fun onTick(millisUntilFinished: Long) {
+                remainingSeconds = (millisUntilFinished / 1000).toInt()
                 val minutes = remainingSeconds / 60
                 val secs = remainingSeconds % 60
                 val timeString = String.format("%02d:%02d", minutes, secs)
@@ -303,51 +286,42 @@ class MainActivity : AppCompatActivity() {
                     floatingTimer.text = timeString
                 }
                 
-                // Voice alerts at specific thresholds
                 when (remainingSeconds) {
                     300 -> speakAlert("5 minutes remaining")
                     60 -> speakAlert("1 minute remaining")
                     30 -> speakAlert("30 seconds remaining")
                 }
-                
-                delay(1000) // Update every second
             }
-        }
+            
+            override fun onFinish() {
+                speakAlert("Time expired")
+                endSession()
+            }
+        }.start()
     }
     
     private fun startExtendListener() {
         extendCheckJob?.cancel()
         extendCheckJob = CoroutineScope(Dispatchers.IO).launch {
-            var lastEndTime = endTimeMillis
+            var lastSeconds = remainingSeconds
             while (isActive && currentPin != null) {
                 delay(3000)
                 try {
                     val result = supabase.validatePin(currentPin!!)
                     if (result.isValid && result.secondsLeft > 0) {
-                        // Recompute end time based on current time + remaining seconds
-                        val newEndTime = System.currentTimeMillis() + (result.secondsLeft * 1000L)
-                        if (Math.abs(newEndTime - lastEndTime) > 2000) {
-                            val addedSeconds = (newEndTime - lastEndTime) / 1000
+                        val newSeconds = result.secondsLeft
+                        if (newSeconds != lastSeconds) {
+                            val addedSeconds = newSeconds - lastSeconds
                             val addedMinutes = addedSeconds / 60
                             withContext(Dispatchers.Main) {
-                                endTimeMillis = newEndTime
+                                countDownTimer?.cancel()
+                                remainingSeconds = newSeconds
+                                startCountDownTimer()
                                 if (addedMinutes > 0) {
                                     Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes", Toast.LENGTH_LONG).show()
-                                    // Refresh timer display immediately
-                                    val now = System.currentTimeMillis()
-                                    val remaining = ((endTimeMillis - now) / 1000).toInt()
-                                    if (remaining > 0) {
-                                        remainingSeconds = remaining
-                                        val minutes = remainingSeconds / 60
-                                        val secs = remainingSeconds % 60
-                                        timerText.text = String.format("%02d:%02d", minutes, secs)
-                                        if (::floatingTimer.isInitialized) {
-                                            floatingTimer.text = timerText.text
-                                        }
-                                    }
                                 }
                             }
-                            lastEndTime = newEndTime
+                            lastSeconds = newSeconds
                         }
                     } else if (result.secondsLeft <= 0) {
                         withContext(Dispatchers.Main) {
@@ -457,7 +431,6 @@ class MainActivity : AppCompatActivity() {
     private fun endSession() {
         try {
             isActive = false
-            timerJob?.cancel()
             extendCheckJob?.cancel()
             countDownTimer?.cancel()
             
@@ -471,7 +444,6 @@ class MainActivity : AppCompatActivity() {
             currentPin = null
             remainingSeconds = 0
             paidAmount = 0.0
-            endTimeMillis = 0L
             pinInput.isEnabled = true
             activateBtn.isEnabled = true
             statusText.text = ""
@@ -485,9 +457,8 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         try {
-            timerJob?.cancel()
-            extendCheckJob?.cancel()
             countDownTimer?.cancel()
+            extendCheckJob?.cancel()
             hideFloatingTimer()
             tts.stop()
             tts.shutdown()
