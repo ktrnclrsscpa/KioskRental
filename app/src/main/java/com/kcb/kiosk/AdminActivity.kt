@@ -51,6 +51,12 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var saveTelegramBtn: Button
     private lateinit var testTelegramBtn: Button
     
+    // Class-level references for extend UI elements (used in extendTime)
+    private lateinit var extendPinInput: EditText
+    private lateinit var extendMinutesInput: EditText
+    private lateinit var extendAmountInput: EditText
+    private lateinit var extendBtn: Button
+    
     private var currentTab = "sales"
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -352,15 +358,15 @@ class AdminActivity : AppCompatActivity() {
             }
             addView(extendTitle)
             
-            val extendPinInput = createEditText("PIN to extend")
+            extendPinInput = createEditText("PIN to extend")
             addView(extendPinInput)
-            val extendMinutesInput = createEditText("Minutes to add", true)
+            extendMinutesInput = createEditText("Minutes to add", true)
             addView(extendMinutesInput)
-            val extendAmountInput = createEditText("Amount (₱)", true)
+            extendAmountInput = createEditText("Amount (₱)", true)
             extendAmountInput.inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
             addView(extendAmountInput)
             
-            val extendBtn = createButton("EXTEND TIME", "#E67E22")
+            extendBtn = createButton("EXTEND TIME", "#E67E22")
             extendBtn.setOnClickListener {
                 val pin = extendPinInput.text.toString().trim()
                 val minutes = extendMinutesInput.text.toString().toIntOrNull()
