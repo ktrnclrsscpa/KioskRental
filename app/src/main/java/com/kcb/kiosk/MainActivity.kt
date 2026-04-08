@@ -35,8 +35,8 @@ class MainActivity : AppCompatActivity() {
     private var extendCheckJob: Job? = null
     private var paidAmount = 0.0
     
-    // For accurate timer
-    private var endTimeMillis = 0L          // System time when session expires
+    // Accurate timer using system time
+    private var endTimeMillis = 0L
     private var timerJob: Job? = null
     
     private lateinit var tts: TextToSpeech
@@ -310,7 +310,7 @@ class MainActivity : AppCompatActivity() {
                     30 -> speakAlert("30 seconds remaining")
                 }
                 
-                delay(200) // Update every 200ms for smooth display, but accuracy is based on endTime
+                delay(1000) // Update every second
             }
         }
     }
@@ -326,14 +326,25 @@ class MainActivity : AppCompatActivity() {
                     if (result.isValid && result.secondsLeft > 0) {
                         // Recompute end time based on current time + remaining seconds
                         val newEndTime = System.currentTimeMillis() + (result.secondsLeft * 1000L)
-                        if (newEndTime != lastEndTime) {
+                        if (Math.abs(newEndTime - lastEndTime) > 2000) {
                             val addedSeconds = (newEndTime - lastEndTime) / 1000
                             val addedMinutes = addedSeconds / 60
                             withContext(Dispatchers.Main) {
                                 endTimeMillis = newEndTime
                                 if (addedMinutes > 0) {
                                     Toast.makeText(this@MainActivity, "✓ Extended! +$addedMinutes minutes", Toast.LENGTH_LONG).show()
-                                    // Send extension notification (already sent from AdminActivity, but we can also send here)
+                                    // Refresh timer display immediately
+                                    val now = System.currentTimeMillis()
+                                    val remaining = ((endTimeMillis - now) / 1000).toInt()
+                                    if (remaining > 0) {
+                                        remainingSeconds = remaining
+                                        val minutes = remainingSeconds / 60
+                                        val secs = remainingSeconds % 60
+                                        timerText.text = String.format("%02d:%02d", minutes, secs)
+                                        if (::floatingTimer.isInitialized) {
+                                            floatingTimer.text = timerText.text
+                                        }
+                                    }
                                 }
                             }
                             lastEndTime = newEndTime
