@@ -3,6 +3,7 @@ package com.kcb.kiosk
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.filter.PostgrestFilterBuilder
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -13,7 +14,6 @@ data class PinRes(
 )
 
 class SupabaseClient {
-    // Siguraduhin na tama ang URL at KEY mo rito
     private val client = createSupabaseClient(
         supabaseUrl = "YOUR_SUPABASE_URL",
         supabaseKey = "YOUR_SUPABASE_KEY"
