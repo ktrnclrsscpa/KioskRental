@@ -10,6 +10,7 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
 
+// Data classes defined outside so other files can use them
 data class PinData(val pin: String, val secondsLeft: Int)
 data class SessionRecord(val pin: String, val minutes: Int, val amount: Double, val date: String)
 data class IncomeStats(val daily: Double, val weekly: Double, val monthly: Double, val yearly: Double, val totalSessions: Int)
@@ -26,11 +27,6 @@ class SupabaseClient private constructor() {
     private fun addApiKeyToUrl(urlString: String): String {
         val separator = if (urlString.contains("?")) "&" else "?"
         return "$urlString${separator}apikey=$apiKey"
-    }
-
-    private fun getCurrentDateTime(): String {
-        val dateFormat = SimpleDateFormat("MM/dd/yyyy HH:mm:ss", Locale.US)
-        return dateFormat.format(Date())
     }
 
     // ==================== CREDITS (PINs with amount) ====================
@@ -136,9 +132,11 @@ class SupabaseClient private constructor() {
         }
     }
 
+    // CORRECTED extendTime - ADDS minutes to current remaining time
     suspend fun extendTime(pin: String, extraMinutes: Int): Boolean = withContext(Dispatchers.IO) {
         try {
             val encodedPin = URLEncoder.encode(pin, "UTF-8")
+            // 1. Get current seconds left
             val getUrl = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits?pin=eq.$encodedPin"))
             val getConnection = getUrl.openConnection() as HttpURLConnection
             getConnection.requestMethod = "GET"
@@ -150,7 +148,11 @@ class SupabaseClient private constructor() {
                 if (jsonArray.length() > 0) jsonArray.getJSONObject(0).getInt("seconds_left") else return@withContext false
             } else return@withContext false
             getConnection.disconnect()
+            
+            // 2. Calculate new seconds by ADDING the extra minutes
             val newSeconds = currentSeconds + (extraMinutes * 60)
+            
+            // 3. Update the database
             val updateUrl = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits?pin=eq.$encodedPin"))
             val updateConnection = updateUrl.openConnection() as HttpURLConnection
             updateConnection.requestMethod = "PATCH"
@@ -170,49 +172,39 @@ class SupabaseClient private constructor() {
 
     // ==================== TELEGRAM (with date/time) ====================
     
+    private fun getCurrentDateTime(): String {
+        val dateFormat = SimpleDateFormat("MM/dd/yyyy HH:mm:ss", Locale.US)
+        return dateFormat.format(Date())
+    }
+
     suspend fun getTelegramConfig(): Pair<String, String> = withContext(Dispatchers.IO) {
         try {
             var token = ""
             var chatId = ""
-            
             val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.telegram_bot_token"))
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.setRequestProperty("apikey", apiKey)
             connection.setRequestProperty("Authorization", "Bearer $apiKey")
-            connection.connectTimeout = 5000
-            connection.readTimeout = 5000
-            
             if (connection.responseCode == 200) {
                 val responseText = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonArray = JSONArray(responseText)
-                if (jsonArray.length() > 0) {
-                    token = jsonArray.getJSONObject(0).getString("setting_value")
-                }
+                if (jsonArray.length() > 0) token = jsonArray.getJSONObject(0).getString("setting_value")
             }
             connection.disconnect()
-            
             val url2 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.telegram_chat_id"))
             val connection2 = url2.openConnection() as HttpURLConnection
             connection2.requestMethod = "GET"
             connection2.setRequestProperty("apikey", apiKey)
             connection2.setRequestProperty("Authorization", "Bearer $apiKey")
-            connection2.connectTimeout = 5000
-            connection2.readTimeout = 5000
-            
             if (connection2.responseCode == 200) {
                 val responseText = connection2.inputStream.bufferedReader().use { it.readText() }
                 val jsonArray = JSONArray(responseText)
-                if (jsonArray.length() > 0) {
-                    chatId = jsonArray.getJSONObject(0).getString("setting_value")
-                }
+                if (jsonArray.length() > 0) chatId = jsonArray.getJSONObject(0).getString("setting_value")
             }
             connection2.disconnect()
-            
             Pair(token, chatId)
-        } catch (e: Exception) { 
-            Pair("", "")
-        }
+        } catch (e: Exception) { Pair("", "") }
     }
 
     suspend fun updateTelegramConfig(token: String, chatId: String): Boolean = withContext(Dispatchers.IO) {
@@ -227,7 +219,6 @@ class SupabaseClient private constructor() {
             conn1.outputStream.write("{\"setting_value\":\"$token\"}".toByteArray())
             val response1 = conn1.responseCode
             conn1.disconnect()
-            
             val url2 = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/admin_settings?setting_key=eq.telegram_chat_id"))
             val conn2 = url2.openConnection() as HttpURLConnection
             conn2.requestMethod = "PATCH"
@@ -238,21 +229,16 @@ class SupabaseClient private constructor() {
             conn2.outputStream.write("{\"setting_value\":\"$chatId\"}".toByteArray())
             val response2 = conn2.responseCode
             conn2.disconnect()
-            
             (response1 in 200..299) && (response2 in 200..299)
-        } catch (e: Exception) { 
-            false
-        }
+        } catch (e: Exception) { false }
     }
 
     suspend fun sendTelegramNotification(message: String): Boolean = withContext(Dispatchers.IO) {
         try {
             val (token, chatId) = getTelegramConfig()
             if (token.isEmpty() || chatId.isEmpty()) return@withContext false
-            
             val dateTime = getCurrentDateTime()
             val messageWithTime = "$message%0A📅 $dateTime"
-            
             val cleanMessage = messageWithTime.replace("*", "").replace("%0A", "\n")
             val encodedMessage = URLEncoder.encode(cleanMessage, "UTF-8")
             val urlString = "https://api.telegram.org/bot$token/sendMessage?chat_id=$chatId&text=$encodedMessage"
@@ -283,21 +269,17 @@ class SupabaseClient private constructor() {
             connection.doOutput = true
             connection.connectTimeout = 5000
             connection.readTimeout = 5000
-            
             val jsonBody = JSONObject().apply {
                 put("pin", pin)
                 put("minutes", minutes)
                 put("amount", amount)
                 put("status", "completed")
             }.toString()
-            
             connection.outputStream.write(jsonBody.toByteArray())
             val responseCode = connection.responseCode
             connection.disconnect()
             responseCode in 200..299
-        } catch (e: Exception) { 
-            false
-        }
+        } catch (e: Exception) { false }
     }
 
     suspend fun recordExtension(pin: String, minutes: Int, amount: Double): Boolean = withContext(Dispatchers.IO) {
@@ -311,21 +293,17 @@ class SupabaseClient private constructor() {
             connection.doOutput = true
             connection.connectTimeout = 5000
             connection.readTimeout = 5000
-            
             val jsonBody = JSONObject().apply {
-                put("pin", "${pin}_EXT")
+                put("pin", pin)
                 put("minutes", minutes)
                 put("amount", amount)
                 put("status", "extension")
             }.toString()
-            
             connection.outputStream.write(jsonBody.toByteArray())
             val responseCode = connection.responseCode
             connection.disconnect()
             responseCode in 200..299
-        } catch (e: Exception) { 
-            false
-        }
+        } catch (e: Exception) { false }
     }
 
     suspend fun getIncomeStats(): IncomeStats = withContext(Dispatchers.IO) {
@@ -337,24 +315,20 @@ class SupabaseClient private constructor() {
             connection.setRequestProperty("Authorization", "Bearer $apiKey")
             connection.connectTimeout = 5000
             connection.readTimeout = 5000
-            
             val now = System.currentTimeMillis()
             val oneDay = 24 * 60 * 60 * 1000L
             val oneWeek = 7 * oneDay
             val oneMonth = 30 * oneDay
             val oneYear = 365 * oneDay
-            
             var daily = 0.0
             var weekly = 0.0
             var monthly = 0.0
             var yearly = 0.0
             var totalSessions = 0
-            
             if (connection.responseCode == 200) {
                 val responseText = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonArray = JSONArray(responseText)
                 totalSessions = jsonArray.length()
-                
                 for (i in 0 until jsonArray.length()) {
                     val obj = jsonArray.getJSONObject(i)
                     val amount = obj.getDouble("amount")
@@ -385,17 +359,15 @@ class SupabaseClient private constructor() {
             connection.setRequestProperty("Authorization", "Bearer $apiKey")
             connection.connectTimeout = 5000
             connection.readTimeout = 5000
-            
             val list = mutableListOf<SessionRecord>()
             if (connection.responseCode == 200) {
                 val responseText = connection.inputStream.bufferedReader().use { it.readText() }
                 val jsonArray = JSONArray(responseText)
                 val dateFormat = SimpleDateFormat("MM/dd HH:mm", Locale.US)
                 val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS", Locale.US)
-                
                 for (i in 0 until jsonArray.length()) {
                     val obj = jsonArray.getJSONObject(i)
-                    var pin = obj.getString("pin")
+                    val pin = obj.getString("pin")
                     val minutes = obj.getInt("minutes")
                     val amount = obj.getDouble("amount")
                     val startedAt = obj.getString("started_at")
