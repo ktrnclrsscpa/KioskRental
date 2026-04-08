@@ -51,7 +51,7 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var saveTelegramBtn: Button
     private lateinit var testTelegramBtn: Button
     
-    // Class-level references for extend UI elements (used in extendTime)
+    // Class-level references for extend UI elements
     private lateinit var extendPinInput: EditText
     private lateinit var extendMinutesInput: EditText
     private lateinit var extendAmountInput: EditText
@@ -563,6 +563,9 @@ class AdminActivity : AppCompatActivity() {
     
     // ==================== CORRECTED EXTEND TIME WITH DEBUG TOASTS ====================
     private fun extendTime(pin: String, minutes: Int, amount: Double) {
+        // Show what we are adding
+        Toast.makeText(this, "Adding $minutes minute(s) to PIN $pin", Toast.LENGTH_SHORT).show()
+        
         extendBtn.isEnabled = false
         extendBtn.text = "EXTENDING..."
         
