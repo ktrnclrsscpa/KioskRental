@@ -9,21 +9,49 @@ import androidx.recyclerview.widget.RecyclerView
 class AppAdapter(private val apps: List<AppInfo>, private val pm: PackageManager) : 
     RecyclerView.Adapter<AppAdapter.Holder>() {
 
-    class Holder(val l: LinearLayout) : RecyclerView.ViewHolder(l) {
-        val i = ImageView(l.context).apply { layoutParams = LinearLayout.LayoutParams(120, 120) }
-        val n = TextView(l.context).apply { gravity = Gravity.CENTER; textSize = 11f }
-        init { l.orientation = LinearLayout.VERTICAL; l.gravity = Gravity.CENTER; l.addView(i); l.addView(n) }
-    }
-
-    override fun onCreateViewHolder(p: ViewGroup, t: Int) = Holder(LinearLayout(p.context))
-    override fun getItemCount() = apps.size
-    override fun onBindViewHolder(h: Holder, pos: Int) {
-        val a = apps[pos]
-        h.n.text = a.name
-        h.i.setImageDrawable(pm.getApplicationIcon(a.packageName))
-        h.l.setOnClickListener {
-            val it = pm.getLaunchIntentForPackage(a.packageName)
-            if (it != null) h.l.context.startActivity(it)
+    class Holder(val layout: LinearLayout) : RecyclerView.ViewHolder(layout) {
+        val icon = ImageView(layout.context).apply { 
+            layoutParams = LinearLayout.LayoutParams(160, 160) // Size ng Icon
+        }
+        val name = TextView(layout.context).apply { 
+            gravity = Gravity.CENTER; textSize = 12f; setPadding(0, 10, 0, 20)
+        }
+        init { 
+            layout.orientation = LinearLayout.VERTICAL
+            layout.gravity = Gravity.CENTER
+            layout.addView(icon)
+            layout.addView(name)
         }
     }
-}
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
+        val lp = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, 
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        )
+        val layout = LinearLayout(parent.context).apply { layoutParams = lp }
+        return Holder(layout)
+    }
+
+    override fun getItemCount() = apps.size
+
+    override fun onBindViewHolder(holder: Holder, position: Int) {
+        val app = apps[position]
+        holder.name.text = app.name
+        try {
+            holder.icon.setImageDrawable(pm.getApplicationIcon(app.packageName))
+        } catch (e: Exception) {
+            // Default icon kung may error
+            holder.icon.setImageResource(android.R.drawable.sym_def_app_icon)
+        }
+
+        holder.layout.setOnClickListener {
+            val launchIntent = pm.getLaunchIntentForPackage(app.packageName)
+            if (launchIntent != null) {
+                holder.layout.context.startActivity(launchIntent)
+            } else {
+                Toast.makeText(holder.layout.context, "Cannot open app", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    }
