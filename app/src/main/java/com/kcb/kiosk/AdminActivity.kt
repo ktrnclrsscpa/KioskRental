@@ -2,22 +2,13 @@ package com.kcb.kiosk
 
 import android.app.AlertDialog
 import android.content.Context
-import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
-import android.view.View
-import android.view.ViewGroup
+import android.view.Gravity
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.*
-import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
-import java.text.SimpleDateFormat
-import java.util.*
 
 class AdminActivity : AppCompatActivity() {
     
@@ -27,118 +18,75 @@ class AdminActivity : AppCompatActivity() {
     private lateinit var contentContainer: LinearLayout
     private lateinit var tabBar: LinearLayout
     
-    private lateinit var salesContent: LinearLayout
-    private lateinit var pinsContent: LinearLayout
-    private lateinit var appsContent: LinearLayout
-    private lateinit var settingsContent: LinearLayout
-    
-    private lateinit var dailyTotalText: TextView
-    private lateinit var transactionRecycler: RecyclerView
-    private lateinit var pinsText: TextView
-    private lateinit var appContainer: LinearLayout
-    private lateinit var appStatusText: TextView
-    private lateinit var saveAppsBtn: Button
-    private val checkBoxes = mutableListOf<Pair<CheckBox, String>>()
-    private lateinit var telegramTokenInput: EditText
-    private lateinit var telegramChatIdInput: EditText
-    private lateinit var saveTelegramBtn: Button
-    private lateinit var testTelegramBtn: Button
-    
+    // UI Elements for Extension
     private lateinit var extendPinInput: EditText
     private lateinit var extendMinutesInput: EditText
     private lateinit var extendAmountInput: EditText
     private lateinit var extendBtn: Button
-    
-    private var currentTab = "sales"
-    
+    private lateinit var pinsText: TextView
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Login prompt bago ipakita ang Admin Panel
         checkAdminPassword()
     }
-    
+
     private fun checkAdminPassword() {
-        val input = EditText(this)
-        input.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-        input.hint = "Enter admin password"
+        val input = EditText(this).apply { 
+            hint = "Admin Password"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD 
+        }
         
         AlertDialog.Builder(this)
-            .setTitle("🔐 Admin Access")
-            .setMessage("Enter password to continue")
+            .setTitle("🔒 Admin Access")
             .setView(input)
+            .setCancelable(false)
             .setPositiveButton("Login") { _, _ ->
-                val password = input.text.toString()
-                val savedPassword = prefs.getString("admin_password", "admin123")
-                if (password == savedPassword) {
+                if (input.text.toString() == prefs.getString("admin_password", "admin123")) {
                     initAdminPanel()
                 } else {
-                    Toast.makeText(this, "Wrong password!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Wrong Password!", Toast.LENGTH_SHORT).show()
                     finish()
                 }
             }
-            .setNegativeButton("Cancel") { _, _ -> finish() }
-            .setCancelable(false)
+            .setNegativeButton("Exit") { _, _ -> finish() }
             .show()
     }
-    
+
     private fun initAdminPanel() {
         supabase = SupabaseClient.getInstance()
         
-        val rootLayout = LinearLayout(this).apply {
+        val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#F5F7FA"))
         }
-        
-        // --- Header Section ---
-        val headerRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(30, 30, 30, 20)
-        }
-        val title = TextView(this).apply {
-            text = "ADMIN PANEL"
-            textSize = 22f
-            setTextColor(Color.parseColor("#2C3E50"))
-            typeface = Typeface.DEFAULT_BOLD
-            layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
-        }
-        headerRow.addView(title)
-        rootLayout.addView(headerRow)
-        
-        // --- Tab Bar ---
+
+        // --- Custom Tab Bar ---
         tabBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(Color.WHITE)
-            elevation = 4f
+            elevation = 8f
         }
-        addTab("SALES", "sales")
         addTab("PINS", "pins")
-        addTab("APPS", "apps")
-        addTab("SETTINGS", "settings")
-        rootLayout.addView(tabBar)
+        addTab("SALES", "sales")
         
+        root.addView(tabBar)
+
         contentContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(-1, 0, 1f)
+            setPadding(40, 40, 40, 40)
         }
-        rootLayout.addView(contentContainer)
-        
-        // Pre-create contents
-        salesContent = createSalesContent()
-        pinsContent = createPinsContent()
-        appsContent = createAppsContent()
-        settingsContent = createSettingsContent()
-        
-        setContentView(rootLayout)
-        selectTab("sales")
-        loadInstalledApps()
-        loadTelegramSettings()
+        root.addView(contentContainer)
+
+        setContentView(root)
+        selectTab("pins") // Default tab
     }
 
     private fun addTab(label: String, tag: String) {
         val tab = TextView(this).apply {
             text = label
-            textSize = 13f
-            setPadding(20, 30, 20, 30)
-            gravity = android.view.Gravity.CENTER
+            setPadding(0, 40, 0, 40)
+            gravity = Gravity.CENTER
             layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
             this.tag = tag
             setOnClickListener { selectTab(tag) }
@@ -147,116 +95,103 @@ class AdminActivity : AppCompatActivity() {
     }
 
     private fun selectTab(tag: String) {
-        currentTab = tag
         contentContainer.removeAllViews()
-        for (i in 0 until tabBar.childCount) {
-            val tv = tabBar.getChildAt(i) as TextView
-            if (tv.tag == tag) {
-                tv.setTextColor(Color.parseColor("#2ECC71"))
-                tv.setTypeface(null, Typeface.BOLD)
-            } else {
-                tv.setTextColor(Color.GRAY)
-                tv.setTypeface(null, Typeface.NORMAL)
-            }
-        }
-        when (tag) {
-            "sales" -> { contentContainer.addView(salesContent); loadTransactionHistory() }
-            "pins" -> { contentContainer.addView(pinsContent); loadActivePins() }
-            "apps" -> contentContainer.addView(appsContent)
-            "settings" -> contentContainer.addView(settingsContent)
+        if (tag == "pins") {
+            showPinsUI()
+        } else {
+            val tv = TextView(this).apply { text = "Sales logic here..." }
+            contentContainer.addView(tv)
         }
     }
 
-    // ==================== CORE LOGIC: EXTEND TIME ====================
-    private fun extendTime(pin: String, minutes: Int, amount: Double) {
-        extendBtn.isEnabled = false
-        extendBtn.text = "PROCESSING..."
+    private fun showPinsUI() {
+        val label = TextView(this).apply { 
+            text = "⏰ ADD TIME TO ACTIVE PIN"
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(0, 0, 0, 20)
+        }
         
+        extendPinInput = EditText(this).apply { hint = "Enter PIN" }
+        extendMinutesInput = EditText(this).apply { hint = "Minutes to add"; inputType = 2 }
+        extendAmountInput = EditText(this).apply { hint = "Amount (₱)"; inputType = 8194 }
+        
+        extendBtn = Button(this).apply {
+            text = "EXTEND TIME"
+            setBackgroundColor(Color.parseColor("#2ECC71"))
+            setTextColor(Color.WHITE)
+            setOnClickListener { processExtension() }
+        }
+
+        pinsText = TextView(this).apply { 
+            text = "Loading active pins..."
+            setPadding(0, 40, 0, 0)
+        }
+
+        contentContainer.addView(label)
+        contentContainer.addView(extendPinInput)
+        contentContainer.addView(extendMinutesInput)
+        contentContainer.addView(extendAmountInput)
+        contentContainer.addView(extendBtn)
+        contentContainer.addView(pinsText)
+        
+        loadActivePins()
+    }
+
+    private fun processExtension() {
+        val pin = extendPinInput.text.toString().trim()
+        val minutes = extendMinutesInput.text.toString().toIntOrNull() ?: 0
+        val amount = extendAmountInput.text.toString().toDoubleOrNull() ?: 0.0
+
+        if (pin.isEmpty() || minutes <= 0) {
+            Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        extendBtn.isEnabled = false
+        extendBtn.text = "Updating..."
+
         CoroutineScope(Dispatchers.IO).launch {
-            try {
-                // STEP 1: Kunin ang saktong oras na natitira sa DB ngayon
-                val currentData = supabase.validatePin(pin)
+            val result = supabase.validatePin(pin)
+            if (result.isValid) {
+                val newSeconds = result.secondsLeft + (minutes * 60)
+                val success = supabase.updatePinSeconds(pin, newSeconds)
                 
-                if (currentData.isValid) {
-                    // STEP 2: I-compute ang New Total (Current DB Oras + Dagdag)
-                    val addedSeconds = minutes * 60
-                    val newTotalSeconds = currentData.secondsLeft + addedSeconds
+                if (success) {
+                    supabase.recordExtension(pin, minutes, amount)
+                    supabase.sendTelegramNotification("✅ *PIN Extended*\nPIN: $pin\nAdded: $minutes mins")
                     
-                    // STEP 3: I-save sa Supabase
-                    val success = supabase.updatePinSeconds(pin, newTotalSeconds)
-                    
-                    if (success) {
-                        supabase.recordExtension(pin, minutes, amount)
-                        supabase.sendTelegramNotification("⏰ *Extended!*%0APIN: $pin%0AAdded: $minutes min%0ANew Total: ${newTotalSeconds/60} min")
-                        
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(this@AdminActivity, "Successfully added $minutes min!", Toast.LENGTH_SHORT).show()
-                            clearExtendInputs()
-                            loadActivePins()
-                        }
-                    }
-                } else {
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(this@AdminActivity, "PIN not found or expired!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@AdminActivity, "Extension Success!", Toast.LENGTH_SHORT).show()
+                        extendPinInput.text.clear()
+                        extendMinutesInput.text.clear()
+                        extendAmountInput.text.clear()
+                        loadActivePins()
                     }
                 }
-            } catch (e: Exception) {
+            } else {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@AdminActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@AdminActivity, "Invalid PIN!", Toast.LENGTH_SHORT).show()
                 }
-            } finally {
-                withContext(Dispatchers.Main) {
-                    extendBtn.isEnabled = true
-                    extendBtn.text = "EXTEND TIME"
-                }
+            }
+            withContext(Dispatchers.Main) {
+                extendBtn.isEnabled = true
+                extendBtn.text = "EXTEND TIME"
             }
         }
     }
 
-    private fun clearExtendInputs() {
-        extendPinInput.text.clear()
-        extendMinutesInput.text.clear()
-        extendAmountInput.text.clear()
-    }
-
-    // ==================== UI GENERATORS ====================
-    private fun createPinsContent(): LinearLayout {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(30, 30, 30, 30)
-            
-            addView(TextView(context).apply { text = "⏰ EXTEND ACTIVE PIN"; typeface = Typeface.DEFAULT_BOLD })
-            
-            extendPinInput = EditText(context).apply { hint = "Enter PIN" }
-            extendMinutesInput = EditText(context).apply { hint = "Minutes to add"; inputType = 2 }
-            extendAmountInput = EditText(context).apply { hint = "Amount (₱)"; inputType = 8194 }
-            
-            extendBtn = Button(context).apply {
-                text = "EXTEND TIME"
-                setBackgroundColor(Color.parseColor("#E67E22"))
-                setTextColor(Color.WHITE)
-                setOnClickListener {
-                    val pin = extendPinInput.text.toString()
-                    val min = extendMinutesInput.text.toString().toIntOrNull() ?: 0
-                    val amt = extendAmountInput.text.toString().toDoubleOrNull() ?: 0.0
-                    if (pin.isNotEmpty() && min > 0) extendTime(pin, min, amt)
+    private fun loadActivePins() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val list = supabase.getActivePins()
+            withContext(Dispatchers.Main) {
+                if (list.isEmpty()) {
+                    pinsText.text = "No active pins found."
+                } else {
+                    val sb = StringBuilder("🔑 ACTIVE PINS:\n\n")
+                    list.forEach { sb.append("${it.pin} - ${it.secondsLeft / 60} mins left\n") }
+                    pinsText.text = sb.toString()
                 }
             }
-            
-            addView(extendPinInput); addView(extendMinutesInput); addView(extendAmountInput); addView(extendBtn)
-            
-            addView(TextView(context).apply { text = "\n🔑 ACTIVE PINS"; setPadding(0, 20, 0, 10) })
-            pinsText = TextView(context).apply { text = "Loading..." }
-            addView(pinsText)
         }
     }
-
-    // (Ilagay dito ang iba pang functions gaya ng createSalesContent, loadTransactionHistory, atbp. mula sa dating code)
-    private fun createSalesContent() = LinearLayout(this).apply { /* Logic same as before */ }
-    private fun createAppsContent() = LinearLayout(this).apply { /* Logic same as before */ }
-    private fun createSettingsContent() = LinearLayout(this).apply { /* Logic same as before */ }
-    private fun loadTransactionHistory() { /* Logic same as before */ }
-    private fun loadActivePins() { /* Logic same as before */ }
-    private fun loadInstalledApps() { /* Logic same as before */ }
-    private fun loadTelegramSettings() { /* Logic same as before */ }
 }
