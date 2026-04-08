@@ -1,54 +1,45 @@
 package com.kcb.kiosk
 
 import android.content.pm.PackageManager
-import android.view.LayoutInflater
-import android.view.View
+import android.view.Gravity
 import android.view.ViewGroup
-import android.widget.ImageView
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
 import androidx.recyclerview.widget.RecyclerView
 
-class AppAdapter(
-    private val apps: List<AppInfo>,
-    private val packageManager: PackageManager
-) : RecyclerView.Adapter<AppAdapter.ViewHolder>() {
+class AppAdapter(private val apps: List<AppInfo>, private val pm: PackageManager) : 
+    RecyclerView.Adapter<AppAdapter.Holder>() {
 
-    class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val icon: ImageView = itemView.findViewById(android.R.id.icon)
-        val name: TextView = itemView.findViewById(android.R.id.text1)
-    }
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(android.R.layout.simple_list_item_2, parent, false)
-        return ViewHolder(view)
-    }
-
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val app = apps[position]
-        holder.name.text = app.name
-        
-        try {
-            val icon = packageManager.getApplicationIcon(app.packageName)
-            holder.icon.setImageDrawable(icon)
-        } catch (e: Exception) {
-            holder.icon.setImageResource(android.R.drawable.sym_def_app_icon)
+    class Holder(val layout: LinearLayout) : RecyclerView.ViewHolder(layout) {
+        val icon = ImageView(layout.context).apply {
+            layoutParams = LinearLayout.LayoutParams(130, 130).apply { setMargins(0, 0, 0, 10) }
         }
-        
-        holder.itemView.setOnClickListener {
-            try {
-                val intent = packageManager.getLaunchIntentForPackage(app.packageName)
-                if (intent != null) {
-                    holder.itemView.context.startActivity(intent)
-                } else {
-                    Toast.makeText(holder.itemView.context, "App not installed", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                Toast.makeText(holder.itemView.context, "Cannot open app", Toast.LENGTH_SHORT).show()
-            }
+        val name = TextView(layout.context).apply {
+            gravity = Gravity.CENTER
+            textSize = 12f
+            maxLines = 1
+        }
+        init {
+            layout.orientation = LinearLayout.VERTICAL
+            layout.gravity = Gravity.CENTER
+            layout.setPadding(20, 30, 20, 30)
+            layout.addView(icon); layout.addView(name)
         }
     }
 
+    override fun onCreateViewHolder(p: ViewGroup, t: Int) = Holder(LinearLayout(p.context))
     override fun getItemCount() = apps.size
-}
+    override fun onBindViewHolder(h: Holder, pos: Int) {
+        val app = apps[pos]
+        h.name.text = app.name
+        try {
+            h.icon.setImageDrawable(pm.getApplicationIcon(app.packageName))
+        } catch (e: Exception) {
+            h.icon.setImageResource(android.R.drawable.sym_def_app_icon)
+        }
+        h.layout.setOnClickListener {
+            val intent = pm.getLaunchIntentForPackage(app.packageName)
+            if (intent != null) h.layout.context.startActivity(intent)
+            else Toast.makeText(h.layout.context, "Cannot open app", Toast.LENGTH_SHORT).show()
+        }
+    }
+    }
