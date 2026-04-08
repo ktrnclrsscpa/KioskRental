@@ -3,7 +3,6 @@ package com.kcb.kiosk
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.from
-import io.github.jan.supabase.postgrest.query.filter.PostgrestFilterBuilder
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -14,6 +13,7 @@ data class PinRes(
 )
 
 class SupabaseClient {
+    // SIGURADUHIN NA TAMA ANG URL AT KEY MO DITO
     private val client = createSupabaseClient(
         supabaseUrl = "https://qbricrnjchbdyseeuwif.supabase.co",
         supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicmljcm5qY2hiZHlzZWV1d2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDU0NDUsImV4cCI6MjA4OTc4MTQ0NX0.5sJqi3fZc4VIFQAIw1QptHt7MlGdnkn5SVxYdRu4f7Q"
@@ -31,12 +31,11 @@ class SupabaseClient {
 
     suspend fun validatePin(pinValue: String): PinRes {
         return try {
-            val result = client.from("credits").select {
+            client.from("credits").select {
                 filter {
-                    this.eq("pin", pinValue) // Gumamit ng 'this.' para sigurado
+                    eq("pin", pinValue)
                 }
-            }
-            result.decodeSingle<PinRes>()
+            }.decodeSingle<PinRes>()
         } catch (e: Exception) {
             PinRes(false, 0)
         }
@@ -44,12 +43,12 @@ class SupabaseClient {
 
     suspend fun getCurrentRemainingSeconds(pinValue: String): Long {
         return try {
-            val result = client.from("credits").select {
+            val res = client.from("credits").select {
                 filter {
-                    this.eq("pin", pinValue)
+                    eq("pin", pinValue)
                 }
-            }
-            result.decodeSingle<PinRes>().seconds_left
+            }.decodeSingle<PinRes>()
+            res.seconds_left
         } catch (e: Exception) {
             0L
         }
@@ -63,7 +62,7 @@ class SupabaseClient {
                 set("is_extension", isExtension)
             }) {
                 filter {
-                    this.eq("pin", pinValue)
+                    eq("pin", pinValue)
                 }
             }
             true
