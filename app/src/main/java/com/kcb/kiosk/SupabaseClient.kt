@@ -14,7 +14,6 @@ data class PinRes(
 )
 
 class SupabaseClient {
-    // ILAGAY DITO ANG TOTOONG CREDENTIALS MO
     private val client = createSupabaseClient(
         supabaseUrl = "https://qbricrnjchbdyseeuwif.supabase.co",
         supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicmljcm5qY2hiZHlzZWV1d2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDU0NDUsImV4cCI6MjA4OTc4MTQ0NX0.5sJqi3fZc4VIFQAIw1QptHt7MlGdnkn5SVxYdRu4f7Q"
@@ -32,12 +31,12 @@ class SupabaseClient {
 
     suspend fun validatePin(pinValue: String): PinRes {
         return try {
-            val table = client.from("credits")
-            table.select {
+            val result = client.from("credits").select {
                 filter {
-                    eq("pin", pinValue)
+                    this.eq("pin", pinValue) // Gumamit ng 'this.' para sigurado
                 }
-            }.decodeSingle<PinRes>()
+            }
+            result.decodeSingle<PinRes>()
         } catch (e: Exception) {
             PinRes(false, 0)
         }
@@ -45,13 +44,12 @@ class SupabaseClient {
 
     suspend fun getCurrentRemainingSeconds(pinValue: String): Long {
         return try {
-            val table = client.from("credits")
-            val res = table.select {
+            val result = client.from("credits").select {
                 filter {
-                    eq("pin", pinValue)
+                    this.eq("pin", pinValue)
                 }
-            }.decodeSingle<PinRes>()
-            res.seconds_left
+            }
+            result.decodeSingle<PinRes>().seconds_left
         } catch (e: Exception) {
             0L
         }
@@ -59,14 +57,13 @@ class SupabaseClient {
 
     suspend fun updatePinTime(pinValue: String, newSeconds: Long, amount: Double, isExtension: Boolean): Boolean {
         return try {
-            val table = client.from("credits")
-            table.update({
+            client.from("credits").update({
                 set("seconds_left", newSeconds)
                 set("amount", amount)
                 set("is_extension", isExtension)
             }) {
                 filter {
-                    eq("pin", pinValue)
+                    this.eq("pin", pinValue)
                 }
             }
             true
