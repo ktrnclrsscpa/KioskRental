@@ -27,7 +27,6 @@ class AdminActivity : AppCompatActivity() {
             .setView(input)
             .setCancelable(false)
             .setPositiveButton("Login") { _, _ ->
-                // Default password is admin123 [cite: 22]
                 if (input.text.toString() == "admin123") {
                     setupAdminUI()
                 } else {
@@ -66,11 +65,14 @@ class AdminActivity : AppCompatActivity() {
             val list = supabase.getActivePins()
             withContext(Dispatchers.Main) {
                 if (list.isEmpty()) {
-                    logText.text = "No active pins found." [cite: 40]
+                    logText.text = "No active pins found."
                 } else {
                     val sb = StringBuilder("🔑 ACTIVE SESSIONS:\n\n")
-                    list.forEach { sb.append("• ${it.pin} (${it.secondsLeft / 60}m left)\n") }
-                    logText.text = sb.toString() [cite: 41]
+                    for (item in list) {
+                        val mins = item.secondsLeft / 60
+                        sb.append("• PIN: ").append(item.pin).append(" (").append(mins).append("m left)\n")
+                    }
+                    logText.text = sb.toString()
                 }
             }
         }
