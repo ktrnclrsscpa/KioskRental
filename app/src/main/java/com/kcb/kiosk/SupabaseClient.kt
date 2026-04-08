@@ -1,6 +1,5 @@
 package com.kcb.kiosk
 
-import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.from
@@ -9,15 +8,18 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class PinRes(
     val isValid: Boolean = false,
-    val secondsLeft: Int = 0,
+    val seconds_left: Long = 0,
     val pin: String = ""
 )
 
 class SupabaseClient {
+    // Siguraduhin na tama ang URL at KEY mo rito
     private val client = createSupabaseClient(
         supabaseUrl = "YOUR_SUPABASE_URL",
         supabaseKey = "YOUR_SUPABASE_KEY"
-    ) { install(Postgrest) }
+    ) {
+        install(Postgrest)
+    }
 
     companion object {
         @Volatile
@@ -27,31 +29,45 @@ class SupabaseClient {
         }
     }
 
-    suspend fun validatePin(pin: String): PinRes {
+    suspend fun validatePin(pinValue: String): PinRes {
         return try {
             client.from("credits").select {
-                filter { eq("pin", pin) }
+                filter {
+                    eq("pin", pinValue)
+                }
             }.decodeSingle<PinRes>()
-        } catch (e: Exception) { PinRes(false, 0) }
+        } catch (e: Exception) {
+            PinRes(false, 0)
+        }
     }
 
-    suspend fun getCurrentRemainingSeconds(pin: String): Long {
+    suspend fun getCurrentRemainingSeconds(pinValue: String): Long {
         return try {
             val res = client.from("credits").select {
-                filter { eq("pin", pin) }
+                filter {
+                    eq("pin", pinValue)
+                }
             }.decodeSingle<PinRes>()
-            res.secondsLeft.toLong()
-        } catch (e: Exception) { 0L }
+            res.seconds_left
+        } catch (e: Exception) {
+            0L
+        }
     }
 
-    suspend fun updatePinTime(pin: String, newSeconds: Long, amount: Double, isExtension: Boolean): Boolean {
+    suspend fun updatePinTime(pinValue: String, newSeconds: Long, amount: Double, isExtension: Boolean): Boolean {
         return try {
             client.from("credits").update({
                 set("seconds_left", newSeconds)
                 set("amount", amount)
                 set("is_extension", isExtension)
-            }) { filter { eq("pin", pin) } }
+            }) {
+                filter {
+                    eq("pin", pinValue)
+                }
+            }
             true
-        } catch (e: Exception) { false }
+        } catch (e: Exception) {
+            false
+        }
     }
 }
