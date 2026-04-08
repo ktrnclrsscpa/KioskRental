@@ -11,7 +11,7 @@ import java.util.*
 
 class AdminActivity : AppCompatActivity() {
     private lateinit var supabase: SupabaseClient
-    private val botToken = "YOUR_TELEGRAM_TOKEN"
+    private val botToken = "YOUR_TELEGRAM_BOT_TOKEN"
     private val chatId = "YOUR_CHAT_ID"
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,12 +26,12 @@ class AdminActivity : AppCompatActivity() {
             setPadding(40, 40, 40, 40)
         }
 
-        val etPin = EditText(this).apply { hint = "Customer PIN" }
-        val etAmt = EditText(this).apply { hint = "Amount (₱)"; inputType = 2 }
-        val etMins = EditText(this).apply { hint = "Minutes to Add"; inputType = 2 }
+        val etPin = EditText(this).apply { hint = "PIN ng Customer" }
+        val etAmt = EditText(this).apply { hint = "Magkano (₱)"; inputType = 2 }
+        val etMins = EditText(this).apply { hint = "Ilang Minutes"; inputType = 2 }
 
         val btnExtend = Button(this).apply {
-            text = "EXTEND (ADDITIVE)"
+            text = "EXTEND TIME"
             setOnClickListener {
                 val pin = etPin.text.toString()
                 val mins = etMins.text.toString().toLongOrNull() ?: 0
@@ -53,7 +53,7 @@ class AdminActivity : AppCompatActivity() {
             if (success) {
                 sendTelegramAlert(pin, minsToAdd, amt, newTotal)
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@AdminActivity, "Extended! New Total: ${newTotal/60}m", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@AdminActivity, "Success! Bagong oras: ${newTotal/60}m", Toast.LENGTH_SHORT).show()
                 }
             }
         }
