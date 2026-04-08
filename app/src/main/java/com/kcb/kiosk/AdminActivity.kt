@@ -1,5 +1,6 @@
 package com.kcb.kiosk
 
+import android.app.AlertDialog
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.*
@@ -7,46 +8,69 @@ import androidx.appcompat.app.AppCompatActivity
 import kotlinx.coroutines.*
 
 class AdminActivity : AppCompatActivity() {
-    private lateinit var s: SupabaseClient
-    private lateinit var pInput: EditText
-    private lateinit var mInput: EditText
-    private lateinit var aInput: EditText
-    private lateinit var log: TextView
+    private lateinit var supabase: SupabaseClient
+    private lateinit var logText: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        s = SupabaseClient.getInstance()
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(40,40,40,40) }
-        pInput = EditText(this).apply { hint = "PIN" }
-        mInput = EditText(this).apply { hint = "Mins"; inputType = 2 }
-        aInput = EditText(this).apply { hint = "₱"; inputType = 8194 }
-        val btn = Button(this).apply { text = "EXTEND"; setOnClickListener { process() } }
-        log = TextView(this).apply { text = "Active pins..."; setPadding(0,40,0,0) }
-        root.addView(pInput); root.addView(mInput); root.addView(aInput); root.addView(btn); root.addView(log)
-        setContentView(root)
-        refresh()
+        showLoginDialog()
     }
 
-    private fun process() {
-        val p = pInput.text.toString()
-        val m = mInput.text.toString().toIntOrNull() ?: 0
-        val a = aInput.text.toString().toDoubleOrNull() ?: 0.0
-        CoroutineScope(Dispatchers.IO).launch {
-            val res = s.validatePin(p)
-            if (res.isValid) {
-                if (s.updatePinSeconds(p, res.secondsLeft + (m*60))) {
-                    s.recordExtension(p, m, a)
-                    withContext(Dispatchers.Main) { refresh() }
+    private fun showLoginDialog() {
+        val input = EditText(this).apply { 
+            hint = "Admin Password"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD 
+        }
+        
+        AlertDialog.Builder(this)
+            .setTitle("Admin Login")
+            .setView(input)
+            .setCancelable(false)
+            .setPositiveButton("Login") { _, _ ->
+                if (input.text.toString() == "admin123") {
+                    setupAdminUI()
+                } else {
+                    Toast.makeText(this, "Wrong Password!", Toast.LENGTH_SHORT).show()
+                    finish()
                 }
             }
-        }
+            .setNegativeButton("Cancel") { _, _ -> finish() }
+            .show()
     }
 
-    private fun refresh() {
+    private fun setupAdminUI() {
+        supabase = SupabaseClient.getInstance()
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(40, 40, 40, 40)
+            setBackgroundColor(android.graphics.Color.parseColor("#F5F5F5"))
+        }
+
+        val title = TextView(this).apply { 
+            text = "ADMIN DASHBOARD"; textSize = 24f; setPadding(0,0,0,30) 
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+        
+        logText = TextView(this).apply { 
+            text = "Loading Active PINs..."; textSize = 16f
+        }
+        
+        root.addView(title); root.addView(logText)
+        setContentView(root)
+        refreshData()
+    }
+
+    private fun refreshData() {
         CoroutineScope(Dispatchers.IO).launch {
-            val list = s.getActivePins()
+            val list = supabase.getActivePins()
             withContext(Dispatchers.Main) {
-                log.text = list.joinToString("\n") { "${it.pin}: ${it.secondsLeft/60}m" }
+                if (list.isEmpty()) {
+                    logText.text = "No active pins found."
+                } else {
+                    val sb = StringBuilder("🔑 ACTIVE SESSIONS:\n\n")
+                    list.forEach { sb.append("• PIN: ${it.pin} (${it.secondsLeft / 60}m left)\n") }
+                    logText.text = sb.toString()
+                }
             }
         }
     }
