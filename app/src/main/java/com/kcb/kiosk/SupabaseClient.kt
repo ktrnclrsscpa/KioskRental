@@ -28,7 +28,6 @@ class SupabaseClient private constructor() {
         return "$urlString${separator}apikey=$apiKey"
     }
 
-    // ==================== CREDITS ====================
     suspend fun generatePin(customPin: String?, seconds: Int, amount: Double): String? = withContext(Dispatchers.IO) {
         try {
             val pin = if (!customPin.isNullOrEmpty()) customPin else generateRandomPin()
@@ -121,7 +120,7 @@ class SupabaseClient private constructor() {
         } catch (e: Exception) { false }
     }
 
-    // FIXED: Adds extra minutes to current remaining seconds
+    // FIXED: Add extra minutes to current seconds
     suspend fun extendTime(pin: String, extraMinutes: Int): Boolean = withContext(Dispatchers.IO) {
         try {
             val encodedPin = URLEncoder.encode(pin, "UTF-8")
@@ -138,8 +137,9 @@ class SupabaseClient private constructor() {
             } else return@withContext false
             getConnection.disconnect()
             
-            // 2. Add extra minutes
-            val newSeconds = currentSeconds + (extraMinutes * 60)
+            // 2. Add extra minutes (convert to seconds)
+            val extraSeconds = extraMinutes * 60
+            val newSeconds = currentSeconds + extraSeconds
             
             // 3. Update database
             val updateUrl = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/credits?pin=eq.$encodedPin"))
@@ -157,7 +157,6 @@ class SupabaseClient private constructor() {
         } catch (e: Exception) { false }
     }
 
-    // ==================== TELEGRAM ====================
     private fun getCurrentDateTime(): String {
         val dateFormat = SimpleDateFormat("MM/dd/yyyy HH:mm:ss", Locale.US)
         return dateFormat.format(Date())
@@ -239,7 +238,6 @@ class SupabaseClient private constructor() {
         } catch (e: Exception) { false }
     }
 
-    // ==================== SESSION HISTORY ====================
     suspend fun recordSession(pin: String, minutes: Int, amount: Double): Boolean = withContext(Dispatchers.IO) {
         try {
             val url = URL(addApiKeyToUrl("$supabaseUrl/rest/v1/session_history"))
@@ -348,7 +346,6 @@ class SupabaseClient private constructor() {
         } catch (e: Exception) { emptyList() }
     }
 
-    // ==================== PRICING ====================
     data class PricingConfig(val pricingType: String, val priceAmount: Double, val durationMinutes: Int, val extendPrice: Double, val extendDuration: Int)
     suspend fun getPricingConfig(): PricingConfig = withContext(Dispatchers.IO) { PricingConfig("fixed", 15.0, 60, 10.0, 30) }
     suspend fun updatePricingConfig(pricingType: String, priceAmount: Double, durationMinutes: Int, extendPrice: Double, extendDuration: Int): Boolean = withContext(Dispatchers.IO) { true }
