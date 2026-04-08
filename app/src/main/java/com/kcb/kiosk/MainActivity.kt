@@ -16,16 +16,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var timerText: TextView
     private lateinit var pinInput: EditText
     private lateinit var appRecycler: RecyclerView
-    private var timer: CountDownTimer? = null
+    private var countDownTimer: CountDownTimer? = null
 
-    // --- DITO MO ILALAGAY ANG WHITELIST ---
-    // Magdagdag o magbawas ng package names dito
+    // --- WHITELIST: Ilagay dito ang package names ng apps na papayagan ---
     private val allowedApps = listOf(
         "com.android.chrome",           // Chrome
         "com.google.android.youtube",    // YouTube
         "com.brave.browser",            // Brave
-        "com.kcb.kiosk",                // Itong App mo
-        "com.facebook.katana"           // Facebook (sample)
+        "com.kcb.kiosk"                 // Itong App mo
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,7 +38,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val title = TextView(this).apply { 
-            text = "KCB RENTAL"; textSize = 30f; setPadding(0, 0, 0, 40)
+            text = "KCB RENTAL"; textSize = 32f; setPadding(0, 0, 0, 40)
             setTypeface(null, android.graphics.Typeface.BOLD)
         }
         
@@ -48,14 +46,14 @@ class MainActivity : AppCompatActivity() {
         pinInput = EditText(this).apply { 
             hint = "Enter PIN"; layoutParams = LinearLayout.LayoutParams(0, -2, 1f) 
         }
-        val btn = Button(this).apply { 
-            text = "GO"
+        val activateBtn = Button(this).apply { 
+            text = "ACTIVATE"
             setOnClickListener { handleAction() } 
         }
-        row.addView(pinInput); row.addView(btn)
+        row.addView(pinInput); row.addView(activateBtn)
 
         timerText = TextView(this).apply { 
-            text = "00 : 00"; textSize = 45f; setPadding(0, 40, 0, 40)
+            text = "00 : 00"; textSize = 48f; setPadding(0, 50, 0, 50)
             setTextColor(android.graphics.Color.RED)
         }
         
@@ -74,6 +72,7 @@ class MainActivity : AppCompatActivity() {
         val mainIntent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
         val allApps = packageManager.queryIntentActivities(mainIntent, 0)
         
+        // I-filter ang apps base sa package names sa allowedApps list [cite: 13, 18]
         val filteredList = allApps.filter { 
             allowedApps.contains(it.activityInfo.packageName) 
         }.map {
@@ -86,7 +85,7 @@ class MainActivity : AppCompatActivity() {
     private fun handleAction() {
         val pin = pinInput.text.toString().trim()
         
-        // --- ADMIN SHORTCUT ---
+        // --- ADMIN SHORTCUT  ---
         if (pin == "000000") {
             startActivity(Intent(this, AdminActivity::class.java))
             return
@@ -100,6 +99,7 @@ class MainActivity : AppCompatActivity() {
                 if (res.isValid && res.secondsLeft > 0) {
                     startTimer(res.secondsLeft.toLong())
                     pinInput.text.clear()
+                    Toast.makeText(this@MainActivity, "Activated!", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(this@MainActivity, "Invalid PIN", Toast.LENGTH_SHORT).show()
                 }
@@ -108,13 +108,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startTimer(seconds: Long) {
-        timer?.cancel()
-        timer = object : CountDownTimer(seconds * 1000, 1000) {
+        countDownTimer?.cancel()
+        countDownTimer = object : CountDownTimer(seconds * 1000, 1000) {
             override fun onTick(ms: Long) {
                 val s = ms / 1000
                 timerText.text = String.format("%02d : %02d", s / 60, s % 60)
             }
-            override fun onFinish() { timerText.text = "EXPIRED" }
+            override fun onFinish() { 
+                timerText.text = "EXPIRED"
+            }
         }.start()
     }
 }
