@@ -165,7 +165,7 @@ class AdminActivity : AppCompatActivity() {
         tabBar.addView(appsTab)
         tabBar.addView(settingsTab)
         
-        // Content container that will hold the active tab's content
+        // Content container
         contentContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
@@ -192,7 +192,6 @@ class AdminActivity : AppCompatActivity() {
         
         setContentView(rootLayout)
         
-        // Initial load
         selectTab("sales")
         
         loadInstalledApps()
@@ -202,7 +201,6 @@ class AdminActivity : AppCompatActivity() {
     
     private fun selectTab(tab: String) {
         currentTab = tab
-        // Update tab colors
         for (i in 0 until tabBar.childCount) {
             val child = tabBar.getChildAt(i) as? TextView ?: continue
             if (child.tag == tab) {
@@ -213,7 +211,6 @@ class AdminActivity : AppCompatActivity() {
                 child.setTypeface(Typeface.DEFAULT)
             }
         }
-        // Replace content
         contentContainer.removeAllViews()
         when (tab) {
             "sales" -> contentContainer.addView(salesContent)
@@ -221,7 +218,6 @@ class AdminActivity : AppCompatActivity() {
             "apps" -> contentContainer.addView(appsContent)
             "settings" -> contentContainer.addView(settingsContent)
         }
-        // Refresh data if needed
         when (tab) {
             "sales" -> loadTransactionHistory()
             "pins" -> loadActivePins()
@@ -377,35 +373,11 @@ class AdminActivity : AppCompatActivity() {
                     Toast.makeText(this@AdminActivity, "Enter valid amount", Toast.LENGTH_SHORT).show()
                     return@setOnClickListener
                 }
-                extendBtn.isEnabled = false
-                extendBtn.text = "EXTENDING..."
-                CoroutineScope(Dispatchers.IO).launch {
-                    val success = supabase.extendTime(pin, minutes)
-                    if (success) {
-                        supabase.recordExtension(pin, minutes, amount)
-                        supabase.sendTelegramNotification("⏰ *Session Extended!*%0APIN: $pin%0AAdded: $minutes minutes%0APayment: ₱${String.format("%.2f", amount)}")
-                        withContext(Dispatchers.Main) {
-                            extendBtn.isEnabled = true
-                            extendBtn.text = "EXTEND TIME"
-                            Toast.makeText(this@AdminActivity, "Added $minutes minutes (₱$amount) to PIN $pin", Toast.LENGTH_LONG).show()
-                            extendPinInput.text.clear()
-                            extendMinutesInput.text.clear()
-                            extendAmountInput.text.clear()
-                            loadActivePins()
-                            loadTransactionHistory()
-                        }
-                    } else {
-                        withContext(Dispatchers.Main) {
-                            extendBtn.isEnabled = true
-                            extendBtn.text = "EXTEND TIME"
-                            Toast.makeText(this@AdminActivity, "Failed to extend", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
+                extendTime(pin, minutes, amount)
             }
             addView(extendBtn)
             
-            // Active PINs list - make it scrollable using a ScrollView
+            // Active PINs list
             val pinsTitle = TextView(this@AdminActivity).apply {
                 text = "🔑 Active PINs"
                 textSize = 18f
@@ -414,7 +386,6 @@ class AdminActivity : AppCompatActivity() {
             }
             addView(pinsTitle)
             
-            // ScrollView for active pins list
             val pinsScrollView = ScrollView(this@AdminActivity).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -465,7 +436,6 @@ class AdminActivity : AppCompatActivity() {
             }
             addView(appStatusText)
             
-            // ScrollView for the app list
             val appScrollView = ScrollView(this@AdminActivity).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -581,11 +551,49 @@ class AdminActivity : AppCompatActivity() {
                 }
             }
             buttonRow.addView(testTelegramBtn)
-            
             addView(buttonRow)
         }
     }
     
+    // ==================== CORRECTED EXTEND TIME WITH DEBUG TOASTS ====================
+    private fun extendTime(pin: String, minutes: Int, amount: Double) {
+        extendBtn.isEnabled = false
+        extendBtn.text = "EXTENDING..."
+        
+        CoroutineScope(Dispatchers.IO).launch {
+            // Get current seconds BEFORE update
+            val beforeResult = supabase.validatePin(pin)
+            val beforeSeconds = beforeResult.secondsLeft
+            
+            val success = supabase.extendTime(pin, minutes)
+            if (success) {
+                val afterResult = supabase.validatePin(pin)
+                val afterSeconds = afterResult.secondsLeft
+                supabase.recordExtension(pin, minutes, amount)
+                supabase.sendTelegramNotification("⏰ *Session Extended!*%0APIN: $pin%0AAdded: $minutes minutes%0APayment: ₱${String.format("%.2f", amount)}")
+                withContext(Dispatchers.Main) {
+                    extendBtn.isEnabled = true
+                    extendBtn.text = "EXTEND TIME"
+                    // Debug toast showing before/after
+                    Toast.makeText(this@AdminActivity, "PIN: $pin\nBefore: ${beforeSeconds}s → After: ${afterSeconds}s\nExpected +${minutes*60}s", Toast.LENGTH_LONG).show()
+                    extendPinInput.text.clear()
+                    extendMinutesInput.text.clear()
+                    extendAmountInput.text.clear()
+                    loadPinsCount()
+                    loadActivePins()
+                    loadTransactionHistory()
+                }
+            } else {
+                withContext(Dispatchers.Main) {
+                    extendBtn.isEnabled = true
+                    extendBtn.text = "EXTEND TIME"
+                    Toast.makeText(this@AdminActivity, "Failed to extend", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+    
+    // ==================== OTHER METHODS ====================
     private fun loadTransactionHistory() {
         CoroutineScope(Dispatchers.IO).launch {
             val history = supabase.getSessionHistory()
@@ -734,6 +742,15 @@ class AdminActivity : AppCompatActivity() {
         }
     }
     
+    private fun loadPinsCount() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val pins = supabase.getActivePins()
+            withContext(Dispatchers.Main) {
+                // update stats if needed
+            }
+        }
+    }
+    
     private fun showChangePasswordDialog() {
         val input = EditText(this)
         input.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
@@ -755,7 +772,7 @@ class AdminActivity : AppCompatActivity() {
             .show()
     }
     
-    // Helper methods
+    // Helper UI methods
     private fun createCardBackground(): GradientDrawable {
         return GradientDrawable().apply {
             setColor(Color.WHITE)
