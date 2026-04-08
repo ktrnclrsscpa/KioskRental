@@ -18,12 +18,17 @@ class MainActivity : AppCompatActivity() {
     private lateinit var appRecycler: RecyclerView
     private var countDownTimer: CountDownTimer? = null
 
-    // --- WHITELIST: Ilagay dito ang package names ng apps na papayagan ---
+    // ==========================================
+    // 📝 EDIT MO DITO ANG MGA APPS NA PWEDE
+    // ==========================================
     private val allowedApps = listOf(
         "com.android.chrome",           // Chrome
         "com.google.android.youtube",    // YouTube
         "com.brave.browser",            // Brave
-        "com.kcb.kiosk"                 // Itong App mo
+        "com.kcb.kiosk",                // Itong Kiosk App mo
+        "com.facebook.katana",          // Facebook
+        "com.zhiliaoapp.musically",     // TikTok
+        "com.google.android.apps.maps"  // Google Maps
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -72,7 +77,7 @@ class MainActivity : AppCompatActivity() {
         val mainIntent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
         val allApps = packageManager.queryIntentActivities(mainIntent, 0)
         
-        // I-filter ang apps base sa package names sa allowedApps list [cite: 13, 18]
+        // Kinukuha lang ang apps na nasa allowedApps list
         val filteredList = allApps.filter { 
             allowedApps.contains(it.activityInfo.packageName) 
         }.map {
@@ -85,7 +90,6 @@ class MainActivity : AppCompatActivity() {
     private fun handleAction() {
         val pin = pinInput.text.toString().trim()
         
-        // --- ADMIN SHORTCUT  ---
         if (pin == "000000") {
             startActivity(Intent(this, AdminActivity::class.java))
             return
@@ -116,6 +120,7 @@ class MainActivity : AppCompatActivity() {
             }
             override fun onFinish() { 
                 timerText.text = "EXPIRED"
+                Toast.makeText(this@MainActivity, "Time is up!", Toast.LENGTH_LONG).show()
             }
         }.start()
     }
