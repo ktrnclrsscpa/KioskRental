@@ -2,7 +2,6 @@ package com.kcb.kiosk
 
 import android.content.*
 import android.os.*
-import android.provider.Settings
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
@@ -16,14 +15,29 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // I-load ang bagong layout na may RecyclerView
+        setContentView(R.layout.activity_main) 
+
+        // Initialize Supabase Client
         supabase = SupabaseClient.getInstance()
+        
+        // Setup the UI components
         setupUI()
-        if (intent.getBooleanExtra("locked", false)) applyLockUI()
+        
+        if (intent.getBooleanExtra("locked", false)) {
+            applyLockUI()
+        }
     }
 
     private fun setupUI() {
-        // UI Code here...
-        // appRecycler = RecyclerView(this)
+        // I-bind ang RecyclerView gamit ang ID mula sa XML
+        appRecycler = findViewById(R.id.appRecycler)
+        
+        // I-set ang LayoutManager (4 columns para sa apps)
+        appRecycler.layoutManager = GridLayoutManager(this, 4)
+        
+        // TODO: Dito mo ikakabit ang Adapter mo para lumitaw ang mga icons
     }
 
     override fun onResume() {
@@ -34,10 +48,14 @@ class MainActivity : AppCompatActivity() {
     fun loadWhitelistedApps() {
         val prefs = getSharedPreferences("KioskPrefs", Context.MODE_PRIVATE)
         val saved = prefs.getStringSet("allowed_packages", setOf())
-        // Adapter logic here...
+        
+        // I-update ang listahan ng apps base sa 'saved' set
+        if (saved.isNullOrEmpty()) {
+            Toast.makeText(this, "No apps allowed yet", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun applyLockUI() {
-        // Lock logic...
+        Toast.makeText(this, "Kiosk Mode Active", Toast.LENGTH_SHORT).show()
     }
 }
