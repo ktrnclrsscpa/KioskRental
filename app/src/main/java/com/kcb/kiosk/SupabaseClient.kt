@@ -8,7 +8,6 @@ import kotlinx.serialization.SerialName
 
 @Serializable
 data class PinRes(
-    // Inalis ang isValid dahil wala ito sa screenshot ng table mo
     @SerialName("pin") val pin: String = "",
     @SerialName("seconds_left") val seconds_left: Long = 0,
     @SerialName("amount") val amount: Double = 0.0,
@@ -33,17 +32,13 @@ class SupabaseClient {
 
     suspend fun validatePin(pinValue: String): PinRes {
         return try {
-            // Gumamit ng .decodeList().firstOrNull() para mas safe kaysa sa decodeSingle
+            // FIX: Inalis ang 'filter { }' block
             val results = client.postgrest.from("credits").select {
-                filter {
-                    eq("pin", pinValue)
-                }
+                eq("pin", pinValue)
             }.decodeList<PinRes>()
             
             results.firstOrNull() ?: PinRes()
         } catch (e: Exception) {
-            // I-print ang error para sa debugging
-            println("Supabase Error: ${e.message}")
             PinRes()
         }
     }
@@ -59,14 +54,13 @@ class SupabaseClient {
 
     suspend fun updatePinTime(pinValue: String, newSeconds: Long, amount: Double, isExtension: Boolean): Boolean {
         return try {
+            // FIX: Inalis ang 'filter { }' block
             client.postgrest.from("credits").update({
                 set("seconds_left", newSeconds)
                 set("amount", amount)
                 set("is_extension", isExtension)
             }) {
-                filter {
-                    eq("pin", pinValue)
-                }
+                eq("pin", pinValue)
             }
             true
         } catch (e: Exception) {
