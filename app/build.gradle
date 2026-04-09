@@ -36,12 +36,9 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.11.0'
     
-    // --- SUPABASE & DATABASE (IMPORTANTE: 1.4.7 VERSION) ---
-    implementation "io.github.jan-tennert.supabase:supabase-kt:1.4.7"
+    // --- FORCE SUPABASE DEPENDENCIES ---
     implementation "io.github.jan-tennert.supabase:postgrest-kt:1.4.7"
-    
-    // Networking & Serialization
+    implementation "io.github.jan-tennert.supabase:supabase-kt:1.4.7"
     implementation "io.ktor:ktor-client-android:2.3.5"
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0"
-    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
 }
