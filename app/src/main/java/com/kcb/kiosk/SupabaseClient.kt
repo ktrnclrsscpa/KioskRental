@@ -3,6 +3,7 @@ package com.kcb.kiosk
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 
@@ -30,22 +31,23 @@ class SupabaseClient {
         }
     }
 
+    // Function para i-validate ang PIN
     suspend fun validatePin(pinValue: String): PinRes? {
-        return try {
-            client.postgrest.from("credits").select {
+        // Explicitly fetch all columns and filter by PIN as String
+        val result = client.postgrest.from("credits")
+            .select(columns = Columns.ALL) {
                 eq("pin", pinValue)
-            }.decodeSingleOrNull<PinRes>()
-        } catch (e: Exception) {
-            null
-        }
+            }
+        
+        val list = result.decodeList<PinRes>()
+        return list.firstOrNull()
     }
 
-    suspend fun updatePinTime(pinValue: String, newSeconds: Long, amount: Double, isExtension: Boolean): Boolean {
+    // Function para mag-update ng oras (kailangan ito mamaya sa timer)
+    suspend fun updatePinTime(pinValue: String, newSeconds: Long): Boolean {
         return try {
             client.postgrest.from("credits").update({
                 set("seconds_left", newSeconds)
-                set("amount", amount)
-                set("is_extension", isExtension)
             }) {
                 eq("pin", pinValue)
             }
