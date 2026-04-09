@@ -14,7 +14,6 @@ android {
         targetSdk 34
         versionCode 1
         versionName "1.0"
-
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -39,12 +38,11 @@ dependencies {
     implementation 'com.google.android.material:material:1.11.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     
-    // --- SUPABASE & DATABASE LIBRARIES ---
-    // Pinaka-importante: Dapat laging magkasama ang core at postgrest
+    // --- SUPABASE FULL STACK ---
     implementation "io.github.jan-tennert.supabase:supabase-kt:1.4.7"
     implementation "io.github.jan-tennert.supabase:postgrest-kt:1.4.7"
     
-    // Networking & JSON
+    // Networking & Serialization
     implementation "io.ktor:ktor-client-android:2.3.5"
     implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
