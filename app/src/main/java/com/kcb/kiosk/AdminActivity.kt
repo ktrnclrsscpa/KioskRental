@@ -3,65 +3,39 @@ package com.kcb.kiosk
 import android.os.Bundle
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import kotlinx.coroutines.*
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class AdminActivity : AppCompatActivity() {
     private lateinit var supabase: SupabaseClient
-    private val botToken = "8754642119:AAEueRR7PuzTcKAkfQ8b2sfMK_HeJ_WDrpU"
-    private val chatId = "579327360"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_admin)
+
         supabase = SupabaseClient.getInstance()
-        setupUI()
-    }
 
-    private fun setupUI() {
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(40, 40, 40, 40)
-            setBackgroundColor(android.graphics.Color.WHITE)
-        }
+        val btnCheckPin = findViewById<Button>(R.id.btnCheckPin)
+        val etTestPin = findViewById<EditText>(R.id.etTestPin)
 
-        val etPin = EditText(this).apply { hint = "PIN ng Customer" }
-        val etAmt = EditText(this).apply { hint = "Magkano (₱)"; inputType = 2 }
-        val etMins = EditText(this).apply { hint = "Ilang Minutes"; inputType = 2 }
-
-        val btnExtend = Button(this).apply {
-            text = "EXTEND TIME"
-            setOnClickListener {
-                val pin = etPin.text.toString()
-                val mins = etMins.text.toString().toLongOrNull() ?: 0
-                val amt = etAmt.text.toString().toDoubleOrNull() ?: 0.0
-                if (pin.isNotEmpty() && mins > 0) processExtension(pin, mins, amt)
-            }
-        }
-
-        root.addView(etPin); root.addView(etAmt); root.addView(etMins); root.addView(btnExtend)
-        setContentView(root)
-    }
-
-    private fun processExtension(pin: String, minsToAdd: Long, amt: Double) {
-        CoroutineScope(Dispatchers.IO).launch {
-            val currentSecs = supabase.getCurrentRemainingSeconds(pin)
-            val newTotal = currentSecs + (minsToAdd * 60)
-            val success = supabase.updatePinTime(pin, newTotal, amt, true)
-            
-            withContext(Dispatchers.Main) {
-                if (success) {
-                    sendTelegramAlert(pin, minsToAdd, amt, newTotal)
-                    Toast.makeText(this@AdminActivity, "Success! New: ${newTotal/60}m", Toast.LENGTH_SHORT).show()
-                }
+        btnCheckPin.setOnClickListener {
+            val pin = etTestPin.text.toString()
+            if (pin.isNotEmpty()) {
+                testPin(pin)
+            } else {
+                Toast.makeText(this, "Please enter a PIN", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
-    private fun sendTelegramAlert(pin: String, added: Long, amt: Double, total: Long) {
-        val msg = "💰 SALE: PIN $pin | Added $added mins | Total ₱$amt"
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                java.net.URL("https://api.telegram.org/bot$botToken/sendMessage?chat_id=$chatId&text=${java.net.URLEncoder.encode(msg, "UTF-8")}").readText()
-            } catch (e: Exception) {}
+    private fun testPin(pin: String) {
+        lifecycleScope.launch {
+            val result = supabase.validatePin(pin)
+            if (result.pin.isNotEmpty()) {
+                Toast.makeText(this@AdminActivity, "Success! Time left: ${result.seconds_left}s", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this@AdminActivity, "PIN not found in Supabase", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 }
