@@ -38,8 +38,10 @@ dependencies {
     implementation 'com.google.android.material:material:1.11.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     
-    // --- SUPABASE LIBRARIES ---
+    // --- SUPABASE FULL STACK ---
+    // Core library
     implementation "io.github.jan-tennert.supabase:supabase-kt:1.4.7"
+    // Postgrest (Ito ang kailangan para sa from, select, filter)
     implementation "io.github.jan-tennert.supabase:postgrest-kt:1.4.7"
     
     // Networking & Serialization
