@@ -30,31 +30,18 @@ class SupabaseClient {
         }
     }
 
-    suspend fun validatePin(pinValue: String): PinRes {
+    suspend fun validatePin(pinValue: String): PinRes? {
         return try {
-            // FIX: Inalis ang 'filter { }' block
-            val results = client.postgrest.from("credits").select {
+            client.postgrest.from("credits").select {
                 eq("pin", pinValue)
-            }.decodeList<PinRes>()
-            
-            results.firstOrNull() ?: PinRes()
+            }.decodeSingleOrNull<PinRes>()
         } catch (e: Exception) {
-            PinRes()
-        }
-    }
-
-    suspend fun getCurrentRemainingSeconds(pinValue: String): Long {
-        return try {
-            val res = validatePin(pinValue)
-            res.seconds_left
-        } catch (e: Exception) {
-            0L
+            null
         }
     }
 
     suspend fun updatePinTime(pinValue: String, newSeconds: Long, amount: Double, isExtension: Boolean): Boolean {
         return try {
-            // FIX: Inalis ang 'filter { }' block
             client.postgrest.from("credits").update({
                 set("seconds_left", newSeconds)
                 set("amount", amount)

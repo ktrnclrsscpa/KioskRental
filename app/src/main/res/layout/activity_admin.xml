@@ -17,20 +17,20 @@
         android:id="@+id/btnSelectApps"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Select Allowed Apps" />
+        android:text="SELECT ALLOWED APPS" />
 
     <EditText
         android:id="@+id/etTestPin"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Enter Test PIN"
-        android:inputType="number"
+        android:hint="031399"
+        android:inputType="text" 
         android:layout_marginTop="20dp"/>
 
     <Button
         android:id="@+id/btnCheckPin"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Test Supabase Connection" />
+        android:text="TEST SUPABASE CONNECTION" />
 
 </LinearLayout>
