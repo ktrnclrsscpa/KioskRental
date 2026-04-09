@@ -4,16 +4,18 @@ import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 
 @Serializable
 data class PinRes(
-    val isValid: Boolean = false,
-    val seconds_left: Long = 0,
-    val pin: String = ""
+    // Inalis ang isValid dahil wala ito sa screenshot ng table mo
+    @SerialName("pin") val pin: String = "",
+    @SerialName("seconds_left") val seconds_left: Long = 0,
+    @SerialName("amount") val amount: Double = 0.0,
+    @SerialName("is_extension") val is_extension: Boolean = false
 )
 
 class SupabaseClient {
-    // Siguraduhin na tama ang URL at Anon Key mo mula sa Supabase Dashboard
     private val client = createSupabaseClient(
         supabaseUrl = "https://qbrjcrnjchbdyseeuwif.supabase.co",
         supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicmljcm5qY2hiZHlzZWV1d2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDU0NDUsImV4cCI6MjA4OTc4MTQ0NX0.5sJqi3fZc4VIFQAIw1QptHt7MlGdnkn5SVxYdRu4f7Q" 
@@ -29,30 +31,32 @@ class SupabaseClient {
         }
     }
 
-    // Function para i-validate ang PIN ng customer
     suspend fun validatePin(pinValue: String): PinRes {
         return try {
-            client.postgrest.from("credits").select {
-                eq("pin", pinValue) 
-            }.decodeSingle<PinRes>()
+            // Gumamit ng .decodeList().firstOrNull() para mas safe kaysa sa decodeSingle
+            val results = client.postgrest.from("credits").select {
+                filter {
+                    eq("pin", pinValue)
+                }
+            }.decodeList<PinRes>()
+            
+            results.firstOrNull() ?: PinRes()
         } catch (e: Exception) {
-            PinRes(false, 0)
+            // I-print ang error para sa debugging
+            println("Supabase Error: ${e.message}")
+            PinRes()
         }
     }
 
-    // Function para kunin ang natitirang oras
     suspend fun getCurrentRemainingSeconds(pinValue: String): Long {
         return try {
-            val res = client.postgrest.from("credits").select {
-                eq("pin", pinValue)
-            }.decodeSingle<PinRes>()
+            val res = validatePin(pinValue)
             res.seconds_left
         } catch (e: Exception) {
             0L
         }
     }
 
-    // Function para i-update ang database pagkatapos ng transaction
     suspend fun updatePinTime(pinValue: String, newSeconds: Long, amount: Double, isExtension: Boolean): Boolean {
         return try {
             client.postgrest.from("credits").update({
@@ -60,7 +64,9 @@ class SupabaseClient {
                 set("amount", amount)
                 set("is_extension", isExtension)
             }) {
-                eq("pin", pinValue)
+                filter {
+                    eq("pin", pinValue)
+                }
             }
             true
         } catch (e: Exception) {
