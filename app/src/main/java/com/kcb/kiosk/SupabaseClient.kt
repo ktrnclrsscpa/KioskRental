@@ -15,7 +15,7 @@ data class PinRes(
 class SupabaseClient {
     private val client = createSupabaseClient(
         supabaseUrl = "https://qbrjcrnjchbdyseeuwif.supabase.co",
-        supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicmljcm5qY2hiZHlzZWV1d2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDU0NDUsImV4cCI6MjA4OTc4MTQ0NX0.5sJqi3fZc4VIFQAIw1QptHt7MlGdnkn5SVxYdRu4f7Q"
+        supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicmljcm5qY2hiZHlzZWV1d2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDU0NDUsImV4cCI6MjA4OTc4MTQ0NX0.5sJqi3fZc4VIFQAIw1QptHt7MlGdnkn5SVxYdRu4f7Q" // Siguraduhin na palitan mo ito
     ) {
         install(Postgrest)
     }
@@ -31,9 +31,7 @@ class SupabaseClient {
     suspend fun validatePin(pinValue: String): PinRes {
         return try {
             client.postgrest.from("credits").select {
-                filter {
-                    eq("pin", pinValue)
-                }
+                eq("pin", pinValue) 
             }.decodeSingle<PinRes>()
         } catch (e: Exception) {
             PinRes(false, 0)
@@ -43,9 +41,7 @@ class SupabaseClient {
     suspend fun getCurrentRemainingSeconds(pinValue: String): Long {
         return try {
             val res = client.postgrest.from("credits").select {
-                filter {
-                    eq("pin", pinValue)
-                }
+                eq("pin", pinValue)
             }.decodeSingle<PinRes>()
             res.seconds_left
         } catch (e: Exception) {
@@ -60,9 +56,7 @@ class SupabaseClient {
                 set("amount", amount)
                 set("is_extension", isExtension)
             }) {
-                filter {
-                    eq("pin", pinValue)
-                }
+                eq("pin", pinValue)
             }
             true
         } catch (e: Exception) {
