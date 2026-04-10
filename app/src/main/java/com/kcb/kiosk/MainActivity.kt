@@ -30,7 +30,6 @@ class MainActivity : AppCompatActivity() {
 
         supabase = SupabaseClient.getInstance()
 
-        // Pag-bind ng UI elements base sa bagong XML IDs
         layoutLock = findViewById(R.id.layoutLock)
         layoutUnlocked = findViewById(R.id.layoutUnlocked)
         tvTimer = findViewById(R.id.tvTimer)
@@ -107,5 +106,4 @@ class MainActivity : AppCompatActivity() {
         }
     }
 }
-
-data class AppInfo(val label: String, val packageName: String, val icon: android.graphics.drawable.Drawable)
+// BURADO NA DITO YUNG "data class AppInfo" PARA HINDI NA MAG-REDECLARATION ERROR
