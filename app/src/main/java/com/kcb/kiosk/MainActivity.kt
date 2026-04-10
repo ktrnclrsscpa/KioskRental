@@ -1,6 +1,8 @@
 package com.kcb.kiosk
 
+import android.app.ActivityManager
 import android.app.AlertDialog
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
@@ -19,18 +21,16 @@ import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var supabase: SupabaseClient
     private lateinit var layoutLock: LinearLayout
     private lateinit var layoutUnlocked: LinearLayout
     private lateinit var tvTimer: TextView
     private lateinit var rvApps: RecyclerView
     private lateinit var etPin: EditText
+    private var isUnlocked = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
-        supabase = SupabaseClient.getInstance()
 
         layoutLock = findViewById(R.id.layoutLock)
         layoutUnlocked = findViewById(R.id.layoutUnlocked)
@@ -42,14 +42,13 @@ class MainActivity : AppCompatActivity() {
 
         btnStart.setOnClickListener {
             val pin = etPin.text.toString().trim()
-            if (pin.isNotEmpty()) {
-                validatePin(pin)
+            if (pin == "123456") { // Temporary test PIN
+                unlockDevice(300) 
             } else {
-                Toast.makeText(this, "Please enter a PIN", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Invalid PIN", Toast.LENGTH_SHORT).show()
             }
         }
 
-        // SECURITY: Admin PIN Check before opening settings
         btnAdmin.setOnClickListener {
             showAdminLoginDialog()
         }
@@ -57,19 +56,40 @@ class MainActivity : AppCompatActivity() {
         setupAppGrid()
     }
 
-    // 1. DISABLE BACK BUTTON
-    override fun onBackPressed() {
-        // Do nothing - Locked ang back button para sa customer
+    // 1. DISABLE RECENT APPS (3-LINES) BY RECALLING ACTIVITY
+    override fun onPause() {
+        super.onPause()
+        if (isUnlocked) {
+            // Kung sinubukan nilang mag-recent apps habang "Unlocked" (naglalaro),
+            // hindi natin sila pipigilan para makapunta sa laro.
+        } else {
+            // Pero kung "Locked" (PIN Screen), hihilahin natin sila pabalik agad
+            val activityManager = applicationContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            activityManager.moveTaskToFront(taskId, 0)
+        }
     }
 
-    // 2. RECENT APPS GUARD (3-Lines Button)
+    // 2. BLOCK SYSTEM DIALOGS (PULL-DOWN MENU & RECENT APPS)
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (!hasFocus) {
-            // Kapag nawala ang focus (dahil pinindot ang 3 lines), isasara natin ang system dialogs
+            // Ito ang "killer" line: Pinipilit isara ang mga system windows
             val closeDialog = Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
             sendBroadcast(closeDialog)
+            
+            // I-delay nang konti tapos hilahin pabalik ang app focus
+            lifecycleScope.launch {
+                delay(100)
+                val intent = Intent(this@MainActivity, MainActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                startActivity(intent)
+            }
         }
+    }
+
+    // 3. DISABLE BACK BUTTON
+    override fun onBackPressed() {
+        // No action para locked ang back button
     }
 
     private fun showAdminLoginDialog() {
@@ -79,11 +99,9 @@ class MainActivity : AppCompatActivity() {
 
         AlertDialog.Builder(this)
             .setTitle("Admin Access")
-            .setMessage("Please enter your secret PIN to access settings.")
             .setView(adminEditText)
             .setPositiveButton("Login") { _, _ ->
-                val enteredPin = adminEditText.text.toString()
-                if (enteredPin == "2026") { // PALITAN MO ITO NG GUSTO MONG PIN
+                if (adminEditText.text.toString() == "2026") {
                     val intent = Intent(Settings.ACTION_HOME_SETTINGS)
                     startActivity(intent)
                 } else {
@@ -94,22 +112,8 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun validatePin(pin: String) {
-        lifecycleScope.launch {
-            try {
-                val result = supabase.validatePin(pin)
-                if (result != null) {
-                    unlockDevice(result.seconds_left)
-                } else {
-                    Toast.makeText(this@MainActivity, "Invalid PIN", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                Toast.makeText(this@MainActivity, "Error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
     private fun unlockDevice(seconds: Long) {
+        isUnlocked = true
         layoutLock.visibility = View.GONE
         layoutUnlocked.visibility = View.VISIBLE
         startTimer(seconds)
@@ -125,6 +129,7 @@ class MainActivity : AppCompatActivity() {
                 delay(1000)
                 timeLeft--
             }
+            isUnlocked = false
             layoutLock.visibility = View.VISIBLE
             layoutUnlocked.visibility = View.GONE
         }
@@ -135,7 +140,6 @@ class MainActivity : AppCompatActivity() {
         mainIntent.addCategory(Intent.CATEGORY_LAUNCHER)
         val pkgAppsList = packageManager.queryIntentActivities(mainIntent, 0)
 
-        // FILTER: Dito natin pwedeng itago ang mga system apps sa susunod
         val apps = pkgAppsList.map { 
             AppInfo(it.loadLabel(packageManager).toString(), it.activityInfo.packageName, it.loadIcon(packageManager)) 
         }
