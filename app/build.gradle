@@ -1,19 +1,22 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
-    id 'org.jetbrains.kotlin.plugin.serialization' version '1.8.20'
+    // Kailangan ito para sa Supabase data parsing
+    id 'org.jetbrains.kotlin.plugin.serialization' version '1.9.0'
 }
 
 android {
     namespace 'com.kcb.kiosk'
-    compileSdk 33
+    compileSdk 34
 
     defaultConfig {
         applicationId "com.kcb.kiosk"
         minSdk 24
-        targetSdk 33
+        targetSdk 34
         versionCode 1
         versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -32,15 +35,29 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.core:core-ktx:1.10.1'
+    implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.9.0'
+    implementation 'com.google.android.material:material:1.11.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-
-    // Supabase & Serialization
-    implementation "io.github.jan-tennert.supabase:postgrest-kt:1.0.0"
-    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.1"
+    implementation 'androidx.cardview:cardview:1.0.0'
     
-    // Lifecycle for Coroutines
-    implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.6.1"
+    // --- SUPABASE & KTOR (ANG SOLUSYON SA CRASH) ---
+    // Ang "Engine" na hinahanap sa Logcat:
+    implementation "io.ktor:ktor-client-android:2.3.10"
+    implementation "io.ktor:ktor-client-cio:2.3.10"
+    implementation "io.ktor:ktor-client-core:2.3.10"
+    
+    // Supabase Modules
+    implementation "io.github.jan-tennert.supabase:postgrest-kt:2.4.0"
+    implementation "io.github.jan-tennert.supabase:gotrue-kt:2.4.0"
+    
+    // Serialization (Para mabasa ang data galing DB)
+    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3"
+
+    // Coroutines (Para sa background tasks)
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
+
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 }
