@@ -1,41 +1,54 @@
 package com.kcb.kiosk
 
+import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
-import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Columns
+// ITO ANG IMPORT NA NAWALA KAYA NAG-ERROR ANG 'eq':
+import io.github.jan.supabase.postgrest.query.filter.PostgrestFilterBuilder
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerialName
 
-@Serializable
-data class PinRes(
-    @SerialName("pin") val pin: String = "",
-    @SerialName("seconds_left") val seconds_left: Long = 0
-)
+class SupabaseClient private constructor() {
 
-class SupabaseClient {
-    private val client = createSupabaseClient(
-        supabaseUrl = "https://qbrjcrnjchbdyseeuwif.supabase.co",
-        supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicmljcm5qY2hiZHlzZWV1d2lmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDU0NDUsImV4cCI6MjA4OTc4MTQ0NX0.5sJqi3fZc4VIFQAIw1QptHt7MlGdnkn5SVxYdRu4f7Q" 
+    private val client: SupabaseClient = createSupabaseClient(
+        supabaseUrl = "https://qbricrnjchbdyseeuwif.supabase.co", // Palitan mo ito ng actual URL mo
+        supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicmljcm5qY2hiZHlzZWV1d2lmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDIwNTQ0NSwiZXhwIjoyMDg5NzgxNDQ1fQ.Zd2Qouvw-4myu89zgaWqq5nV2DBYMdjk93aQ6scA_uY" // Palitan mo ito ng actual Key mo
     ) {
         install(Postgrest)
     }
 
-    companion object {
-        @Volatile
-        private var instance: SupabaseClient? = null
-        fun getInstance() = instance ?: synchronized(this) {
-            instance ?: SupabaseClient().also { instance = it }
-        }
-    }
-
-    suspend fun validatePin(pinValue: String): PinRes? {
+    suspend fun validatePin(pin: String): RentalPin? {
         return try {
-            val result = client.postgrest.from("credits").select {
-                eq("pin", pinValue)
-            }.decodeList<PinRes>()
-            result.firstOrNull()
+            val result = client.from("credits")
+                .select {
+                    filter {
+                        // Dito ginagamit yung 'eq'
+                        eq("pin", pin)
+                    }
+                }
+                .decodeSingleOrNull<RentalPin>()
+            result
         } catch (e: Exception) {
+            e.printStackTrace()
             null
         }
     }
+
+    companion object {
+        @Volatile
+        private var instance: com.kcb.kiosk.SupabaseClient? = null
+
+        fun getInstance(): com.kcb.kiosk.SupabaseClient {
+            return instance ?: synchronized(this) {
+                instance ?: SupabaseClient().also { instance = it }
+            }
+        }
+    }
 }
+
+@Serializable
+data class RentalPin(
+    val pin: String,
+    val seconds_left: Long
+)
