@@ -18,14 +18,16 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleInstance"
-            android:stateNotNeeded="true"
-            android:clearTaskOnLaunch="true">
+            android:launchMode="singleTask"
+            android:stateNotNeeded="true">
             
-            <intent-filter android:priority="1000">
+            <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHer" />
-                
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.HOME" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
