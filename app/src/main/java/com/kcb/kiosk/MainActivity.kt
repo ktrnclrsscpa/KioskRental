@@ -1,74 +1,107 @@
 package com.kcb.kiosk
 
-import android.content.*
-import android.os.*
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.os.CountDownTimer
+import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import kotlinx.coroutines.*
-import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var supabase: SupabaseClient
-    private lateinit var appRecycler: RecyclerView
-    private var currentLocalSeconds = 0L
+    private lateinit var tvTimer: TextView
+    private lateinit var etPin: EditText
+    private lateinit var layoutLocked: LinearLayout
+    private lateinit var layoutUnlocked: LinearLayout
+    private lateinit var rvApps: RecyclerView
+    private var countDownTimer: CountDownTimer? = null
+    private val supabase = SupabaseClient.getInstance()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // 1. I-load ang layout (Dapat may ConstraintLayout at RecyclerView ito)
-        setContentView(R.layout.activity_main) 
+        setContentView(R.layout.activity_main)
 
-        // 2. Initialize Supabase Client
-        supabase = SupabaseClient.getInstance()
-        
-        // 3. Setup UI components at Admin Access
-        setupUI()
-        
-        // Check kung galing sa Lock screen
-        if (intent.getBooleanExtra("locked", false)) {
-            applyLockUI()
+        tvTimer = findViewById(R.id.tvTimer)
+        etPin = findViewById(R.id.etPin)
+        layoutLocked = findViewById(R.id.layoutLocked)
+        layoutUnlocked = findViewById(R.id.layoutUnlocked)
+        rvApps = findViewById(R.id.rvAllowedApps)
+
+        setupAppGrid()
+        checkExistingTime()
+
+        findViewById<Button>(R.id.btnStart).setOnClickListener {
+            val pin = etPin.text.toString().trim()
+            if (pin.isNotEmpty()) validateAndStart(pin)
+        }
+
+        findViewById<Button>(R.id.btnAdmin).setOnClickListener {
+            startActivity(Intent(this, AdminActivity::class.java))
         }
     }
 
-    private fun setupUI() {
-        // I-bind ang Title Text para sa Hidden Admin Access
-        val titleText = findViewById<TextView>(R.id.titleText)
-        
-        // HIDDEN ADMIN ACCESS: Long press sa "KCB RENTAL" para pumasok sa Admin Settings
-        titleText.setOnLongClickListener {
-            val intent = Intent(this, AdminActivity::class.java)
-            startActivity(intent)
-            true // Ibig sabihin na-consume ang long click
-        }
+    private fun setupAppGrid() {
+        val pm = packageManager
+        val intent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
+        val apps = pm.queryIntentActivities(intent, 0).map {
+            AppInfo(it.loadLabel(pm).toString(), it.activityInfo.packageName, it.loadIcon(pm))
+        }.filter { it.packageName != packageName } // Wag ipakita ang sariling app sa listahan
 
-        // I-bind at i-setup ang RecyclerView para sa App Icons
-        appRecycler = findViewById(R.id.appRecycler)
-        appRecycler.layoutManager = GridLayoutManager(this, 4) // 4 icons per row
-    }
-
-    override fun onResume() {
-        super.onResume()
-        // I-refresh ang listahan ng apps tuwing babalik sa home
-        loadWhitelistedApps()
-    }
-
-    private fun loadWhitelistedApps() {
-        val prefs = getSharedPreferences("KioskPrefs", Context.MODE_PRIVATE)
-        val savedApps = prefs.getStringSet("allowed_packages", setOf())
-        
-        if (savedApps.isNullOrEmpty()) {
-            // Paalala kung wala pang napiling apps sa Admin Settings
-            Toast.makeText(this, "Go to Admin Settings to select apps", Toast.LENGTH_LONG).show()
-        } else {
-            // TODO: Dito mo ikakabit ang Adapter mo sa susunod na step
-            // Halimbawa: appRecycler.adapter = AppAdapter(savedApps.toList())
+        rvApps.layoutManager = GridLayoutManager(this, 4)
+        rvApps.adapter = AppAdapter(apps) { app ->
+            val launchIntent = pm.getLaunchIntentForPackage(app.packageName)
+            launchIntent?.let { startActivity(it) }
         }
     }
 
-    private fun applyLockUI() {
-        // Logic para sa Kiosk Lock Mode
-        Toast.makeText(this, "Kiosk Mode Active", Toast.LENGTH_SHORT).show()
+    private fun validateAndStart(pin: String) {
+        lifecycleScope.launch {
+            try {
+                val result = supabase.validatePin(pin)
+                if (result != null && result.seconds_left > 0) {
+                    startTimer(result.seconds_left)
+                    etPin.text.clear()
+                } else {
+                    Toast.makeText(this@MainActivity, "Invalid PIN or No Time", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, "Connection Error", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
+
+    private fun startTimer(seconds: Long) {
+        countDownTimer?.cancel()
+        layoutLocked.visibility = View.GONE
+        layoutUnlocked.visibility = View.VISIBLE
+
+        countDownTimer = object : CountDownTimer(seconds * 1000, 1000) {
+            override fun onTick(m: Long) {
+                val s = m / 1000
+                tvTimer.text = String.format("%02d:%02d", s / 60, s % 60)
+                saveTimeLocally(s)
+            }
+            override fun onFinish() { lockPhone() }
+        }.start()
+    }
+
+    private fun lockPhone() {
+        layoutLocked.visibility = View.VISIBLE
+        layoutUnlocked.visibility = View.GONE
+        saveTimeLocally(0)
+    }
+
+    private fun saveTimeLocally(s: Long) = getSharedPreferences("KioskPrefs", Context.MODE_PRIVATE).edit().putLong("rem", s).apply()
+
+    private fun checkExistingTime() {
+        val s = getSharedPreferences("KioskPrefs", Context.MODE_PRIVATE).getLong("rem", 0)
+        if (s > 0) startTimer(s) else lockPhone()
+    }
+
+    override fun onBackPressed() { /* Disabled */ }
 }

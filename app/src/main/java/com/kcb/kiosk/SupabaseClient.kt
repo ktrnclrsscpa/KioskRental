@@ -9,9 +9,7 @@ import kotlinx.serialization.SerialName
 @Serializable
 data class PinRes(
     @SerialName("pin") val pin: String = "",
-    @SerialName("seconds_left") val seconds_left: Long = 0,
-    @SerialName("amount") val amount: Double = 0.0,
-    @SerialName("is_extension") val is_extension: Boolean = false
+    @SerialName("seconds_left") val seconds_left: Long = 0
 )
 
 class SupabaseClient {
@@ -32,15 +30,12 @@ class SupabaseClient {
 
     suspend fun validatePin(pinValue: String): PinRes? {
         return try {
-            // Kinukuha ang listahan ng credits kung saan match ang PIN
             val result = client.postgrest.from("credits").select {
-                filter {
-                    eq("pin", pinValue)
-                }
+                eq("pin", pinValue)
             }.decodeList<PinRes>()
             result.firstOrNull()
         } catch (e: Exception) {
-            throw e // Ipapasa ang error sa Activity para ma-Toast
+            null
         }
     }
 }

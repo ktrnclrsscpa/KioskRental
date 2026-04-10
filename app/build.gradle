@@ -1,17 +1,17 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
-    id 'org.jetbrains.kotlin.plugin.serialization' version '1.9.0'
+    id 'org.jetbrains.kotlin.plugin.serialization' version '1.8.20'
 }
 
 android {
     namespace 'com.kcb.kiosk'
-    compileSdk 34
+    compileSdk 33
 
     defaultConfig {
         applicationId "com.kcb.kiosk"
         minSdk 24
-        targetSdk 34
+        targetSdk 33
         versionCode 1
         versionName "1.0"
     }
@@ -32,18 +32,15 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.core:core-ktx:1.10.1'
     implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'com.google.android.material:material:1.9.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+
+    // Supabase & Serialization
+    implementation "io.github.jan-tennert.supabase:postgrest-kt:1.0.0"
+    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.1"
     
-    // --- SUPABASE STACK (V1.4.7) ---
-    // Mahalaga ito para sa database operations
-    implementation "io.github.jan-tennert.supabase:supabase-kt:1.4.7"
-    implementation "io.github.jan-tennert.supabase:postgrest-kt:1.4.7"
-    
-    // Networking & Serialization
-    implementation "io.ktor:ktor-client-android:2.3.5"
-    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0"
-    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
+    // Lifecycle for Coroutines
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.6.1"
 }
