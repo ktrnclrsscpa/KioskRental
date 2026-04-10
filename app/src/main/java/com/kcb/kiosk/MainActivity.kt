@@ -1,5 +1,6 @@
 package com.kcb.kiosk
 
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
@@ -13,6 +14,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -47,19 +49,49 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // FORCE HOME SETTINGS: Pag kinlik ang Admin, pupunta sa Default App settings
+        // SECURITY: Admin PIN Check before opening settings
         btnAdmin.setOnClickListener {
-            try {
-                val intent = Intent(Settings.ACTION_HOME_SETTINGS)
-                startActivity(intent)
-            } catch (e: Exception) {
-                // Fallback kung hindi supported ang direct home settings
-                val intent = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
-                startActivity(intent)
-            }
+            showAdminLoginDialog()
         }
 
         setupAppGrid()
+    }
+
+    // 1. DISABLE BACK BUTTON
+    override fun onBackPressed() {
+        // Do nothing - Locked ang back button para sa customer
+    }
+
+    // 2. RECENT APPS GUARD (3-Lines Button)
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus) {
+            // Kapag nawala ang focus (dahil pinindot ang 3 lines), isasara natin ang system dialogs
+            val closeDialog = Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
+            sendBroadcast(closeDialog)
+        }
+    }
+
+    private fun showAdminLoginDialog() {
+        val adminEditText = EditText(this)
+        adminEditText.inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        adminEditText.hint = "Enter Admin PIN"
+
+        AlertDialog.Builder(this)
+            .setTitle("Admin Access")
+            .setMessage("Please enter your secret PIN to access settings.")
+            .setView(adminEditText)
+            .setPositiveButton("Login") { _, _ ->
+                val enteredPin = adminEditText.text.toString()
+                if (enteredPin == "2026") { // PALITAN MO ITO NG GUSTO MONG PIN
+                    val intent = Intent(Settings.ACTION_HOME_SETTINGS)
+                    startActivity(intent)
+                } else {
+                    Toast.makeText(this, "Wrong Admin PIN!", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun validatePin(pin: String) {
@@ -90,7 +122,7 @@ class MainActivity : AppCompatActivity() {
                 val mins = timeLeft / 60
                 val secs = timeLeft % 60
                 tvTimer.text = String.format("%02d:%02d", mins, secs)
-                kotlinx.coroutines.delay(1000)
+                delay(1000)
                 timeLeft--
             }
             layoutLock.visibility = View.VISIBLE
@@ -103,6 +135,7 @@ class MainActivity : AppCompatActivity() {
         mainIntent.addCategory(Intent.CATEGORY_LAUNCHER)
         val pkgAppsList = packageManager.queryIntentActivities(mainIntent, 0)
 
+        // FILTER: Dito natin pwedeng itago ang mga system apps sa susunod
         val apps = pkgAppsList.map { 
             AppInfo(it.loadLabel(packageManager).toString(), it.activityInfo.packageName, it.loadIcon(packageManager)) 
         }
