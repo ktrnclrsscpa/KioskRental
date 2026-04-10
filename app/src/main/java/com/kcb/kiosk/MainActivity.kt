@@ -1,12 +1,14 @@
 package com.kcb.kiosk
 
-import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
+import android.content.pm.ResolveInfo
 import android.os.Bundle
-import android.os.CountDownTimer
 import android.view.View
-import android.widget.*
+import android.widget.Button
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
@@ -14,94 +16,96 @@ import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var tvTimer: TextView
-    private lateinit var etPin: EditText
-    private lateinit var layoutLocked: LinearLayout
+
+    private lateinit var supabase: SupabaseClient
+    private lateinit var layoutLock: LinearLayout
     private lateinit var layoutUnlocked: LinearLayout
+    private lateinit var tvTimer: TextView
     private lateinit var rvApps: RecyclerView
-    private var countDownTimer: CountDownTimer? = null
-    private val supabase = SupabaseClient.getInstance()
+    private lateinit var etPin: EditText
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        tvTimer = findViewById(R.id.tvTimer)
-        etPin = findViewById(R.id.etPin)
-        layoutLocked = findViewById(R.id.layoutLocked)
+        supabase = SupabaseClient.getInstance()
+
+        // Pag-bind ng UI elements base sa bagong XML IDs
+        layoutLock = findViewById(R.id.layoutLock)
         layoutUnlocked = findViewById(R.id.layoutUnlocked)
-        rvApps = findViewById(R.id.rvAllowedApps)
+        tvTimer = findViewById(R.id.tvTimer)
+        rvApps = findViewById(R.id.rvApps)
+        etPin = findViewById(R.id.etPin)
+        val btnStart = findViewById<Button>(R.id.btnStart)
+        val btnAdmin = findViewById<TextView>(R.id.btnAdmin)
 
-        setupAppGrid()
-        checkExistingTime()
-
-        findViewById<Button>(R.id.btnStart).setOnClickListener {
+        btnStart.setOnClickListener {
             val pin = etPin.text.toString().trim()
-            if (pin.isNotEmpty()) validateAndStart(pin)
+            if (pin.isNotEmpty()) {
+                validatePin(pin)
+            } else {
+                Toast.makeText(this, "Please enter a PIN", Toast.LENGTH_SHORT).show()
+            }
         }
 
-        findViewById<Button>(R.id.btnAdmin).setOnClickListener {
+        btnAdmin.setOnClickListener {
             startActivity(Intent(this, AdminActivity::class.java))
+        }
+
+        setupAppGrid()
+    }
+
+    private fun validatePin(pin: String) {
+        lifecycleScope.launch {
+            try {
+                val result = supabase.validatePin(pin)
+                if (result != null) {
+                    unlockDevice(result.seconds_left)
+                } else {
+                    Toast.makeText(this@MainActivity, "Invalid PIN", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, "Error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun unlockDevice(seconds: Long) {
+        layoutLock.visibility = View.GONE
+        layoutUnlocked.visibility = View.VISIBLE
+        startTimer(seconds)
+    }
+
+    private fun startTimer(seconds: Long) {
+        var timeLeft = seconds
+        lifecycleScope.launch {
+            while (timeLeft > 0) {
+                val mins = timeLeft / 60
+                val secs = timeLeft % 60
+                tvTimer.text = String.format("%02d:%02d", mins, secs)
+                kotlinx.coroutines.delay(1000)
+                timeLeft--
+            }
+            layoutLock.visibility = View.VISIBLE
+            layoutUnlocked.visibility = View.GONE
         }
     }
 
     private fun setupAppGrid() {
-        val pm = packageManager
-        val intent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
-        val apps = pm.queryIntentActivities(intent, 0).map {
-            AppInfo(it.loadLabel(pm).toString(), it.activityInfo.packageName, it.loadIcon(pm))
-        }.filter { it.packageName != packageName } // Wag ipakita ang sariling app sa listahan
+        val mainIntent = Intent(Intent.ACTION_MAIN, null)
+        mainIntent.addCategory(Intent.CATEGORY_LAUNCHER)
+        val pkgAppsList = packageManager.queryIntentActivities(mainIntent, 0)
+
+        val apps = pkgAppsList.map { 
+            AppInfo(it.loadLabel(packageManager).toString(), it.activityInfo.packageName, it.loadIcon(packageManager)) 
+        }
 
         rvApps.layoutManager = GridLayoutManager(this, 4)
         rvApps.adapter = AppAdapter(apps) { app ->
-            val launchIntent = pm.getLaunchIntentForPackage(app.packageName)
+            val launchIntent = packageManager.getLaunchIntentForPackage(app.packageName)
             launchIntent?.let { startActivity(it) }
         }
     }
-
-    private fun validateAndStart(pin: String) {
-        lifecycleScope.launch {
-            try {
-                val result = supabase.validatePin(pin)
-                if (result != null && result.seconds_left > 0) {
-                    startTimer(result.seconds_left)
-                    etPin.text.clear()
-                } else {
-                    Toast.makeText(this@MainActivity, "Invalid PIN or No Time", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                Toast.makeText(this@MainActivity, "Connection Error", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    private fun startTimer(seconds: Long) {
-        countDownTimer?.cancel()
-        layoutLocked.visibility = View.GONE
-        layoutUnlocked.visibility = View.VISIBLE
-
-        countDownTimer = object : CountDownTimer(seconds * 1000, 1000) {
-            override fun onTick(m: Long) {
-                val s = m / 1000
-                tvTimer.text = String.format("%02d:%02d", s / 60, s % 60)
-                saveTimeLocally(s)
-            }
-            override fun onFinish() { lockPhone() }
-        }.start()
-    }
-
-    private fun lockPhone() {
-        layoutLocked.visibility = View.VISIBLE
-        layoutUnlocked.visibility = View.GONE
-        saveTimeLocally(0)
-    }
-
-    private fun saveTimeLocally(s: Long) = getSharedPreferences("KioskPrefs", Context.MODE_PRIVATE).edit().putLong("rem", s).apply()
-
-    private fun checkExistingTime() {
-        val s = getSharedPreferences("KioskPrefs", Context.MODE_PRIVATE).getLong("rem", 0)
-        if (s > 0) startTimer(s) else lockPhone()
-    }
-
-    override fun onBackPressed() { /* Disabled */ }
 }
+
+data class AppInfo(val label: String, val packageName: String, val icon: android.graphics.drawable.Drawable)
