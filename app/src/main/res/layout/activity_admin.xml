@@ -3,34 +3,37 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="20dp"
+    android:gravity="center">
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Admin Settings"
+        android:text="Admin Panel"
         android:textSize="24sp"
         android:textStyle="bold"
-        android:layout_marginBottom="20dp"/>
-
-    <Button
-        android:id="@+id/btnSelectApps"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="SELECT ALLOWED APPS" />
+        android:layout_marginBottom="30dp"/>
 
     <EditText
         android:id="@+id/etTestPin"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="031399"
-        android:inputType="text" 
-        android:layout_marginTop="20dp"/>
+        android:hint="Test PIN here"
+        android:inputType="number"
+        android:layout_marginBottom="10dp"/>
 
     <Button
         android:id="@+id/btnCheckPin"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="TEST SUPABASE CONNECTION" />
+        android:text="Check PIN Connection"/>
+
+    <Button
+        android:id="@+id/btnExitAdmin"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Exit Admin"
+        android:layout_marginTop="20dp"
+        style="@style/Widget.AppCompat.Button.Colored"/>
 
 </LinearLayout>

@@ -12,7 +12,7 @@ class AppAdapter(private val apps: List<AppInfo>, private val onClick: (AppInfo)
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val icon: ImageView = view.findViewById(R.id.appIcon)
-        val name: TextView = view.findViewById(R.id.appName)
+        val appName: TextView = view.findViewById(R.id.appName) // FIX: Inayos ang ID dito
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -22,7 +22,7 @@ class AppAdapter(private val apps: List<AppInfo>, private val onClick: (AppInfo)
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val app = apps[position]
-        holder.name.text = app.label
+        holder.appName.text = app.label // FIX: Inayos ang reference dito
         holder.icon.setImageDrawable(app.icon)
         holder.itemView.setOnClickListener { onClick(app) }
     }

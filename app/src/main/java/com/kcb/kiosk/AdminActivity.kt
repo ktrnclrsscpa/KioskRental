@@ -20,21 +20,17 @@ class AdminActivity : AppCompatActivity() {
 
         val etTestPin = findViewById<EditText>(R.id.etTestPin)
         val btnCheckPin = findViewById<Button>(R.id.btnCheckPin)
-        val btnExitAdmin = findViewById<Button>(R.id.btnExitAdmin)
+        val btnExitAdmin = findViewById<Button>(R.id.btnExitAdmin) // Dito nag-error kanina
 
-        // Button para i-test kung gumagana ang PIN sa database
         btnCheckPin.setOnClickListener {
             val pin = etTestPin.text.toString().trim()
             if (pin.isNotEmpty()) {
                 testPinConnection(pin)
-            } else {
-                Toast.makeText(this, "Enter a PIN to test", Toast.LENGTH_SHORT).show()
             }
         }
 
-        // Button para bumalik sa Main Launcher
         btnExitAdmin.setOnClickListener {
-            finish()
+            finish() // Babalik sa MainActivity (Launcher)
         }
     }
 
@@ -43,16 +39,12 @@ class AdminActivity : AppCompatActivity() {
             try {
                 val result = supabase.validatePin(pin)
                 if (result != null) {
-                    Toast.makeText(
-                        this@AdminActivity,
-                        "DATABASE OK!\nPIN: ${result.pin}\nSeconds: ${result.seconds_left}",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    Toast.makeText(this@AdminActivity, "DB Online: ${result.seconds_left}s", Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(this@AdminActivity, "PIN not found in database.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@AdminActivity, "PIN not found", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
-                Toast.makeText(this@AdminActivity, "Error: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@AdminActivity, "Error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
             }
         }
     }
