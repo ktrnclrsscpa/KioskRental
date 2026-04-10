@@ -1,8 +1,8 @@
 package com.kcb.kiosk
 
 import android.content.Intent
-import android.content.pm.ResolveInfo
 import android.os.Bundle
+import android.provider.Settings
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
@@ -47,8 +47,16 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // FORCE HOME SETTINGS: Pag kinlik ang Admin, pupunta sa Default App settings
         btnAdmin.setOnClickListener {
-            startActivity(Intent(this, AdminActivity::class.java))
+            try {
+                val intent = Intent(Settings.ACTION_HOME_SETTINGS)
+                startActivity(intent)
+            } catch (e: Exception) {
+                // Fallback kung hindi supported ang direct home settings
+                val intent = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+                startActivity(intent)
+            }
         }
 
         setupAppGrid()
@@ -106,4 +114,3 @@ class MainActivity : AppCompatActivity() {
         }
     }
 }
-// BURADO NA DITO YUNG "data class AppInfo" PARA HINDI NA MAG-REDECLARATION ERROR
