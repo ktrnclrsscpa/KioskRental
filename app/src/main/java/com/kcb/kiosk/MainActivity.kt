@@ -7,11 +7,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
-import android.widget.Button
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
@@ -42,7 +38,7 @@ class MainActivity : AppCompatActivity() {
 
         btnStart.setOnClickListener {
             val pin = etPin.text.toString().trim()
-            if (pin == "123456") { // Temporary test PIN
+            if (pin == "123456") { // Gpalitan mo ng Supabase logic mo dito
                 unlockDevice(300) 
             } else {
                 Toast.makeText(this, "Invalid PIN", Toast.LENGTH_SHORT).show()
@@ -56,56 +52,44 @@ class MainActivity : AppCompatActivity() {
         setupAppGrid()
     }
 
-    // 1. DISABLE RECENT APPS (3-LINES) BY RECALLING ACTIVITY
+    override fun onResume() {
+        super.onResume()
+        setupAppGrid() // Refresh grid para lumitaw ang changes mula Admin
+    }
+
     override fun onPause() {
         super.onPause()
-        if (isUnlocked) {
-            // Kung sinubukan nilang mag-recent apps habang "Unlocked" (naglalaro),
-            // hindi natin sila pipigilan para makapunta sa laro.
-        } else {
-            // Pero kung "Locked" (PIN Screen), hihilahin natin sila pabalik agad
-            val activityManager = applicationContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        if (!isUnlocked) {
+            val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
             activityManager.moveTaskToFront(taskId, 0)
         }
     }
 
-    // 2. BLOCK SYSTEM DIALOGS (PULL-DOWN MENU & RECENT APPS)
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (!hasFocus) {
-            // Ito ang "killer" line: Pinipilit isara ang mga system windows
+        if (!hasFocus && !isUnlocked) {
             val closeDialog = Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
             sendBroadcast(closeDialog)
-            
-            // I-delay nang konti tapos hilahin pabalik ang app focus
-            lifecycleScope.launch {
-                delay(100)
-                val intent = Intent(this@MainActivity, MainActivity::class.java)
-                intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                startActivity(intent)
-            }
         }
     }
 
-    // 3. DISABLE BACK BUTTON
     override fun onBackPressed() {
-        // No action para locked ang back button
+        // Disabled back button
     }
 
     private fun showAdminLoginDialog() {
         val adminEditText = EditText(this)
         adminEditText.inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
-        adminEditText.hint = "Enter Admin PIN"
-
+        
         AlertDialog.Builder(this)
             .setTitle("Admin Access")
+            .setMessage("Enter Admin PIN to manage apps")
             .setView(adminEditText)
             .setPositiveButton("Login") { _, _ ->
                 if (adminEditText.text.toString() == "2026") {
-                    val intent = Intent(Settings.ACTION_HOME_SETTINGS)
-                    startActivity(intent)
+                    startActivity(Intent(this, AdminActivity::class.java))
                 } else {
-                    Toast.makeText(this, "Wrong Admin PIN!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Wrong PIN!", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Cancel", null)
@@ -136,16 +120,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupAppGrid() {
+        val sharedPrefs = getSharedPreferences("KCB_SETTINGS", Context.MODE_PRIVATE)
+        val allowedPackages = sharedPrefs.getStringSet("allowed_apps", emptySet()) ?: emptySet()
+
         val mainIntent = Intent(Intent.ACTION_MAIN, null)
         mainIntent.addCategory(Intent.CATEGORY_LAUNCHER)
         val pkgAppsList = packageManager.queryIntentActivities(mainIntent, 0)
 
-        val apps = pkgAppsList.map { 
+        val filteredApps = pkgAppsList.filter { 
+            allowedPackages.isEmpty() || allowedPackages.contains(it.activityInfo.packageName)
+        }.map { 
             AppInfo(it.loadLabel(packageManager).toString(), it.activityInfo.packageName, it.loadIcon(packageManager)) 
         }
 
         rvApps.layoutManager = GridLayoutManager(this, 4)
-        rvApps.adapter = AppAdapter(apps) { app ->
+        rvApps.adapter = AppAdapter(filteredApps) { app ->
             val launchIntent = packageManager.getLaunchIntentForPackage(app.packageName)
             launchIntent?.let { startActivity(it) }
         }

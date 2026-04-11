@@ -1,51 +1,47 @@
 package com.kcb.kiosk
 
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
-import android.widget.EditText
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 
 class AdminActivity : AppCompatActivity() {
-
-    private lateinit var supabase: SupabaseClient
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_admin)
 
-        supabase = SupabaseClient.getInstance()
+        val rvAdminApps = findViewById<RecyclerView>(R.id.rvAdminApps)
+        val btnSave = findViewById<Button>(R.id.btnSaveWhitelist)
 
-        val etTestPin = findViewById<EditText>(R.id.etTestPin)
-        val btnCheckPin = findViewById<Button>(R.id.btnCheckPin)
-        val btnExitAdmin = findViewById<Button>(R.id.btnExitAdmin) // Dito nag-error kanina
+        // Kunin lahat ng Installed Launcher Apps
+        val mainIntent = Intent(Intent.ACTION_MAIN, null)
+        mainIntent.addCategory(Intent.CATEGORY_LAUNCHER)
+        val allApps = packageManager.queryIntentActivities(mainIntent, 0)
 
-        btnCheckPin.setOnClickListener {
-            val pin = etTestPin.text.toString().trim()
-            if (pin.isNotEmpty()) {
-                testPinConnection(pin)
-            }
-        }
+        // Pag-aayos ng listahan alphabetically
+        val sortedApps = allApps.sortedBy { it.loadLabel(packageManager).toString() }
 
-        btnExitAdmin.setOnClickListener {
-            finish() // Babalik sa MainActivity (Launcher)
-        }
-    }
+        // Kunin ang kasalukuyang whitelist mula sa SharedPrefs
+        val sharedPrefs = getSharedPreferences("KCB_SETTINGS", Context.MODE_PRIVATE)
+        val currentWhitelist = sharedPrefs.getStringSet("allowed_apps", mutableSetOf()) ?: mutableSetOf()
 
-    private fun testPinConnection(pin: String) {
-        lifecycleScope.launch {
-            try {
-                val result = supabase.validatePin(pin)
-                if (result != null) {
-                    Toast.makeText(this@AdminActivity, "DB Online: ${result.seconds_left}s", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this@AdminActivity, "PIN not found", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                Toast.makeText(this@AdminActivity, "Error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-            }
+        val adapter = AdminAppAdapter(sortedApps, currentWhitelist.toMutableSet(), packageManager)
+        rvAdminApps.layoutManager = LinearLayoutManager(this)
+        rvAdminApps.adapter = adapter
+
+        btnSave.setOnClickListener {
+            val selectedApps = adapter.getSelectedApps()
+            sharedPrefs.edit().putStringSet("allowed_apps", selectedApps).apply()
+            
+            // Bumalik sa MainActivity para mag-apply ang changes
+            val intent = Intent(this, MainActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
+            finish()
         }
     }
 }
