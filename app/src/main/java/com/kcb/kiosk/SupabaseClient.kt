@@ -5,6 +5,7 @@ import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.serialization.Serializable
 
 class SupabaseClient private constructor() {
@@ -18,58 +19,79 @@ class SupabaseClient private constructor() {
 
     suspend fun validatePin(pin: String): RentalPin? {
         return try {
-            val response = client.from("credits").select(columns = Columns.ALL) {
+            // Gumamit tayo ng explicit 'postgrest' call
+            val response = client.postgrest.from("credits").select(columns = Columns.ALL) {
                 filter {
                     eq("pin", pin)
                     eq("status", "active")
                 }
             }
             response.decodeSingleOrNull<RentalPin>()
-        } catch (e: Exception) { null }
+        } catch (e: Exception) {
+            null
+        }
     }
 
     suspend fun usePin(pin: String) {
         try {
-            client.from("credits").update(
-                update = { set("status", "used") }
+            client.postgrest.from("credits").update(
+                update = {
+                    set("status", "used")
+                }
             ) {
                 filter { eq("pin", pin) }
             }
-        } catch (e: Exception) { e.printStackTrace() }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     suspend fun createNewPin(pin: String, seconds: Long) {
         try {
             val newData = RentalPin(pin, seconds, "active")
-            client.from("credits").insert(newData)
-        } catch (e: Exception) { e.printStackTrace() }
+            client.postgrest.from("credits").insert(newData)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     suspend fun extendPinTime(pin: String, extraSeconds: Long): Boolean {
         return try {
-            val current = client.from("credits").select(columns = Columns.ALL) {
+            val current = client.postgrest.from("credits").select(columns = Columns.ALL) {
                 filter { eq("pin", pin) }
             }.decodeSingleOrNull<RentalPin>()
 
             if (current != null) {
                 val newTotal = current.seconds_left + extraSeconds
-                client.from("credits").update(
-                    update = { set("seconds_left", newTotal) }
+                client.postgrest.from("credits").update(
+                    update = {
+                        set("seconds_left", newTotal)
+                    }
                 ) {
                     filter { eq("pin", pin) }
                 }
                 true
             } else false
-        } catch (e: Exception) { false }
+        } catch (e: Exception) {
+            false
+        }
     }
 
     companion object {
-        @Volatile private var instance: com.kcb.kiosk.SupabaseClient? = null
-        fun getInstance() = instance ?: synchronized(this) { 
-            instance ?: SupabaseClient().also { instance = it } 
+        @Volatile
+        private var instance: com.kcb.kiosk.SupabaseClient? = null
+
+        fun getInstance(): com.kcb.kiosk.SupabaseClient {
+            return instance ?: synchronized(this) {
+                instance ?: SupabaseClient().also { instance = it }
+            }
         }
     }
 }
 
 @Serializable
-data class RentalPin(val pin: String, val seconds_left: Long, val status: String)
+data class RentalPin(
+    val pin: String,
+    val seconds_left: Long,
+    val status: String
+)
