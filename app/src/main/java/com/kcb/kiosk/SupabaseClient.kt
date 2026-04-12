@@ -16,31 +16,29 @@ class SupabaseClient private constructor() {
         install(Postgrest)
     }
 
-    // Para sa Validation ng PIN sa Lock Screen
+    // Validate PIN
     suspend fun validatePin(pin: String): RentalPin? {
         return try {
             val response = client.postgrest["credits"].select(columns = Columns.ALL) {
-                filter {
-                    eq("pin", pin)
-                    eq("status", "active")
-                }
+                eq("pin", pin)
+                eq("status", "active")
             }
             response.decodeSingleOrNull<RentalPin>()
         } catch (e: Exception) { null }
     }
 
-    // Para i-update ang status kapag ginamit na
+    // Use PIN
     suspend fun usePin(pin: String) {
         try {
             client.postgrest["credits"].update({
                 set("status", "used")
             }) {
-                filter { eq("pin", pin) }
+                eq("pin", pin)
             }
         } catch (e: Exception) { e.printStackTrace() }
     }
 
-    // Para sa AdminActivity (Create Feature)
+    // Create PIN (for Admin)
     suspend fun createNewPin(pin: String, seconds: Long) {
         try {
             val newData = RentalPin(pin, seconds, "active")
@@ -48,11 +46,11 @@ class SupabaseClient private constructor() {
         } catch (e: Exception) { e.printStackTrace() }
     }
 
-    // Para sa AdminActivity (Extend Feature)
+    // Extend Time (for Admin)
     suspend fun extendPinTime(pin: String, extraSeconds: Long): Boolean {
         return try {
             val current = client.postgrest["credits"].select(columns = Columns.ALL) {
-                filter { eq("pin", pin) }
+                eq("pin", pin)
             }.decodeSingleOrNull<RentalPin>()
 
             if (current != null) {
@@ -60,7 +58,7 @@ class SupabaseClient private constructor() {
                 client.postgrest["credits"].update({
                     set("seconds_left", newTotal)
                 }) {
-                    filter { eq("pin", pin) }
+                    eq("pin", pin)
                 }
                 true
             } else false
