@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F5F5">
+    android:padding="16dp">
 
     <LinearLayout
         android:id="@+id/layoutLock"
@@ -11,108 +10,63 @@
         android:layout_height="match_parent"
         android:gravity="center"
         android:orientation="vertical"
-        android:padding="30dp"
         android:visibility="visible">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="DEVICE LOCKED"
-            android:textColor="#333333"
-            android:textSize="32sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="40dp"
-            android:text="Please enter a valid PIN to start"
-            android:textColor="#777777"
-            android:textSize="16sp" />
+            android:text="Enter Rental PIN"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="20dp"/>
 
         <EditText
             android:id="@+id/etPin"
-            android:layout_width="250dp"
-            android:layout_height="60dp"
-            android:layout_marginBottom="20dp"
-            android:background="@android:drawable/editbox_background"
-            android:gravity="center"
-            android:hint="000000"
-            android:inputType="number" 
-            android:maxLength="6"
-            android:textColor="#000000"
-            android:textSize="28sp"
-            android:textStyle="bold" />
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            android:hint="0000"
+            android:inputType="number"
+            android:maxLength="10"
+            android:textAlignment="center"
+            android:textSize="30sp" />
 
         <Button
-            android:id="@+id/btnStart"
-            android:layout_width="250dp"
-            android:layout_height="60dp"
-            android:backgroundTint="#2196F3"
-            android:text="START RENTAL"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/btnAdmin"
-            android:layout_width="wrap_content"
+            android:id="@+id/btnStartRental"
+            android:layout_width="200dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="50dp"
-            android:padding="10dp"
-            android:text="ADMIN SETTINGS"
-            android:textColor="#999999"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:layout_marginTop="20dp"
+            android:text="START RENTAL" />
     </LinearLayout>
 
     <LinearLayout
-        android:id="@+id/layoutUnlocked"
+        android:id="@+id/layoutTimer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:gravity="center"
         android:orientation="vertical"
         android:visibility="gone">
 
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
+        <TextView
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_margin="15dp"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="8dp"
-            app:cardBackgroundColor="#333333">
+            android:text="Time Remaining"
+            android:textSize="18sp" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:orientation="vertical"
-                android:padding="20dp">
+        <TextView
+            android:id="@+id/tvTimerDisplay"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="00:00:00"
+            android:textColor="@android:color/holo_red_dark"
+            android:textSize="60sp"
+            android:textStyle="bold" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="REMAINING TIME"
-                    android:textColor="#999999"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvTimer"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="00:00"
-                    android:textColor="#FF5252"
-                    android:textSize="50sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvApps"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:padding="10dp" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Enjoy your rental!"
+            android:textStyle="italic" />
     </LinearLayout>
 
 </RelativeLayout>
