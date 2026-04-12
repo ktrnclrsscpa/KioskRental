@@ -5,7 +5,6 @@ import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
-import io.github.jan.supabase.postgrest.query.filter.PostgrestFilterBuilder
 import kotlinx.serialization.Serializable
 
 class SupabaseClient private constructor() {
@@ -17,32 +16,31 @@ class SupabaseClient private constructor() {
         install(Postgrest)
     }
 
-    // Fixed Validate PIN - Added explicit filter scope
+    // Fixed Validate PIN - Simplified filtering
     suspend fun validatePin(pin: String): RentalPin? {
         return try {
             val response = client.postgrest["credits"].select(columns = Columns.ALL) {
                 filter {
-                    this.eq("pin", pin)
-                    this.eq("status", "active")
+                    eq("pin", pin)
+                    eq("status", "active")
                 }
             }
             response.decodeSingleOrNull<RentalPin>()
         } catch (e: Exception) { null }
     }
 
-    // Fixed Use PIN - Used explicit parameter naming to avoid Type Mismatch
+    // Fixed Use PIN - Corrected update syntax for v1.3.0
     suspend fun usePin(pin: String) {
         try {
             client.postgrest["credits"].update(
-                update = {
+                {
                     set("status", "used")
-                },
-                request = {
-                    filter {
-                        this.eq("pin", pin)
-                    }
                 }
-            )
+            ) {
+                filter {
+                    eq("pin", pin)
+                }
+            }
         } catch (e: Exception) { e.printStackTrace() }
     }
 
@@ -54,27 +52,26 @@ class SupabaseClient private constructor() {
         } catch (e: Exception) { e.printStackTrace() }
     }
 
-    // Fixed Extend Time - Combined explicit update and filter syntax
+    // Fixed Extend Time - Standardized structure
     suspend fun extendPinTime(pin: String, extraSeconds: Long): Boolean {
         return try {
             val current = client.postgrest["credits"].select(columns = Columns.ALL) {
                 filter {
-                    this.eq("pin", pin)
+                    eq("pin", pin)
                 }
             }.decodeSingleOrNull<RentalPin>()
 
             if (current != null) {
                 val newTotal = current.seconds_left + extraSeconds
                 client.postgrest["credits"].update(
-                    update = {
+                    {
                         set("seconds_left", newTotal)
-                    },
-                    request = {
-                        filter {
-                            this.eq("pin", pin)
-                        }
                     }
-                )
+                ) {
+                    filter {
+                        eq("pin", pin)
+                    }
+                }
                 true
             } else false
         } catch (e: Exception) { false }
