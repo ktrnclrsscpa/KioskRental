@@ -16,48 +16,35 @@ class SupabaseClient private constructor() {
         install(Postgrest)
     }
 
-    // Validates PIN from Supabase
     suspend fun validatePin(pin: String): RentalPin? {
         return try {
-            // Explicitly calling from the Postgrest plugin
-            val result = client.from("credits").select(columns = Columns.ALL) {
+            val response = client.from("credits").select(columns = Columns.ALL) {
                 filter {
                     eq("pin", pin)
                     eq("status", "active")
                 }
             }
-            result.decodeSingleOrNull<RentalPin>()
-        } catch (e: Exception) {
-            null
-        }
+            response.decodeSingleOrNull<RentalPin>()
+        } catch (e: Exception) { null }
     }
 
-    // Mark PIN as USED (One-time usage logic)
     suspend fun usePin(pin: String) {
         try {
             client.from("credits").update(
-                update = {
-                    set("status", "used")
-                }
+                update = { set("status", "used") }
             ) {
                 filter { eq("pin", pin) }
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        } catch (e: Exception) { e.printStackTrace() }
     }
 
-    // Create New PIN (Alphanumeric ready)
     suspend fun createNewPin(pin: String, seconds: Long) {
         try {
             val newData = RentalPin(pin, seconds, "active")
             client.from("credits").insert(newData)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        } catch (e: Exception) { e.printStackTrace() }
     }
 
-    // Admin Extension Logic
     suspend fun extendPinTime(pin: String, extraSeconds: Long): Boolean {
         return try {
             val current = client.from("credits").select(columns = Columns.ALL) {
@@ -67,34 +54,22 @@ class SupabaseClient private constructor() {
             if (current != null) {
                 val newTotal = current.seconds_left + extraSeconds
                 client.from("credits").update(
-                    update = {
-                        set("seconds_left", newTotal)
-                    }
+                    update = { set("seconds_left", newTotal) }
                 ) {
                     filter { eq("pin", pin) }
                 }
                 true
             } else false
-        } catch (e: Exception) {
-            false
-        }
+        } catch (e: Exception) { false }
     }
 
     companion object {
-        @Volatile
-        private var instance: com.kcb.kiosk.SupabaseClient? = null
-
-        fun getInstance(): com.kcb.kiosk.SupabaseClient {
-            return instance ?: synchronized(this) {
-                instance ?: SupabaseClient().also { instance = it }
-            }
+        @Volatile private var instance: com.kcb.kiosk.SupabaseClient? = null
+        fun getInstance() = instance ?: synchronized(this) { 
+            instance ?: SupabaseClient().also { instance = it } 
         }
     }
 }
 
 @Serializable
-data class RentalPin(
-    val pin: String,
-    val seconds_left: Long,
-    val status: String
-)
+data class RentalPin(val pin: String, val seconds_left: Long, val status: String)
