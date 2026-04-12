@@ -5,7 +5,6 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.provider.Settings
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
@@ -28,6 +27,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // Initialize Views
         layoutLock = findViewById(R.id.layoutLock)
         layoutUnlocked = findViewById(R.id.layoutUnlocked)
         tvTimer = findViewById(R.id.tvTimer)
@@ -37,11 +37,37 @@ class MainActivity : AppCompatActivity() {
         val btnAdmin = findViewById<TextView>(R.id.btnAdmin)
 
         btnStart.setOnClickListener {
-            val pin = etPin.text.toString().trim()
-            if (pin == "123456") { // Gpalitan mo ng Supabase logic mo dito
-                unlockDevice(300) 
-            } else {
-                Toast.makeText(this, "Invalid PIN", Toast.LENGTH_SHORT).show()
+            val enteredPin = etPin.text.toString().trim()
+            
+            if (enteredPin.isEmpty()) {
+                Toast.makeText(this, "Please enter a PIN", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // --- SUPABASE AUDIT LOGIC START ---
+            lifecycleScope.launch {
+                btnStart.isEnabled = false
+                btnStart.text = "Checking..."
+
+                try {
+                    // Tinatawag ang validatePin function mula sa SupabaseClient
+                    val rentalData = SupabaseClient.getInstance().validatePin(enteredPin)
+
+                    if (rentalData != null) {
+                        // SUCCESS: Nahanap ang PIN sa database
+                        unlockDevice(rentalData.seconds_left)
+                        Toast.makeText(this@MainActivity, "Access Granted!", Toast.LENGTH_SHORT).show()
+                        etPin.text.clear()
+                    } else {
+                        // FAIL: Invalid PIN
+                        Toast.makeText(this@MainActivity, "Invalid or Used PIN", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(this@MainActivity, "Connection Error: ${e.message}", Toast.LENGTH_LONG).show()
+                } finally {
+                    btnStart.isEnabled = true
+                    btnStart.text = "START RENTAL"
+                }
             }
         }
 
@@ -50,50 +76,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         setupAppGrid()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        setupAppGrid() // Refresh grid para lumitaw ang changes mula Admin
-    }
-
-    override fun onPause() {
-        super.onPause()
-        if (!isUnlocked) {
-            val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            activityManager.moveTaskToFront(taskId, 0)
-        }
-    }
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (!hasFocus && !isUnlocked) {
-            val closeDialog = Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
-            sendBroadcast(closeDialog)
-        }
-    }
-
-    override fun onBackPressed() {
-        // Disabled back button
-    }
-
-    private fun showAdminLoginDialog() {
-        val adminEditText = EditText(this)
-        adminEditText.inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
-        
-        AlertDialog.Builder(this)
-            .setTitle("Admin Access")
-            .setMessage("Enter Admin PIN to manage apps")
-            .setView(adminEditText)
-            .setPositiveButton("Login") { _, _ ->
-                if (adminEditText.text.toString() == "2026") {
-                    startActivity(Intent(this, AdminActivity::class.java))
-                } else {
-                    Toast.makeText(this, "Wrong PIN!", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
     }
 
     private fun unlockDevice(seconds: Long) {
@@ -106,13 +88,14 @@ class MainActivity : AppCompatActivity() {
     private fun startTimer(seconds: Long) {
         var timeLeft = seconds
         lifecycleScope.launch {
-            while (timeLeft > 0) {
+            while (timeLeft > 0 && isUnlocked) {
                 val mins = timeLeft / 60
                 val secs = timeLeft % 60
                 tvTimer.text = String.format("%02d:%02d", mins, secs)
                 delay(1000)
                 timeLeft--
             }
+            // Pag-expire ng oras, i-lock ulit ang phone
             isUnlocked = false
             layoutLock.visibility = View.VISIBLE
             layoutUnlocked.visibility = View.GONE
@@ -139,4 +122,34 @@ class MainActivity : AppCompatActivity() {
             launchIntent?.let { startActivity(it) }
         }
     }
+
+    private fun showAdminLoginDialog() {
+        val adminEditText = EditText(this)
+        adminEditText.inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        
+        AlertDialog.Builder(this)
+            .setTitle("Admin Access")
+            .setMessage("Enter Admin PIN")
+            .setView(adminEditText)
+            .setPositiveButton("Login") { _, _ ->
+                if (adminEditText.text.toString() == "2026") {
+                    startActivity(Intent(this, AdminActivity::class.java))
+                } else {
+                    Toast.makeText(this, "Wrong PIN!", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // Security Features
+    override fun onResume() { super.onResume(); setupAppGrid() }
+    override fun onPause() {
+        super.onPause()
+        if (!isUnlocked) {
+            val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            activityManager.moveTaskToFront(taskId, 0)
+        }
+    }
+    override fun onBackPressed() { /* Disabled */ }
 }
