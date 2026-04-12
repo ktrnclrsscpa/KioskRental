@@ -1,12 +1,10 @@
 package com.kcb.kiosk
 
-import android.content.Context
-import android.content.Intent
 import android.os.Bundle
-import android.widget.Button
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class AdminActivity : AppCompatActivity() {
 
@@ -14,34 +12,39 @@ class AdminActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_admin)
 
-        val rvAdminApps = findViewById<RecyclerView>(R.id.rvAdminApps)
-        val btnSave = findViewById<Button>(R.id.btnSaveWhitelist)
+        val btnGenerate = findViewById<Button>(R.id.btnGenerate)
+        val tvGeneratedPin = findViewById<TextView>(R.id.tvGeneratedPin)
+        val etExtendPin = findViewById<EditText>(R.id.etExtendPin)
+        val btnExtend = findViewById<Button>(R.id.btnExtend)
 
-        // Kunin lahat ng Installed Launcher Apps
-        val mainIntent = Intent(Intent.ACTION_MAIN, null)
-        mainIntent.addCategory(Intent.CATEGORY_LAUNCHER)
-        val allApps = packageManager.queryIntentActivities(mainIntent, 0)
+        // Generate PIN Logic
+        btnGenerate.setOnClickListener {
+            val newPin = (1..6).map { "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".random() }.joinToString("")
+            lifecycleScope.launch {
+                try {
+                    SupabaseClient.getInstance().createNewPin(newPin, 3600) // Default 1 hour
+                    tvGeneratedPin.text = "Generated: $newPin"
+                    Toast.makeText(this@AdminActivity, "PIN Saved to Database", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(this@AdminActivity, "Error saving PIN", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
 
-        // Pag-aayos ng listahan alphabetically
-        val sortedApps = allApps.sortedBy { it.loadLabel(packageManager).toString() }
-
-        // Kunin ang kasalukuyang whitelist mula sa SharedPrefs
-        val sharedPrefs = getSharedPreferences("KCB_SETTINGS", Context.MODE_PRIVATE)
-        val currentWhitelist = sharedPrefs.getStringSet("allowed_apps", mutableSetOf()) ?: mutableSetOf()
-
-        val adapter = AdminAppAdapter(sortedApps, currentWhitelist.toMutableSet(), packageManager)
-        rvAdminApps.layoutManager = LinearLayoutManager(this)
-        rvAdminApps.adapter = adapter
-
-        btnSave.setOnClickListener {
-            val selectedApps = adapter.getSelectedApps()
-            sharedPrefs.edit().putStringSet("allowed_apps", selectedApps).apply()
-            
-            // Bumalik sa MainActivity para mag-apply ang changes
-            val intent = Intent(this, MainActivity::class.java)
-            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            startActivity(intent)
-            finish()
+        // Extend Logic
+        btnExtend.setOnClickListener {
+            val pin = etExtendPin.text.toString().trim().uppercase()
+            if (pin.isNotEmpty()) {
+                lifecycleScope.launch {
+                    val success = SupabaseClient.getInstance().extendPinTime(pin, 1800) // Add 30 mins
+                    if (success) {
+                        Toast.makeText(this@AdminActivity, "PIN $pin Extended!", Toast.LENGTH_SHORT).show()
+                        etExtendPin.text.clear()
+                    } else {
+                        Toast.makeText(this@AdminActivity, "PIN not found!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
         }
     }
 }

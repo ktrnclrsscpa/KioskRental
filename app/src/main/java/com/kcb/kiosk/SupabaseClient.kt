@@ -17,35 +17,41 @@ class SupabaseClient private constructor() {
 
     suspend fun validatePin(pin: String): RentalPin? {
         return try {
-            client.from("credits")
-                .select {
-                    filter {
-                        eq("pin", pin)
-                        eq("status", "active") // Auditor's check: Dapat active ang status
-                    }
-                }
-                .decodeSingleOrNull<RentalPin>()
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
+            client.from("credits").select {
+                filter { eq("pin", pin); eq("status", "active") }
+            }.decodeSingleOrNull<RentalPin>()
+        } catch (e: Exception) { null }
+    }
+
+    suspend fun usePin(pin: String) {
+        try {
+            client.from("credits").update({ set("status", "used") }) {
+                filter { eq("pin", pin) }
+            }
+        } catch (e: Exception) { e.printStackTrace() }
+    }
+
+    suspend fun createNewPin(pin: String, seconds: Long) {
+        val newData = RentalPin(pin, seconds, "active")
+        client.from("credits").insert(newData)
+    }
+
+    suspend fun extendPinTime(pin: String, extraSeconds: Long): Boolean {
+        return try {
+            val current = client.from("credits").select { filter { eq("pin", pin) } }.decodeSingleOrNull<RentalPin>()
+            if (current != null) {
+                val newTotal = current.seconds_left + extraSeconds
+                client.from("credits").update({ set("seconds_left", newTotal) }) { filter { eq("pin", pin) } }
+                true
+            } else false
+        } catch (e: Exception) { false }
     }
 
     companion object {
-        @Volatile
-        private var instance: com.kcb.kiosk.SupabaseClient? = null
-
-        fun getInstance(): com.kcb.kiosk.SupabaseClient {
-            return instance ?: synchronized(this) {
-                instance ?: SupabaseClient().also { instance = it }
-            }
-        }
+        @Volatile private var instance: com.kcb.kiosk.SupabaseClient? = null
+        fun getInstance() = instance ?: synchronized(this) { instance ?: SupabaseClient().also { instance = it } }
     }
 }
 
 @Serializable
-data class RentalPin(
-    val pin: String,
-    val seconds_left: Long,
-    val status: String
-)
+data class RentalPin(val pin: String, val seconds_left: Long, val status: String)

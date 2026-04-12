@@ -36,34 +36,36 @@ class MainActivity : AppCompatActivity() {
         val btnStart = findViewById<Button>(R.id.btnStart)
         val btnAdmin = findViewById<TextView>(R.id.btnAdmin)
 
+        // PIN Submission Logic
         btnStart.setOnClickListener {
-            val enteredPin = etPin.text.toString().trim()
+            val enteredPin = etPin.text.toString().trim().uppercase()
             
             if (enteredPin.isEmpty()) {
                 Toast.makeText(this, "Please enter a PIN", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            // --- SUPABASE AUDIT LOGIC START ---
             lifecycleScope.launch {
                 btnStart.isEnabled = false
                 btnStart.text = "Checking..."
 
                 try {
-                    // Tinatawag ang validatePin function mula sa SupabaseClient
+                    // 1. Audit check sa Supabase
                     val rentalData = SupabaseClient.getInstance().validatePin(enteredPin)
 
                     if (rentalData != null) {
-                        // SUCCESS: Nahanap ang PIN sa database
+                        // 2. Mark as USED agad para hindi na ma-reuse (One-Time Use)
+                        SupabaseClient.getInstance().usePin(enteredPin)
+
+                        // 3. Unlock and Start Timer
                         unlockDevice(rentalData.seconds_left)
                         Toast.makeText(this@MainActivity, "Access Granted!", Toast.LENGTH_SHORT).show()
                         etPin.text.clear()
                     } else {
-                        // FAIL: Invalid PIN
-                        Toast.makeText(this@MainActivity, "Invalid or Used PIN", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, "Invalid or Expired PIN", Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
-                    Toast.makeText(this@MainActivity, "Connection Error: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                 } finally {
                     btnStart.isEnabled = true
                     btnStart.text = "START RENTAL"
@@ -95,11 +97,15 @@ class MainActivity : AppCompatActivity() {
                 delay(1000)
                 timeLeft--
             }
-            // Pag-expire ng oras, i-lock ulit ang phone
-            isUnlocked = false
-            layoutLock.visibility = View.VISIBLE
-            layoutUnlocked.visibility = View.GONE
+            // Pag tapos na ang oras o ni-lock, balik sa lock screen
+            lockDevice()
         }
+    }
+
+    private fun lockDevice() {
+        isUnlocked = false
+        layoutLock.visibility = View.VISIBLE
+        layoutUnlocked.visibility = View.GONE
     }
 
     private fun setupAppGrid() {
@@ -142,8 +148,9 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    // Security Features
+    // --- KIOSK SECURITY ---
     override fun onResume() { super.onResume(); setupAppGrid() }
+    
     override fun onPause() {
         super.onPause()
         if (!isUnlocked) {
@@ -151,5 +158,14 @@ class MainActivity : AppCompatActivity() {
             activityManager.moveTaskToFront(taskId, 0)
         }
     }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus && !isUnlocked) {
+            val closeDialog = Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
+            sendBroadcast(closeDialog)
+        }
+    }
+
     override fun onBackPressed() { /* Disabled */ }
 }
