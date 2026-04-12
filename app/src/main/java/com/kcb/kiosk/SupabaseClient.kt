@@ -16,7 +16,7 @@ class SupabaseClient private constructor() {
         install(Postgrest)
     }
 
-    // Validate PIN
+    // Fixed Validate PIN - Using correct lambda scope
     suspend fun validatePin(pin: String): RentalPin? {
         return try {
             val response = client.postgrest["credits"].select(columns = Columns.ALL) {
@@ -26,16 +26,14 @@ class SupabaseClient private constructor() {
                 }
             }
             response.decodeSingleOrNull<RentalPin>()
-        } catch (e: Exception) {
-            null
-        }
+        } catch (e: Exception) { null }
     }
 
-    // Use PIN
+    // Fixed Use PIN - Explicit update and filter blocks
     suspend fun usePin(pin: String) {
         try {
             client.postgrest["credits"].update(
-                {
+                update = {
                     set("status", "used")
                 }
             ) {
@@ -43,22 +41,18 @@ class SupabaseClient private constructor() {
                     eq("pin", pin)
                 }
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        } catch (e: Exception) { e.printStackTrace() }
     }
 
-    // Create PIN
+    // Fixed Create PIN
     suspend fun createNewPin(pin: String, seconds: Long) {
         try {
             val newData = RentalPin(pin, seconds, "active")
             client.postgrest["credits"].insert(newData)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        } catch (e: Exception) { e.printStackTrace() }
     }
 
-    // Extend Time
+    // Fixed Extend Time - Corrected nested blocks
     suspend fun extendPinTime(pin: String, extraSeconds: Long): Boolean {
         return try {
             val current = client.postgrest["credits"].select(columns = Columns.ALL) {
@@ -70,7 +64,7 @@ class SupabaseClient private constructor() {
             if (current != null) {
                 val newTotal = current.seconds_left + extraSeconds
                 client.postgrest["credits"].update(
-                    {
+                    update = {
                         set("seconds_left", newTotal)
                     }
                 ) {
@@ -80,9 +74,7 @@ class SupabaseClient private constructor() {
                 }
                 true
             } else false
-        } catch (e: Exception) {
-            false
-        }
+        } catch (e: Exception) { false }
     }
 
     companion object {
