@@ -5,6 +5,8 @@ import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+// CRITICAL IMPORTS: Ito ang mag-aayos sa Type Mismatch
+import io.github.jan.supabase.postgrest.query.filter.filter
 import kotlinx.serialization.Serializable
 
 class SupabaseClient private constructor() {
@@ -16,7 +18,7 @@ class SupabaseClient private constructor() {
         install(Postgrest)
     }
 
-    // Fixed Validate PIN - Simplified filtering
+    // Validate PIN
     suspend fun validatePin(pin: String): RentalPin? {
         return try {
             val response = client.postgrest["credits"].select(columns = Columns.ALL) {
@@ -29,7 +31,7 @@ class SupabaseClient private constructor() {
         } catch (e: Exception) { null }
     }
 
-    // Fixed Use PIN - Corrected update syntax for v1.3.0
+    // Use PIN
     suspend fun usePin(pin: String) {
         try {
             client.postgrest["credits"].update(
@@ -52,7 +54,7 @@ class SupabaseClient private constructor() {
         } catch (e: Exception) { e.printStackTrace() }
     }
 
-    // Fixed Extend Time - Standardized structure
+    // Extend Time
     suspend fun extendPinTime(pin: String, extraSeconds: Long): Boolean {
         return try {
             val current = client.postgrest["credits"].select(columns = Columns.ALL) {
