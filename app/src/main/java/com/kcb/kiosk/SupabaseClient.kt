@@ -17,9 +17,9 @@ class SupabaseClient private constructor() {
         install(Postgrest)
     }
 
+    // Fixed Syntax for Validate PIN
     suspend fun validatePin(pin: String): RentalPin? {
         return try {
-            // Gumamit tayo ng explicit 'postgrest' call
             val response = client.postgrest.from("credits").select(columns = Columns.ALL) {
                 filter {
                     eq("pin", pin)
@@ -32,20 +32,24 @@ class SupabaseClient private constructor() {
         }
     }
 
+    // Fixed Syntax for Use PIN
     suspend fun usePin(pin: String) {
         try {
             client.postgrest.from("credits").update(
-                update = {
+                {
                     set("status", "used")
                 }
             ) {
-                filter { eq("pin", pin) }
+                filter {
+                    eq("pin", pin)
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
+    // Fixed Syntax for Create PIN
     suspend fun createNewPin(pin: String, seconds: Long) {
         try {
             val newData = RentalPin(pin, seconds, "active")
@@ -55,20 +59,25 @@ class SupabaseClient private constructor() {
         }
     }
 
+    // Fixed Syntax for Extend Time
     suspend fun extendPinTime(pin: String, extraSeconds: Long): Boolean {
         return try {
             val current = client.postgrest.from("credits").select(columns = Columns.ALL) {
-                filter { eq("pin", pin) }
+                filter {
+                    eq("pin", pin)
+                }
             }.decodeSingleOrNull<RentalPin>()
 
             if (current != null) {
                 val newTotal = current.seconds_left + extraSeconds
                 client.postgrest.from("credits").update(
-                    update = {
+                    {
                         set("seconds_left", newTotal)
                     }
                 ) {
-                    filter { eq("pin", pin) }
+                    filter {
+                        eq("pin", pin)
+                    }
                 }
                 true
             } else false
