@@ -3,9 +3,8 @@ package com.kcb.kiosk
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
-import io.github.jan.supabase.postgrest.from
-import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.serialization.Serializable
 
 class SupabaseClient private constructor() {
@@ -17,10 +16,10 @@ class SupabaseClient private constructor() {
         install(Postgrest)
     }
 
-    // Fixed Syntax for Validate PIN
+    // Validate PIN
     suspend fun validatePin(pin: String): RentalPin? {
         return try {
-            val response = client.postgrest.from("credits").select(columns = Columns.ALL) {
+            val response = client.postgrest["credits"].select(columns = Columns.ALL) {
                 filter {
                     eq("pin", pin)
                     eq("status", "active")
@@ -32,10 +31,10 @@ class SupabaseClient private constructor() {
         }
     }
 
-    // Fixed Syntax for Use PIN
+    // Use PIN
     suspend fun usePin(pin: String) {
         try {
-            client.postgrest.from("credits").update(
+            client.postgrest["credits"].update(
                 {
                     set("status", "used")
                 }
@@ -49,20 +48,20 @@ class SupabaseClient private constructor() {
         }
     }
 
-    // Fixed Syntax for Create PIN
+    // Create PIN
     suspend fun createNewPin(pin: String, seconds: Long) {
         try {
             val newData = RentalPin(pin, seconds, "active")
-            client.postgrest.from("credits").insert(newData)
+            client.postgrest["credits"].insert(newData)
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    // Fixed Syntax for Extend Time
+    // Extend Time
     suspend fun extendPinTime(pin: String, extraSeconds: Long): Boolean {
         return try {
-            val current = client.postgrest.from("credits").select(columns = Columns.ALL) {
+            val current = client.postgrest["credits"].select(columns = Columns.ALL) {
                 filter {
                     eq("pin", pin)
                 }
@@ -70,7 +69,7 @@ class SupabaseClient private constructor() {
 
             if (current != null) {
                 val newTotal = current.seconds_left + extraSeconds
-                client.postgrest.from("credits").update(
+                client.postgrest["credits"].update(
                     {
                         set("seconds_left", newTotal)
                     }
