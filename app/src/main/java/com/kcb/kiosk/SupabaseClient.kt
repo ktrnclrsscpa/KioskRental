@@ -16,7 +16,7 @@ class SupabaseClient private constructor() {
         install(Postgrest)
     }
 
-    // Validate PIN - Direct equality check
+    // Validate PIN
     suspend fun validatePin(pin: String): RentalPin? {
         return try {
             val response = client.postgrest["credits"].select(columns = Columns.ALL) {
@@ -24,10 +24,12 @@ class SupabaseClient private constructor() {
                 eq("status", "active")
             }
             response.decodeSingleOrNull<RentalPin>()
-        } catch (e: Exception) { null }
+        } catch (e: Exception) {
+            null
+        }
     }
 
-    // Use PIN - Direct update and filter
+    // Use PIN
     suspend fun usePin(pin: String) {
         try {
             client.postgrest["credits"].update(
@@ -37,7 +39,9 @@ class SupabaseClient private constructor() {
             ) {
                 eq("pin", pin)
             }
-        } catch (e: Exception) { e.printStackTrace() }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     // Create PIN
@@ -45,10 +49,12 @@ class SupabaseClient private constructor() {
         try {
             val newData = RentalPin(pin, seconds, "active")
             client.postgrest["credits"].insert(newData)
-        } catch (e: Exception) { e.printStackTrace() }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
-    // Extend Time - Direct filter check
+    // Extend Time
     suspend fun extendPinTime(pin: String, extraSeconds: Long): Boolean {
         return try {
             val current = client.postgrest["credits"].select(columns = Columns.ALL) {
@@ -66,7 +72,9 @@ class SupabaseClient private constructor() {
                 }
                 true
             } else false
-        } catch (e: Exception) { false }
+        } catch (e: Exception) {
+            false
+        }
     }
 
     companion object {
