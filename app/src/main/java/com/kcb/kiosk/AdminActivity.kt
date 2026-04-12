@@ -17,34 +17,33 @@ class AdminActivity : AppCompatActivity() {
         val etExtendPin = findViewById<EditText>(R.id.etExtendPin)
         val btnExtend = findViewById<Button>(R.id.btnExtend)
 
-        // Generate PIN Logic
         btnGenerate.setOnClickListener {
-            val newPin = (1..6).map { "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".random() }.joinToString("")
+            val newPin = generateRandomAlphanumeric()
             lifecycleScope.launch {
-                try {
-                    SupabaseClient.getInstance().createNewPin(newPin, 3600) // Default 1 hour
-                    tvGeneratedPin.text = "Generated: $newPin"
-                    Toast.makeText(this@AdminActivity, "PIN Saved to Database", Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Toast.makeText(this@AdminActivity, "Error saving PIN", Toast.LENGTH_SHORT).show()
-                }
+                SupabaseClient.getInstance().createNewPin(newPin, 3600)
+                tvGeneratedPin.text = "Generated: $newPin"
+                Toast.makeText(this@AdminActivity, "PIN Active for 1 Hour", Toast.LENGTH_SHORT).show()
             }
         }
 
-        // Extend Logic
         btnExtend.setOnClickListener {
             val pin = etExtendPin.text.toString().trim().uppercase()
             if (pin.isNotEmpty()) {
                 lifecycleScope.launch {
-                    val success = SupabaseClient.getInstance().extendPinTime(pin, 1800) // Add 30 mins
+                    val success = SupabaseClient.getInstance().extendPinTime(pin, 1800)
                     if (success) {
-                        Toast.makeText(this@AdminActivity, "PIN $pin Extended!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@AdminActivity, "Extended 30 Minutes", Toast.LENGTH_SHORT).show()
                         etExtendPin.text.clear()
                     } else {
-                        Toast.makeText(this@AdminActivity, "PIN not found!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@AdminActivity, "PIN Not Found", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
         }
+    }
+
+    private fun generateRandomAlphanumeric(): String {
+        val source = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+        return (1..6).map { source.random() }.joinToString("")
     }
 }

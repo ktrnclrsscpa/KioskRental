@@ -16,26 +16,30 @@ class SupabaseClient private constructor() {
         install(Postgrest)
     }
 
-    // Check if PIN is valid and active
+    // Validates PIN from Supabase
     suspend fun validatePin(pin: String): RentalPin? {
         return try {
-            client.from("credits").select {
+            // Explicitly calling from the Postgrest plugin
+            val result = client.from("credits").select(columns = Columns.ALL) {
                 filter {
                     eq("pin", pin)
                     eq("status", "active")
                 }
-            }.decodeSingleOrNull<RentalPin>()
+            }
+            result.decodeSingleOrNull<RentalPin>()
         } catch (e: Exception) {
             null
         }
     }
 
-    // One-Time Use logic
+    // Mark PIN as USED (One-time usage logic)
     suspend fun usePin(pin: String) {
         try {
-            client.from("credits").update({
-                set("status", "used")
-            }) {
+            client.from("credits").update(
+                update = {
+                    set("status", "used")
+                }
+            ) {
                 filter { eq("pin", pin) }
             }
         } catch (e: Exception) {
@@ -43,7 +47,7 @@ class SupabaseClient private constructor() {
         }
     }
 
-    // Admin: Create PIN
+    // Create New PIN (Alphanumeric ready)
     suspend fun createNewPin(pin: String, seconds: Long) {
         try {
             val newData = RentalPin(pin, seconds, "active")
@@ -53,18 +57,20 @@ class SupabaseClient private constructor() {
         }
     }
 
-    // Admin: Extend Time
+    // Admin Extension Logic
     suspend fun extendPinTime(pin: String, extraSeconds: Long): Boolean {
         return try {
-            val current = client.from("credits").select {
+            val current = client.from("credits").select(columns = Columns.ALL) {
                 filter { eq("pin", pin) }
             }.decodeSingleOrNull<RentalPin>()
 
             if (current != null) {
                 val newTotal = current.seconds_left + extraSeconds
-                client.from("credits").update({
-                    set("seconds_left", newTotal)
-                }) {
+                client.from("credits").update(
+                    update = {
+                        set("seconds_left", newTotal)
+                    }
+                ) {
                     filter { eq("pin", pin) }
                 }
                 true
